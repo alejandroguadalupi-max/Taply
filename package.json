@@ -1,0 +1,7 @@
+{
+  "type": "module",
+  "dependencies": {
+    "raw-body": "^2.5.2",
+    "stripe": "^16.0.0"
+  }
+}
