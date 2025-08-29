@@ -1,26 +1,40 @@
-// /api/create-checkout-session.js
 import Stripe from 'stripe';
 
 const PRICES = {
   monthly: {
     basic: process.env.PRICE_ID_BASIC_MONTH,
     medio: process.env.PRICE_ID_MEDIO_MONTH,
-    pro: process.env.PRICE_ID_PRO_MONTH,
+    pro: process.env.PRICE_ID_PRO_MONTH
   },
   annual: {
     basic: process.env.PRICE_ID_BASIC_YEAR,
     medio: process.env.PRICE_ID_MEDIO_YEAR,
-    pro: process.env.PRICE_ID_PRO_YEAR,
-  },
+    pro: process.env.PRICE_ID_PRO_YEAR
+  }
 };
+
+// Lee cuerpo JSON
+async function readJson(req) {
+  return await new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk) => (data += chunk));
+    req.on('end', () => {
+      try { resolve(data ? JSON.parse(data) : {}); }
+      catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    const { tier, frequency } = req.body || {};
-    const freq = frequency === 'annual' ? 'annual' : 'monthly';
+
+    const body = await readJson(req);
+    const tier = body?.tier;
+    const freq = body?.frequency === 'annual' ? 'annual' : 'monthly';
 
     if (!['basic', 'medio', 'pro'].includes(tier)) {
       return res.status(400).json({ error: 'Plan inválido' });
@@ -35,12 +49,12 @@ export default async function handler(req, res) {
       success_url: `${process.env.BASE_URL}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/cancelado.html`,
       phone_number_collection: { enabled: true },
-      billing_address_collection: 'auto',
+      billing_address_collection: 'auto'
     });
 
     return res.status(200).json({ url: session.url });
   } catch (e) {
-    console.error(e);
+    console.error('create-checkout-session error:', e);
     return res.status(500).json({ error: 'No se pudo crear la suscripción' });
   }
 }

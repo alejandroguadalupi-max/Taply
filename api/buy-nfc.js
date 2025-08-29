@@ -1,13 +1,26 @@
-// /api/buy-nfc.js
 import Stripe from 'stripe';
+
+// Lee el cuerpo JSON en funciones serverless de Vercel
+async function readJson(req) {
+  return await new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk) => (data += chunk));
+    req.on('end', () => {
+      try { resolve(data ? JSON.parse(data) : {}); }
+      catch (e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    const { quantity } = req.body || {};
-    const q = Number(quantity);
+
+    const body = await readJson(req);
+    const q = Number(body.quantity);
 
     if (!Number.isInteger(q) || q < 1 || q > 500) {
       return res.status(400).json({ error: 'Cantidad inválida' });
@@ -15,17 +28,28 @@ export default async function handler(req, res) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      line_items: [{ price: process.env.PRICE_ID_NFC, quantity: q }],
+      line_items: [
+        { price: process.env.PRICE_ID_NFC, quantity: q }
+
+        // --- Opción sin PRICE_ID_NFC (descomenta esto y comenta la línea de arriba) ---
+        // {
+        //   price_data: {
+        //     currency: 'eur',
+        //     unit_amount: 500, // 5,00 € en céntimos
+        //     product_data: { name: 'NFC' }
+        //   },
+        //   quantity: q
+        // }
+      ],
       success_url: `${process.env.BASE_URL}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/cancelado.html`,
       phone_number_collection: { enabled: true },
-      billing_address_collection: 'auto',
-      // shipping_address_collection: { allowed_countries: ['ES'] }, // activa si envías físico
+      billing_address_collection: 'auto'
     });
 
     return res.status(200).json({ url: session.url });
   } catch (e) {
-    console.error(e);
+    console.error('buy-nfc error:', e);
     return res.status(500).json({ error: 'No se pudo crear el checkout' });
   }
 }
