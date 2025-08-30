@@ -1,5 +1,6 @@
-// /api/create-checkout-session.js
 import Stripe from 'stripe';
+import { readJson } from './_utils';        // ¡OJO! usa la misma readJson de _utils
+import { getSession } from './_utils';
 
 const PRICES = {
   monthly: {
@@ -14,24 +15,15 @@ const PRICES = {
   }
 };
 
-async function readJson(req) {
-  return await new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', (c) => (data += c));
-    req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); }});
-    req.on('error', reject);
-  });
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const body = await readJson(req);
+
     const tier = body?.tier;
     const freq = body?.frequency === 'annual' ? 'annual' : 'monthly';
-
     if (!['basic', 'medio', 'pro'].includes(tier)) {
       return res.status(400).json({ error: 'Plan inválido' });
     }
@@ -39,17 +31,17 @@ export default async function handler(req, res) {
     const priceId = PRICES[freq][tier];
     if (!priceId) return res.status(400).json({ error: 'Price no configurado' });
 
+    // Si el usuario está logueado, atamos la sesión al mismo customer
+    const sess = getSession(req);
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-
-      // 🔽 fuerza solo tarjeta (rápido)
-      payment_method_types: ['card'],
-
       success_url: `${process.env.BASE_URL}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/cancelado.html`,
       phone_number_collection: { enabled: true },
-      billing_address_collection: 'auto'
+      billing_address_collection: 'auto',
+      ...(sess?.customerId ? { customer: sess.customerId } : {})
     });
 
     return res.status(200).json({ url: session.url });

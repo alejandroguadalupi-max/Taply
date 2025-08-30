@@ -65,5 +65,17 @@
     <p>Te hemos enviado un correo de confirmación y pronto recibirás un WhatsApp nuestro.</p>
     <a href="/suscripciones.html">Volver a suscripciones</a>
   </div>
+  <script>
+(async ()=>{
+  const sid = new URL(location.href).searchParams.get('session_id');
+  if(!sid) return;
+  try{
+    await fetch('/api/store-customer-from-session', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ session_id: sid })
+    });
+  }catch(e){ console.warn('No se guardó el customer:', e); }
+})();
+</script>
 </body>
 </html>

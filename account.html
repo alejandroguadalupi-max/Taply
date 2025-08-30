@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Mi cuenta — Taply</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b0f1a;--bg2:#0e1424;--txt:#e9eefc;--muted:#9fb0c6;--b:#ffffff14;--r:16px;--brand1:#00d4ff;--brand2:#7c3aed}
+    *{box-sizing:border-box} html,body{height:100%}
+    body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--txt)}
+    a{color:inherit;text-decoration:none}
+    header{position:sticky;top:0;z-index:50;background:#0a0f16cc;border-bottom:1px solid #ffffff0f;backdrop-filter:blur(10px)}
+    .container{width:min(1100px,92%);margin-inline:auto}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
+    .brand{display:flex;gap:10px;align-items:center;font-weight:800}
+    .logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand1),var(--brand2))}
+    .wrap{display:grid;place-items:center;min-height:calc(100dvh - 72px);padding:28px 0}
+    .card{width:min(560px,100%);background:var(--bg2);border:1px solid var(--b);border-radius:var(--r);padding:22px;box-shadow:0 12px 30px rgba(0,0,0,.45)}
+    h1{margin:0 0 4px;font-size:1.6rem}
+    p.muted{margin:0 0 16px;color:var(--muted)}
+    .tabs{display:flex;gap:8px;margin:12px 0 18px}
+    .tab{flex:1;border:1px solid var(--b);background:#ffffff08;padding:10px 12px;border-radius:999px;text-align:center;cursor:pointer}
+    .tab.active{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017;font-weight:800}
+    form{display:grid;gap:12px}
+    .row{display:grid;gap:6px}
+    label{font-weight:600}
+    input{background:#0b1324;border:1px solid #ffffff1c;border-radius:10px;padding:12px;color:var(--txt);outline:none}
+    .btn{display:inline-flex;justify-content:center;align-items:center;gap:8px;padding:12px 16px;border-radius:999px;border:0;cursor:pointer;font-weight:800;
+         background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017;box-shadow:0 10px 28px rgba(124,58,237,.35),0 4px 14px rgba(0,212,255,.25)}
+    .split{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .info{margin-top:14px;color:#cfe3ff;font-size:.95rem}
+    .danger{background:#2a1418;border:1px solid #ff4d6d33;padding:10px 12px;border-radius:10px;color:#ffc0cb;margin-top:10px}
+  </style>
+</head>
+<body>
+<header>
+  <div class="container nav">
+    <a class="brand" href="index.html">
+      <span class="logo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M5 12a7 7 0 1114 0v6.5a2.5 2.5 0 01-5 0V9.75a2.25 2.25 0 10-4.5 0V18.5a2.5 2.5 0 01-5 0V12z" stroke="#061017" stroke-width="1.7"/></svg></span>
+      <span>taply</span>
+    </a>
+    <a class="btn" href="suscripciones.html">Suscripciones</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="card">
+    <h1>Mi cuenta</h1>
+    <p class="muted">Crea tu cuenta o inicia sesión para comprar, ver facturas y gestionar tu suscripción.</p>
+
+    <div class="tabs">
+      <button class="tab active" id="tab-login">Iniciar sesión</button>
+      <button class="tab" id="tab-signup">Crear cuenta</button>
+    </div>
+
+    <form id="form-login">
+      <div class="row">
+        <label for="login-email">Email</label>
+        <input id="login-email" type="email" required autocomplete="email" placeholder="tu@email.com">
+      </div>
+      <div class="row">
+        <label for="login-pass">Contraseña</label>
+        <input id="login-pass" type="password" required autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <button class="btn" type="submit">Entrar</button>
+      <div class="info" id="login-msg"></div>
+    </form>
+
+    <form id="form-signup" style="display:none">
+      <div class="row">
+        <label for="su-name">Tu nombre</label>
+        <input id="su-name" type="text" required placeholder="Nombre y apellidos">
+      </div>
+      <div class="row">
+        <label for="su-email">Email</label>
+        <input id="su-email" type="email" required autocomplete="email" placeholder="empresa@email.com">
+      </div>
+      <div class="row">
+        <label for="su-pass">Contraseña</label>
+        <input id="su-pass" type="password" required autocomplete="new-password" minlength="8" placeholder="Mín. 8 caracteres">
+      </div>
+      <button class="btn" type="submit">Crear cuenta</button>
+      <div class="info" id="signup-msg"></div>
+    </form>
+
+    <div class="split">
+      <button class="btn" id="open-portal">Gestionar suscripción</button>
+      <button class="btn" id="logout" style="background:#ffffff12;color:#e9eefc">Cerrar sesión</button>
+    </div>
+
+    <div class="danger" id="warn" style="display:none">
+      Para gestionar tu suscripción necesitas iniciar sesión. Si acabas de pagar, vuelve a entrar con el mismo email.
+    </div>
+  </div>
+</main>
+
+<script>
+  const qs = sel => document.querySelector(sel);
+  const next = new URLSearchParams(location.search).get('next');
+
+  // Tabs
+  qs('#tab-login').onclick = () => {
+    qs('#tab-login').classList.add('active'); qs('#tab-signup').classList.remove('active');
+    qs('#form-login').style.display='grid'; qs('#form-signup').style.display='none';
+  };
+  qs('#tab-signup').onclick = () => {
+    qs('#tab-signup').classList.add('active'); qs('#tab-login').classList.remove('active');
+    qs('#form-signup').style.display='grid'; qs('#form-login').style.display='none';
+  };
+
+  // Login
+  qs('#form-login').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    qs('#login-msg').textContent='';
+    const email = qs('#login-email').value.trim();
+    const password = qs('#login-pass').value;
+    const r = await fetch('/api/auth/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const d = await r.json();
+    if(r.ok){
+      qs('#login-msg').textContent='¡Bienvenido!';
+      setTimeout(()=> location.href = next || 'suscripciones.html', 400);
+    }else{
+      qs('#login-msg').textContent = d.error || 'No se pudo iniciar sesión';
+      qs('#warn').style.display='block';
+    }
+  });
+
+  // Signup
+  qs('#form-signup').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    qs('#signup-msg').textContent='';
+    const name = qs('#su-name').value.trim();
+    const email = qs('#su-email').value.trim();
+    const password = qs('#su-pass').value;
+    const r = await fetch('/api/auth/signup', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,password})});
+    const d = await r.json();
+    if(r.ok){
+      qs('#signup-msg').textContent='Cuenta creada. Redirigiendo…';
+      setTimeout(()=> location.href = next || 'suscripciones.html', 500);
+    }else{
+      qs('#signup-msg').textContent = d.error || 'No se pudo crear la cuenta';
+    }
+  });
+
+  // Abrir portal
+  qs('#open-portal').onclick = async ()=>{
+    const r = await fetch('/api/create-portal-session', {method:'POST'});
+    const d = await r.json();
+    if(d.url){ location.href = d.url; }
+    else{
+      qs('#warn').style.display='block';
+      alert(d.error || 'Inicia sesión para gestionar la suscripción.');
+    }
+  };
+
+  // Logout
+  qs('#logout').onclick = async ()=>{
+    await fetch('/api/auth/logout', {method:'POST'});
+    alert('Sesión cerrada');
+  };
+</script>
+</body>
+</html>
