@@ -1,7 +1,64 @@
-<!doctype html><html lang="es"><meta charset="utf-8">
-<title>Pago correcto</title>
-<body style="font-family:system-ui;margin:30px">
-  <h1>Gracias, tu pago se ha procesado correctamente.</h1>
-  <p>Te hemos enviado un correo con los detalles. Si tienes dudas, responde a ese correo.</p>
-  <p><a href="/suscripciones.html">Volver</a></p>
-</body></html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pago correcto</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      background: #fff;
+      color: #333;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .card {
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 30px 20px;
+      max-width: 420px;
+      margin: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    h1 {
+      font-size: 1.6em;
+      margin-bottom: 15px;
+      color: #2e7d32; /* Verde elegante */
+    }
+    p {
+      font-size: 1em;
+      margin: 10px 0;
+    }
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      background: #2e7d32;
+      color: #fff;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+    a:hover {
+      background: #256628;
+    }
+    .icon {
+      font-size: 50px;
+      margin-bottom: 15px;
+      color: #2e7d32;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✅</div>
+    <h1>Pago correcto</h1>
+    <p>Gracias, tu pago se ha procesado correctamente.</p>
+    <p>Te hemos enviado un correo de confirmación y pronto te llegará un WhatsApp nuestro.</p>
+    <a href="/suscripciones.html">Volver</a>
+  </div>
+</body>
+</html>

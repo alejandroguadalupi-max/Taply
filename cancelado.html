@@ -1,7 +1,63 @@
-<!doctype html><html lang="es"><meta charset="utf-8">
-<title>Pago cancelado</title>
-<body style="font-family:system-ui;margin:30px">
-  <h1>Has cancelado el pago.</h1>
-  <p>Puedes intentarlo de nuevo cuando quieras.</p>
-  <p><a href="/suscripciones.html">Volver</a></p>
-</body></html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pago cancelado</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      background: #fff;
+      color: #333;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .card {
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 30px 20px;
+      max-width: 400px;
+      margin: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    h1 {
+      font-size: 1.6em;
+      margin-bottom: 12px;
+      color: #c62828;
+    }
+    p {
+      font-size: 1em;
+      margin: 8px 0;
+    }
+    a {
+      display: inline-block;
+      margin-top: 18px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      background: #c62828;
+      color: #fff;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+    a:hover {
+      background: #a31616;
+    }
+    .icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      color: #c62828;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">❌</div>
+    <h1>Pago cancelado</h1>
+    <p>No te preocupes, puedes intentarlo de nuevo cuando quieras.</p>
+    <a href="/suscripciones.html">Volver</a>
+  </div>
+</body>
+</html>
