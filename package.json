@@ -1,6 +1,7 @@
 {
   "name": "taply",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "dependencies": {
     "stripe": "^14.24.0",

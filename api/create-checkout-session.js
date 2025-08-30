@@ -1,15 +1,16 @@
 import Stripe from 'stripe';
 
+// Mapeo a TUS variables de entorno (según tu captura de Vercel)
 const PRICES = {
   monthly: {
-    basic: process.env.PRICE_BASIC_MONTHLY,
-    medio: process.env.PRICE_MEDIO_MONTHLY,
-    pro:   process.env.PRICE_PRO_MONTHLY,
+    basic: process.env.PRICE_ID_BASIC_MONTH,
+    medio: process.env.PRICE_ID_MEDIO_MONTH,
+    pro:   process.env.PRICE_ID_PRO_MONTH,
   },
   annual: {
-    basic: process.env.PRICE_BASIC_ANNUAL,
-    medio: process.env.PRICE_MEDIO_ANNUAL,
-    pro:   process.env.PRICE_PRO_ANNUAL,
+    basic: process.env.PRICE_ID_BASIC_YEAR,
+    medio: process.env.PRICE_ID_MEDIO_YEAR,
+    pro:   process.env.PRICE_ID_PRO_YEAR,
   },
 };
 
@@ -19,35 +20,41 @@ function baseUrl(req) {
   return `${proto}://${host}`;
 }
 
+// Funciona tanto si Vercel te da req.body como objeto o como string
+function getBody(req) {
+  if (!req.body) return {};
+  return (typeof req.body === 'string') ? JSON.parse(req.body) : req.body;
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
 
   try {
-    // ❌ nada de JSON.parse
-    const { tier, frequency } = req.body || {};
+    if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'missing_stripe_key' });
+
+    const { tier, frequency } = getBody(req);
+    if (!tier || !frequency) return res.status(400).json({ error: 'missing_params' });
+
     const price = PRICES?.[frequency]?.[tier];
     if (!price) {
       console.error('price_not_found', { tier, frequency });
-      res.status(400).json({ error: 'price_not_found' });
-      return;
+      return res.status(400).json({ error: 'price_not_found' });
     }
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
+      ui_mode: 'hosted', // garantiza session.url
       line_items: [{ price, quantity: 1 }],
       success_url: `${process.env.BASE_URL || baseUrl(req)}/exito.html`,
       cancel_url:  `${process.env.BASE_URL || baseUrl(req)}/cancelado.html`,
-      // opcional: ui_mode 'hosted' para garantizar session.url
-      // ui_mode: 'hosted'
     });
 
-    res.status(200).json({ url: session.url });
+    if (!session?.url) return res.status(500).json({ error: 'no_session_url' });
+    return res.status(200).json({ url: session.url });
   } catch (e) {
-    console.error('create-checkout-session error', e);
-    res.status(500).json({ error: 'stripe_error' });
+    console.error('create-checkout-session error:', e);
+    return res.status(500).json({ error: 'stripe_error', detail: e?.message });
   }
 }

@@ -2,8 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <!-- evita zoom por doble-tap en móvil -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0f1a" />
   <title>Taply — NFC + Suscripción</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -14,40 +13,16 @@
       --border:rgba(255,255,255,.08); --radius:18px;
       --shadow:0 12px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
     }
-    *{box-sizing:border-box}
-    html,body{height:100%; touch-action:manipulation}
+    *{box-sizing:border-box} html,body{height:100%}
     body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--txt);opacity:0;transition:.35s}
     body.is-loaded{opacity:1}
     a{text-decoration:none;color:inherit}
     .container{max-width:1100px;width:92%;margin-inline:auto}
 
-    /* HEADER */
-    header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px)}
-    .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0; position:relative}
-    .brand{display:flex;gap:10px;align-items:center;font-weight:800}
+    header{padding:14px 0;border-bottom:1px solid var(--border);background:#0a0f16cc;backdrop-filter:blur(10px)}
+    .brand{font-weight:800;display:flex;align-items:center;gap:8px}
     .logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2))}
-    .nav-links{display:flex;gap:22px;align-items:center}
-    .ghost{padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);color:var(--txt)}
-    .btn{
-      background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
-      color:#061017;font-weight:800;border:0;border-radius:999px;cursor:pointer;
-      padding:12px 16px;display:inline-flex;align-items:center;justify-content:center;
-      box-shadow:0 10px 28px rgba(124,58,237,.35),0 4px 14px rgba(0,212,255,.25)
-    }
-    .btn:disabled{opacity:.7;cursor:not-allowed}
-    .btn.sm{padding:6px 12px;min-width:0;line-height:1;border-radius:999px}
 
-    .menu{display:none}
-    .mobile-menu{
-      position:absolute; left:0; right:0; top:100%;
-      display:none; padding:14px; background:#0b0f1a; border-top:1px solid rgba(255,255,255,.08);
-      box-shadow:0 16px 40px rgba(0,0,0,.45)
-    }
-    .mobile-links{display:flex;flex-direction:column;gap:10px}
-    .mobile-links .ghost{background:rgba(255,255,255,.02); border-color:rgba(255,255,255,.18)}
-    .mobile-links .btn{width:100%; justify-content:center}
-
-    /* Página */
     .hero{text-align:center;padding:40px 0 24px}
     .h1{font-size:clamp(2rem,5.5vw,3.2rem);margin:0;font-weight:800}
     .lead{color:var(--muted);max-width:860px;margin:12px auto 0}
@@ -62,6 +37,9 @@
     .card p{margin:0;color:var(--muted)}
     .badge{font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.04);color:#cfe3ff;display:inline-block;margin-bottom:8px}
     .actions{display:flex;gap:10px;margin-top:14px}
+    .btn{padding:12px 16px;border:0;border-radius:999px;font-weight:800;cursor:pointer;display:inline-flex;justify-content:center;
+      background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;box-shadow:0 10px 28px rgba(124,58,237,.35),0 4px 14px rgba(0,212,255,.25)}
+    .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--txt);box-shadow:none}
 
     .seg{display:flex;justify-content:center;gap:10px;margin:22px auto}
     .seg button{border:0;padding:10px 18px;border-radius:999px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.06);color:var(--muted)}
@@ -75,54 +53,17 @@
     .plan.rec{outline:2px solid rgba(0,212,255,.25);box-shadow:0 0 0 5px rgba(124,58,237,.08),var(--shadow)}
 
     footer{text-align:center;padding:28px 0 36px;color:#b7c3d2;border-top:1px solid var(--border)}
-    @media(max-width:700px){.btn{width:100%}}
+    @media(max-width:700px){.btn,.btn.ghost{width:100%}}
 
     .panel{display:none;margin-bottom:40px}
     .panel.show{display:block}
-    .anchor-offset{position:relative; top:-80px; display:block; height:0}
-
-    @media (max-width: 768px){
-      .nav-links{display:none}
-      .menu{
-        display:block;
-        background:#0f172a; color:#e9eefc;
-        border:1px solid rgba(255,255,255,.28);
-        box-shadow:0 8px 24px rgba(0,0,0,.45);
-        padding:10px 14px; border-radius:999px;
-      }
-      .menu:hover{filter:brightness(1.08)}
-      .menu:active{transform:translateY(1px)}
-    }
   </style>
 </head>
 <body>
 <header>
-  <div class="container nav">
-    <a class="brand" href="index.html" aria-label="Volver al inicio">
-      <span class="logo">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M5 12a7 7 0 1114 0v6.5a2.5 2.5 0 01-5 0V9.75a2.25 2.25 0 10-4.5 0V18.5a2.5 2.5 0 01-5 0V12z" stroke="#061017" stroke-width="1.7"/></svg>
-      </span>
-      <span>taply</span>
-    </a>
-
-    <nav class="nav-links" aria-label="Navegación principal">
-      <a class="ghost" href="index.html#beneficios">Beneficios</a>
-      <a class="ghost" href="index.html#como-funciona">Cómo funciona</a>
-      <a class="ghost" href="index.html#reviews">Opiniones</a>
-      <!-- QUITADO: <a class="ghost" href="#cuenta">Mi suscripción</a> -->
-      <a class="btn" href="index.html">Volver al inicio</a>
-    </nav>
-
-    <button class="menu ghost" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Menú</button>
-    <div class="mobile-menu" id="mobileMenu" role="menu" aria-label="Menú móvil">
-      <div class="mobile-links">
-        <a class="ghost" href="index.html#beneficios" role="menuitem">Beneficios</a>
-        <a class="ghost" href="index.html#como-funciona" role="menuitem">Cómo funciona</a>
-        <a class="ghost" href="index.html#reviews" role="menuitem">Opiniones</a>
-        <!-- QUITADO: <a class="ghost" href="#cuenta" role="menuitem">Mi suscripción</a> -->
-        <a class="btn" href="index.html" role="menuitem">Volver al inicio</a>
-      </div>
-    </div>
+  <div class="container brand">
+    <span class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12a7 7 0 1114 0v6.5a2.5 2.5 0 01-5 0V9.75a2.25 2.25 0 10-4.5 0V18.5a2.5 2.5 0 01-5 0V12z" stroke="#061017" stroke-width="1.7"/></svg></span>
+    <span>taply</span>
   </div>
 </header>
 
@@ -141,7 +82,7 @@
         <h3>Comprar NFC</h3>
         <p>Dispositivos que colocas en las mesas o mostradores. Pago único, necesarios para empezar.</p>
         <div class="actions">
-          <a href="#nfc" id="showNfc" class="btn">Comprar NFC</a>
+          <a href="#" id="showNfc" class="btn">Comprar NFC</a>
         </div>
       </article>
       <article class="card">
@@ -149,38 +90,34 @@
         <h3>Activar Suscripción</h3>
         <p>Elige plan mensual o anual para gestionar reseñas, panel privado y más. Una vez tengas NFC.</p>
         <div class="actions">
-          <a href="#planes" id="showSub" class="btn">Ver planes</a>
+          <a href="#" id="showSub" class="btn">Ver planes</a>
         </div>
       </article>
     </div>
   </div>
 </section>
 
-<!-- Panel NFC -->
 <section id="panel-nfc" class="panel container">
-  <span id="nfc" class="anchor-offset" aria-hidden="true"></span>
   <article class="card">
     <h3>Compra tus NFC</h3>
     <p class="desc">Selecciona cuántos necesitas. Tras pagar recibirás WhatsApp automático con la guía.</p>
     <div class="actions" style="justify-content:center;gap:16px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);padding:6px;border-radius:999px">
-        <button id="minus" class="btn sm" aria-label="Restar">−</button>
-        <span id="qty" aria-live="polite">1</span>
-        <button id="plus" class="btn sm" aria-label="Sumar">＋</button>
+        <button id="minus" class="btn ghost" style="padding:6px 12px">−</button>
+        <span id="qty">1</span>
+        <button id="plus" class="btn ghost" style="padding:6px 12px">＋</button>
       </div>
-      <div class="price">Importe total: <span id="totalNfc">—</span></div>
+      <div class="price">Total: <span id="totalNfc">—</span></div>
       <a class="btn" id="buyNfcBtn">Comprar ahora</a>
     </div>
     <p style="font-size:14px;text-align:center;margin-top:10px">Precio unitario: <strong id="unitPrice">—</strong></p>
   </article>
 </section>
 
-<!-- Panel Suscripción -->
 <section id="panel-sub" class="panel container">
-  <span id="planes" class="anchor-offset" aria-hidden="true"></span>
-  <div class="seg" role="tablist" aria-label="Frecuencia de facturación">
-    <button id="btn-month" class="active" role="tab" aria-selected="true">Mensual</button>
-    <button id="btn-year" role="tab" aria-selected="false">Anual · ahorra</button>
+  <div class="seg">
+    <button id="btn-month" class="active">Mensual</button>
+    <button id="btn-year">Anual · ahorra</button>
   </div>
 
   <div class="plan-grid">
@@ -218,26 +155,24 @@
   const fmt=v=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(v);
   window.addEventListener('load',()=>document.body.classList.add('is-loaded'));
 
-  /* Menú móvil */
-  const menuBtn=document.getElementById('menuBtn');
-  const mobileMenu=document.getElementById('mobileMenu');
-  menuBtn?.addEventListener('click', ()=> {
-    const open = mobileMenu.style.display === 'block';
-    mobileMenu.style.display = open ? 'none' : 'block';
-    menuBtn.setAttribute('aria-expanded', String(!open));
-  });
-  mobileMenu?.addEventListener('click', (e)=>{
-    const a = e.target.closest('a');
-    if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }
-  });
-  window.addEventListener('resize', ()=>{
-    if(window.innerWidth > 768){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }
-  });
-
-  /* Precios y NFC */
   const PRICE={nfcUnit:5,monthly:{basic:25,medio:35,pro:45},annualDiscount:.20};
   let qty=1,yearly=false;
 
+  // Mostrar paneles
+  $('#showNfc').addEventListener('click',e=>{
+    e.preventDefault();
+    $('#panel-nfc').classList.add('show');
+    $('#panel-sub').classList.remove('show');
+    $('#panel-nfc').scrollIntoView({behavior:'smooth'});
+  });
+  $('#showSub').addEventListener('click',e=>{
+    e.preventDefault();
+    $('#panel-sub').classList.add('show');
+    $('#panel-nfc').classList.remove('show');
+    $('#panel-sub').scrollIntoView({behavior:'smooth'});
+  });
+
+  // NFC UX
   function paintNfc(){
     $('#qty').textContent=qty;
     $('#totalNfc').textContent=fmt(qty*PRICE.nfcUnit)+' (pago único)';
@@ -247,6 +182,29 @@
   $('#plus').addEventListener('click',()=>{qty=Math.min(99,qty+1);paintNfc()});
   paintNfc();
 
+  // Pago NFC (errores claros)
+  $('#buyNfcBtn').addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/buy-nfc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: qty })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error('buy-nfc server error:', data);
+        alert(data?.error || 'Error iniciando el pago de NFC');
+        return;
+      }
+      if (data?.url) location.href = data.url;
+      else alert('No se generó la URL de Stripe (no_session_url)');
+    } catch (err) {
+      console.error(err);
+      alert('Error de red al iniciar el pago de NFC');
+    }
+  });
+
+  // Toggle mensual/anual
   function planAmount(tier){const m=PRICE.monthly[tier];return yearly?Math.round(m*12*(1-PRICE.annualDiscount)):m}
   function paintPrices(){
     $('#p-basic').textContent=yearly?fmt(planAmount('basic')):PRICE.monthly.basic+'€';
@@ -258,44 +216,29 @@
   $('#btn-year').addEventListener('click',()=>{yearly=true;$('#btn-year').classList.add('active');$('#btn-month').classList.remove('active');paintPrices()});
   paintPrices();
 
-  // Helper JSON
-  async function apiFetch(url, options={}){
-    const res = await fetch(url, {headers:{'Content-Type':'application/json'}, ...options});
-    const isJson=(res.headers.get('content-type')||'').includes('application/json');
-    const data = isJson ? await res.json().catch(()=>({})) : {};
-    if(!res.ok) throw new Error(data.message || `${res.status} ${res.statusText}`);
-    return data;
-  }
-
-  // PAGOS DIRECTOS A STRIPE (sin login)
-  $('#buyNfcBtn').addEventListener('click',async()=>{
-    try{
-      const data = await apiFetch('/api/buy-nfc',{method:'POST',body:JSON.stringify({quantity:qty})});
-      if(data.url) location.href = data.url;
-      else alert('No se pudo iniciar la compra.');
-    }catch{ alert('No se pudo iniciar la compra de NFC.'); }
-  });
-
-  $$('.btn.plan').forEach(btn=>btn.addEventListener('click',async()=>{
-    try{
-      const tier = btn.dataset.tier;
-      const payload = { tier, frequency: yearly ? 'annual' : 'monthly' };
-      const data = await apiFetch('/api/create-checkout-session',{method:'POST',body:JSON.stringify(payload)});
-      if(data.url) location.href = data.url;
-      else alert('No se pudo iniciar el checkout.');
-    }catch{ alert('No se pudo iniciar el checkout.'); }
+  // Pago suscripciones (errores claros)
+  $$('.btn.plan').forEach(btn => btn.addEventListener('click', async () => {
+    const tier = btn.dataset.tier;
+    const frequency = yearly ? 'annual' : 'monthly';
+    try {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier, frequency })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error('create-checkout-session server error:', data);
+        alert(data?.error || 'Error iniciando la suscripción');
+        return;
+      }
+      if (data?.url) location.href = data.url;
+      else alert('No se generó la URL de Stripe (no_session_url)');
+    } catch (err) {
+      console.error(err);
+      alert('Error de red al iniciar la suscripción');
+    }
   }));
-
-  // Mostrar paneles por hash
-  function openFromHash(){
-    const h = location.hash;
-    if (h==='#nfc'){ $('#panel-nfc').classList.add('show'); $('#panel-nfc').scrollIntoView({behavior:'smooth',block:'start'}) }
-    else if (h==='#planes'){ $('#panel-sub').classList.add('show'); $('#panel-sub').scrollIntoView({behavior:'smooth',block:'start'}) }
-  }
-  $('#showNfc').addEventListener('click',(e)=>{e.preventDefault();history.pushState(null,'','#nfc');openFromHash();});
-  $('#showSub').addEventListener('click',(e)=>{e.preventDefault();history.pushState(null,'','#planes');openFromHash();});
-  window.addEventListener('hashchange', openFromHash);
-  openFromHash();
 </script>
 </body>
 </html>

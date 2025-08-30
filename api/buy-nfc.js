@@ -5,38 +5,35 @@ function baseUrl(req) {
   const host  = req.headers['x-forwarded-host'] || req.headers.host;
   return `${proto}://${host}`;
 }
+function getBody(req) {
+  if (!req.body) return {};
+  return (typeof req.body === 'string') ? JSON.parse(req.body) : req.body;
+}
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
 
   try {
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: 'missing_stripe_key' });
+    if (!process.env.PRICE_ID_NFC)     return res.status(500).json({ error: 'missing_nfc_price_id' });
 
-    // ❌ nada de JSON.parse
-    const { quantity = 1 } = req.body || {};
+    const { quantity = 1 } = getBody(req);
     const qty = Math.max(1, Math.min(Number(quantity) || 1, 99));
 
-    const priceId = process.env.NFC_PRICE_ID;
-    if (!priceId) {
-      console.error('NFC_PRICE_ID missing');
-      return res.status(400).json({ error: 'price_not_configured' });
-    }
-
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      line_items: [{ price: priceId, quantity: qty }],
+      ui_mode: 'hosted',
+      line_items: [{ price: process.env.PRICE_ID_NFC, quantity: qty }],
       success_url: `${process.env.BASE_URL || baseUrl(req)}/exito.html`,
       cancel_url:  `${process.env.BASE_URL || baseUrl(req)}/cancelado.html`,
       allow_promotion_codes: true,
-      // ui_mode: 'hosted' // opcional
     });
 
-    res.status(200).json({ url: session.url });
+    if (!session?.url) return res.status(500).json({ error: 'no_session_url' });
+    return res.status(200).json({ url: session.url });
   } catch (e) {
-    console.error('buy-nfc error', e);
-    res.status(500).json({ error: 'stripe_error' });
+    console.error('buy-nfc error:', e);
+    return res.status(500).json({ error: 'stripe_error', detail: e?.message });
   }
 }
