@@ -28,33 +28,24 @@ export default async function handler(req, res) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      customer_creation: 'always', // crea Customer y nos garantiza email/teléfono guardados
+      customer_creation: 'always', // guardará los datos en un Customer
 
       line_items: [
         { price: process.env.PRICE_ID_NFC, quantity: q }
-        // Alternativa sin PRICE_ID_NFC:
-        // {
-        //   price_data: {
-        //     currency: 'eur',
-        //     unit_amount: 500, // 5,00 € en céntimos
-        //     product_data: { name: 'NFC' }
-        //   },
-        //   quantity: q
-        // }
       ],
 
       success_url: `${process.env.BASE_URL}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/cancelado.html`,
 
-      // Teléfono (para WhatsApp)
+      // Teléfono nativo de Stripe (visible pero no estrictamente obligatorio)
       phone_number_collection: { enabled: true },
 
       // Dirección de envío OBLIGATORIA
       shipping_address_collection: {
-        allowed_countries: ['ES'] // añade ['PT','FR',...] si envías a más países
+        allowed_countries: ['ES'] // añade más si envías a otros países
       },
 
-      // Campos personalizados obligatorios
+      // Campos personalizados OBLIGATORIOS
       custom_fields: [
         {
           key: 'business_name',
@@ -69,23 +60,29 @@ export default async function handler(req, res) {
           type: 'text',
           optional: false,
           text: { maximum_length: 120 }
+        },
+        {
+          key: 'contact_phone',
+          label: { type: 'custom', custom: 'Teléfono de contacto (WhatsApp)' },
+          type: 'text',
+          optional: false,
+          text: { maximum_length: 20 }
         }
       ],
 
-      // Dirección de facturación (opcional)
       billing_address_collection: 'auto',
 
-      // Mensajes en Checkout
+      // Mensajes en Checkout para remarcar el teléfono
       custom_text: {
         shipping_address: {
           message: 'Usaremos esta dirección para enviar tus dispositivos NFC.'
         },
         submit: {
-          message: 'Te contactaremos por WhatsApp al número indicado para la configuración.'
+          message: 'IMPORTANTE: te escribiremos por WhatsApp al teléfono de contacto para configurar Taply. Verifica que sea correcto.'
         }
       },
 
-      // Para identificar el pedido de NFC en el webhook
+      // Identificar que es compra de NFC en el webhook
       metadata: { nfc_quantity: String(q) }
     });
 
