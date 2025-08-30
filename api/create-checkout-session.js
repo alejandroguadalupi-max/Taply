@@ -1,3 +1,4 @@
+// /api/create-checkout-session.js
 import Stripe from 'stripe';
 
 const PRICES = {
@@ -13,15 +14,11 @@ const PRICES = {
   }
 };
 
-// Lee cuerpo JSON
 async function readJson(req) {
   return await new Promise((resolve, reject) => {
     let data = '';
-    req.on('data', (chunk) => (data += chunk));
-    req.on('end', () => {
-      try { resolve(data ? JSON.parse(data) : {}); }
-      catch (e) { reject(e); }
-    });
+    req.on('data', (c) => (data += c));
+    req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); }});
     req.on('error', reject);
   });
 }
@@ -31,7 +28,6 @@ export default async function handler(req, res) {
 
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
     const body = await readJson(req);
     const tier = body?.tier;
     const freq = body?.frequency === 'annual' ? 'annual' : 'monthly';
@@ -46,6 +42,10 @@ export default async function handler(req, res) {
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
+
+      // 🔽 fuerza solo tarjeta (rápido)
+      payment_method_types: ['card'],
+
       success_url: `${process.env.BASE_URL}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/cancelado.html`,
       phone_number_collection: { enabled: true },

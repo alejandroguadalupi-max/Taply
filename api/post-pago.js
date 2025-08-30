@@ -2,6 +2,10 @@
 import Stripe from 'stripe';
 import getRawBody from 'raw-body';
 
+export const config = {
+  api: { bodyParser: false } // 🔴 NECESARIO para verificar la firma
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method not allowed');
 
@@ -20,15 +24,12 @@ export default async function handler(req, res) {
   try {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      // Aquí tienes los datos del cliente:
-      // const email = session.customer_details?.email;
-      // const phone = session.customer_details?.phone; // si activaste phone_number_collection
-      // const mode = session.mode; // 'payment' o 'subscription'
-
-      // Aquí en el futuro: enviar WhatsApp / email.
+      // Aquí haz lo mínimo imprescindible y NO esperes tareas pesadas.
+      // (envíos de email/WhatsApp mejor sin bloquear la respuesta)
       console.log('Pago completado:', session.id, session.mode);
     }
 
+    // ✅ Responde rápido para no bloquear entregas de Stripe
     return res.status(200).json({ received: true });
   } catch (e) {
     console.error('Webhook handler error', e);
