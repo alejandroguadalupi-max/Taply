@@ -1,4 +1,3 @@
-// /api/create-checkout-session.js
 import Stripe from 'stripe';
 
 const PRICES = {
@@ -27,9 +26,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { tier, frequency } = req.body ? JSON.parse(req.body) : {};
+    // ❌ nada de JSON.parse
+    const { tier, frequency } = req.body || {};
     const price = PRICES?.[frequency]?.[tier];
     if (!price) {
+      console.error('price_not_found', { tier, frequency });
       res.status(400).json({ error: 'price_not_found' });
       return;
     }
@@ -40,6 +41,8 @@ export default async function handler(req, res) {
       line_items: [{ price, quantity: 1 }],
       success_url: `${process.env.BASE_URL || baseUrl(req)}/exito.html`,
       cancel_url:  `${process.env.BASE_URL || baseUrl(req)}/cancelado.html`,
+      // opcional: ui_mode 'hosted' para garantizar session.url
+      // ui_mode: 'hosted'
     });
 
     res.status(200).json({ url: session.url });

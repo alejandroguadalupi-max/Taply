@@ -1,4 +1,3 @@
-// /api/buy-nfc.js
 import Stripe from 'stripe';
 
 function baseUrl(req) {
@@ -15,15 +14,24 @@ export default async function handler(req, res) {
 
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    const { quantity = 1 } = req.body ? JSON.parse(req.body) : {};
+
+    // ❌ nada de JSON.parse
+    const { quantity = 1 } = req.body || {};
     const qty = Math.max(1, Math.min(Number(quantity) || 1, 99));
+
+    const priceId = process.env.NFC_PRICE_ID;
+    if (!priceId) {
+      console.error('NFC_PRICE_ID missing');
+      return res.status(400).json({ error: 'price_not_configured' });
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      line_items: [{ price: process.env.NFC_PRICE_ID, quantity: qty }],
+      line_items: [{ price: priceId, quantity: qty }],
       success_url: `${process.env.BASE_URL || baseUrl(req)}/exito.html`,
       cancel_url:  `${process.env.BASE_URL || baseUrl(req)}/cancelado.html`,
       allow_promotion_codes: true,
+      // ui_mode: 'hosted' // opcional
     });
 
     res.status(200).json({ url: session.url });
