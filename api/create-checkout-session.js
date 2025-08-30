@@ -1,6 +1,5 @@
 import Stripe from 'stripe';
 
-// Mapeo a TUS variables de entorno (según tu captura de Vercel)
 const PRICES = {
   monthly: {
     basic: process.env.PRICE_ID_BASIC_MONTH,
@@ -19,8 +18,6 @@ function baseUrl(req) {
   const host  = req.headers['x-forwarded-host'] || req.headers.host;
   return `${proto}://${host}`;
 }
-
-// Funciona tanto si Vercel te da req.body como objeto o como string
 function getBody(req) {
   if (!req.body) return {};
   return (typeof req.body === 'string') ? JSON.parse(req.body) : req.body;
@@ -36,19 +33,21 @@ export default async function handler(req, res) {
     if (!tier || !frequency) return res.status(400).json({ error: 'missing_params' });
 
     const price = PRICES?.[frequency]?.[tier];
-    if (!price) {
-      console.error('price_not_found', { tier, frequency });
-      return res.status(400).json({ error: 'price_not_found' });
-    }
+    if (!price) return res.status(400).json({ error: 'price_not_found' });
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
-      ui_mode: 'hosted', // garantiza session.url
+      ui_mode: 'hosted',
       line_items: [{ price, quantity: 1 }],
       success_url: `${process.env.BASE_URL || baseUrl(req)}/exito.html`,
       cancel_url:  `${process.env.BASE_URL || baseUrl(req)}/cancelado.html`,
+
+      // 👉 pedir teléfono también en suscripción
+      phone_number_collection: { enabled: true },
+
+      // opcional: metadata para distinguir
+      metadata: { type: 'subscription', tier, frequency }
     });
 
     if (!session?.url) return res.status(500).json({ error: 'no_session_url' });

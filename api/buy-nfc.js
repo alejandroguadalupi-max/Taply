@@ -29,11 +29,14 @@ export default async function handler(req, res) {
       cancel_url:  `${process.env.BASE_URL || baseUrl(req)}/cancelado.html`,
       allow_promotion_codes: true,
 
-      // 👇 obligar dirección y teléfono
+      // 👉 obligar dirección y teléfono
       phone_number_collection: { enabled: true },
       shipping_address_collection: {
-        allowed_countries: ['ES'] // pon ['ES','PT'] si quieres más
-      }
+        allowed_countries: ['ES'] // añade más si quieres ['ES','PT',...]
+      },
+
+      // opcional: te dejo metadata útil
+      metadata: { type: 'nfc', qty: String(qty) }
     });
 
     if (!session?.url) return res.status(500).json({ error: 'no_session_url' });

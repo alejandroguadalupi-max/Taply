@@ -1,5 +1,3 @@
-// /api/stripe-webhook.js
-// TAPLY/api/post-pago.js
 import Stripe from 'stripe';
 import getRawBody from 'raw-body';
 import twilio from 'twilio';
@@ -9,6 +7,7 @@ export default async function handler(req, res) {
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+  // 1) verificar firma
   let event;
   try {
     const sig = req.headers['stripe-signature'];
@@ -23,17 +22,16 @@ export default async function handler(req, res) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
 
-      // Expandimos para ver items/planes
+      // 2) expandir para ver items/plan
       const full = await stripe.checkout.sessions.retrieve(session.id, {
         expand: ['line_items.data.price.product']
       });
 
-      // Datos del cliente
-      const details = session.customer_details || {};
-      const name = details.name || 'cliente';
-      let phone = details.phone || session?.shipping_details?.phone || null;
+      // 3) datos cliente (nombre/teléfono)
+      const d = session.customer_details || {};
+      const name = d.name || 'cliente';
+      let phone = d.phone || session?.shipping_details?.phone || null;
 
-      // Fallback al Customer si existe
       if (!phone && session.customer) {
         try {
           const customer = await stripe.customers.retrieve(session.customer);
@@ -42,35 +40,38 @@ export default async function handler(req, res) {
       }
       phone = normalizePhone(phone);
 
-      // Mensaje según tipo
-      let body;
-      if (session.mode === 'payment') {
-        // NFC (pago único)
+      // 4) textos distintos
+      let body = null;
+
+      if (session.mode === 'payment' || session.metadata?.type === 'nfc') {
         const items = full.line_items?.data || [];
-        const qty = items.reduce((acc, it) => acc + (it.quantity || 0), 0) || 1;
+        const qty = items.reduce((acc, it) => acc + (it.quantity || 0), 0) || session.metadata?.qty || 1;
         body =
-          `¡Hola ${firstName(name)}! Soy de Taply 👋\n` +
-          `Hemos recibido tu compra de ${qty} NFC ✅\n\n` +
-          `En breve te escribo para confirmar el envío y preparar tu proyecto. ` +
-          `Si necesitas algo, responde a este WhatsApp.`;
-      } else if (session.mode === 'subscription') {
-        // Suscripción
+`¡Hola ${firstName(name)}! Soy de Taply 👋
+Hemos recibido tu compra de ${qty} NFC ✅
+
+En breve te escribo para confirmar el envío y preparar tu proyecto.
+Si necesitas algo, responde a este WhatsApp.`;
+      } else if (session.mode === 'subscription' || session.metadata?.type === 'subscription') {
         const item = full.line_items?.data?.[0];
         const planName =
           item?.price?.product?.name ||
           item?.description ||
+          `${session.metadata?.tier || ''} ${session.metadata?.frequency || ''}`.trim() ||
           'tu suscripción';
         body =
-          `¡Hola ${firstName(name)}! Soy de Taply 👋\n` +
-          `Tu suscripción (${planName}) está activa ✅\n\n` +
-          `Ahora te envío la guía rápida y configuro tu panel. ` +
-          `Cualquier duda, respóndeme por aquí.`;
+`¡Hola ${firstName(name)}! Soy de Taply 👋
+Tu suscripción (${planName}) está activa ✅
+
+Ahora te envío la guía rápida y configuro tu panel.
+Cualquier duda, respóndeme por aquí.`;
       }
 
+      // 5) enviar WhatsApp
       if (phone && body) {
         await sendWhatsApp({ to: phone, body });
       } else {
-        console.warn('No phone or body for session', session.id);
+        console.warn('No phone or body; skip WhatsApp. session:', session.id);
       }
     }
 
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
   }
 }
 
-/* Helpers */
+/* helpers */
 function firstName(full) {
   return String(full || '').trim().split(/\s+/)[0] || 'cliente';
 }
@@ -94,14 +95,15 @@ function normalizePhone(raw) {
   return prefix ? prefix + digits : digits;
 }
 async function sendWhatsApp({ to, body }) {
-  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM) {
+  const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM } = process.env;
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_WHATSAPP_FROM) {
     console.warn('Missing Twilio env vars → skip WhatsApp'); return;
   }
-  const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
   const toAddr = to.startsWith('whatsapp:') ? to : `whatsapp:+${to}`;
   try {
     const msg = await client.messages.create({
-      from: process.env.TWILIO_WHATSAPP_FROM,
+      from: TWILIO_WHATSAPP_FROM, // 'whatsapp:+14155238886' (sandbox)
       to: toAddr,
       body
     });
