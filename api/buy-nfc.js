@@ -28,6 +28,8 @@ export default async function handler(req, res) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
+      customer_creation: 'always', // crea Customer y nos garantiza email/teléfono guardados
+
       line_items: [
         { price: process.env.PRICE_ID_NFC, quantity: q }
         // Alternativa sin PRICE_ID_NFC:
@@ -47,12 +49,12 @@ export default async function handler(req, res) {
       // Teléfono (para WhatsApp)
       phone_number_collection: { enabled: true },
 
-      // Dirección de envío OBLIGATORIA (ajusta países)
+      // Dirección de envío OBLIGATORIA
       shipping_address_collection: {
-        allowed_countries: ['ES'] // añade ['PT','FR',...] si envías a más
+        allowed_countries: ['ES'] // añade ['PT','FR',...] si envías a más países
       },
 
-      // Nombre del negocio OBLIGATORIO
+      // Campos personalizados obligatorios
       custom_fields: [
         {
           key: 'business_name',
@@ -60,23 +62,30 @@ export default async function handler(req, res) {
           type: 'text',
           optional: false,
           text: { maximum_length: 120 }
+        },
+        {
+          key: 'contact_name',
+          label: { type: 'custom', custom: 'Nombre y apellidos de contacto' },
+          type: 'text',
+          optional: false,
+          text: { maximum_length: 120 }
         }
       ],
 
-      // Dirección de facturación automática (opcional)
+      // Dirección de facturación (opcional)
       billing_address_collection: 'auto',
 
-      // Mensajes informativos en Checkout
+      // Mensajes en Checkout
       custom_text: {
         shipping_address: {
-          message: 'Usaremos esta dirección para enviar tus dispositivos Taply.'
+          message: 'Usaremos esta dirección para enviar tus dispositivos NFC.'
         },
         submit: {
-          message: 'Te contactaremos por WhatsApp al número indicado.'
+          message: 'Te contactaremos por WhatsApp al número indicado para la configuración.'
         }
       },
 
-      // Útil para identificar la compra en tu webhook
+      // Para identificar el pedido de NFC en el webhook
       metadata: { nfc_quantity: String(q) }
     });
 
