@@ -28,12 +28,18 @@ export default async function handler(req, res) {
       success_url: `${process.env.BASE_URL || baseUrl(req)}/exito.html`,
       cancel_url:  `${process.env.BASE_URL || baseUrl(req)}/cancelado.html`,
       allow_promotion_codes: true,
+
+      // 👇 obligar dirección y teléfono
+      phone_number_collection: { enabled: true },
+      shipping_address_collection: {
+        allowed_countries: ['ES'] // pon ['ES','PT'] si quieres más
+      }
     });
 
     if (!session?.url) return res.status(500).json({ error: 'no_session_url' });
     return res.status(200).json({ url: session.url });
   } catch (e) {
-    console.error('buy-nfc error:', e);
+    console.error('buy-nfc error', e);
     return res.status(500).json({ error: 'stripe_error', detail: e?.message });
   }
 }
