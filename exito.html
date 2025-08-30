@@ -6,59 +6,66 @@
   <title>Pago correcto</title>
   <style>
     body {
-      font-family: system-ui, sans-serif;
+      font-family: "Segoe UI", Roboto, system-ui, sans-serif;
       margin: 0;
-      background: #fff;
+      background: #f9fafb;
       color: #333;
-      text-align: center;
-      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
     }
     .card {
-      background: #fafafa;
-      border: 1px solid #e0e0e0;
+      background: #fff;
+      border: 1px solid #e5e7eb;
       border-radius: 12px;
-      padding: 30px 20px;
-      max-width: 420px;
-      margin: auto;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      padding: 40px 30px;
+      max-width: 450px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    }
+    .icon {
+      font-size: 64px;
+      color: #2e7d32;
+      margin-bottom: 20px;
     }
     h1 {
-      font-size: 1.6em;
+      font-size: 1.8em;
       margin-bottom: 15px;
-      color: #2e7d32; /* Verde elegante */
+      color: #111827;
     }
     p {
       font-size: 1em;
-      margin: 10px 0;
+      margin: 8px 0;
+      line-height: 1.5;
+      color: #4b5563;
     }
     a {
       display: inline-block;
-      margin-top: 20px;
-      padding: 10px 20px;
+      margin-top: 25px;
+      padding: 12px 28px;
       border-radius: 8px;
       background: #2e7d32;
       color: #fff;
       font-weight: 500;
       text-decoration: none;
-      transition: background 0.3s;
+      font-size: 1em;
+      transition: background 0.25s;
     }
     a:hover {
       background: #256628;
-    }
-    .icon {
-      font-size: 50px;
-      margin-bottom: 15px;
-      color: #2e7d32;
     }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="icon">✅</div>
-    <h1>Pago correcto</h1>
+    <h1>Pago realizado con éxito</h1>
     <p>Gracias, tu pago se ha procesado correctamente.</p>
-    <p>Te hemos enviado un correo de confirmación y pronto te llegará un WhatsApp nuestro.</p>
-    <a href="/suscripciones.html">Volver</a>
+    <p>Te hemos enviado un correo de confirmación y pronto recibirás un WhatsApp nuestro.</p>
+    <a href="/suscripciones.html">Volver a suscripciones</a>
   </div>
 </body>
 </html>
