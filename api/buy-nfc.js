@@ -30,8 +30,7 @@ export default async function handler(req, res) {
       mode: 'payment',
       line_items: [
         { price: process.env.PRICE_ID_NFC, quantity: q }
-
-        // --- Opción sin PRICE_ID_NFC (descomenta esto y comenta la línea de arriba) ---
+        // Alternativa sin PRICE_ID_NFC:
         // {
         //   price_data: {
         //     currency: 'eur',
@@ -41,10 +40,44 @@ export default async function handler(req, res) {
         //   quantity: q
         // }
       ],
+
       success_url: `${process.env.BASE_URL}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/cancelado.html`,
+
+      // Teléfono (para WhatsApp)
       phone_number_collection: { enabled: true },
-      billing_address_collection: 'auto'
+
+      // Dirección de envío OBLIGATORIA (ajusta países)
+      shipping_address_collection: {
+        allowed_countries: ['ES'] // añade ['PT','FR',...] si envías a más
+      },
+
+      // Nombre del negocio OBLIGATORIO
+      custom_fields: [
+        {
+          key: 'business_name',
+          label: { type: 'custom', custom: 'Nombre del negocio' },
+          type: 'text',
+          optional: false,
+          text: { maximum_length: 120 }
+        }
+      ],
+
+      // Dirección de facturación automática (opcional)
+      billing_address_collection: 'auto',
+
+      // Mensajes informativos en Checkout
+      custom_text: {
+        shipping_address: {
+          message: 'Usaremos esta dirección para enviar tus dispositivos Taply.'
+        },
+        submit: {
+          message: 'Te contactaremos por WhatsApp al número indicado.'
+        }
+      },
+
+      // Útil para identificar la compra en tu webhook
+      metadata: { nfc_quantity: String(q) }
     });
 
     return res.status(200).json({ url: session.url });
