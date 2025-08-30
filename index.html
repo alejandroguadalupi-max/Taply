@@ -16,11 +16,11 @@
       --brand-1:#00d4ff; --brand-2:#7c3aed;
       --radius:20px; --shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
       --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 28px);
-      --border:rgba(255,255,255,.10);
-      --ok:#22c55e; --danger:#ef4444;
     }
     *{box-sizing:border-box}
     html,body{margin:0;height:100%;scroll-behavior:smooth}
+
+    /* Fondo */
     body{
       font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
       background:var(--bg); color:var(--txt);
@@ -30,19 +30,24 @@
     body.is-loaded{opacity:1;transform:none}
     a{color:inherit;text-decoration:none}
     .container{width:min(1200px,92%);margin-inline:auto}
-
-    /* Fondo */
-    body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.6px);background-size:26px 26px;opacity:.12}
-    body::after{content:"";position:fixed;inset:-10%;z-index:-1;pointer-events:none;background:
-      radial-gradient(circle at 12% 18%, rgba(255,255,255,.9) 1.2px, transparent 1.6px),
-      radial-gradient(circle at 28% 72%, rgba(255,255,255,.9) 1.2px, transparent 1.6px),
-      radial-gradient(circle at 45% 25%, rgba(255,255,255,.9) 1.4px, transparent 1.8px),
-      radial-gradient(circle at 63% 66%, rgba(255,255,255,.9) 1.2px, transparent 1.6px),
-      radial-gradient(circle at 80% 30%, rgba(255,255,255,.9) 1.3px, transparent 1.7px),
-      radial-gradient(circle at 14% 88%, rgba(255,255,255,.9) 1.1px, transparent 1.5px),
-      radial-gradient(circle at 88% 84%, rgba(255,255,255,.9) 1.2px, transparent 1.6px),
-      radial-gradient(circle at 6% 52%,  rgba(255,255,255,.9) 1.3px, transparent 1.7px);
-      background-repeat:no-repeat;filter:drop-shadow(0 0 6px rgba(255,255,255,.22));opacity:.28}
+    body::before{
+      content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+      background-image: radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.6px);
+      background-size:26px 26px;opacity:.12
+    }
+    body::after{
+      content:"";position:fixed;inset:-10%;z-index:-1;pointer-events:none;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(255,255,255,.9) 1.2px, transparent 1.6px),
+        radial-gradient(circle at 28% 72%, rgba(255,255,255,.9) 1.2px, transparent 1.6px),
+        radial-gradient(circle at 45% 25%, rgba(255,255,255,.9) 1.4px, transparent 1.8px),
+        radial-gradient(circle at 63% 66%, rgba(255,255,255,.9) 1.2px, transparent 1.6px),
+        radial-gradient(circle at 80% 30%, rgba(255,255,255,.9) 1.3px, transparent 1.7px),
+        radial-gradient(circle at 14% 88%, rgba(255,255,255,.9) 1.1px, transparent 1.5px),
+        radial-gradient(circle at 88% 84%, rgba(255,255,255,.9) 1.2px, transparent 1.6px),
+        radial-gradient(circle at 6% 52%,  rgba(255,255,255,.9) 1.3px, transparent 1.7px);
+      background-repeat:no-repeat;filter:drop-shadow(0 0 6px rgba(255,255,255,.22));opacity:.28
+    }
 
     /* Header */
     header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px)}
@@ -93,27 +98,61 @@
     .card h3{margin:.2rem 0 .6rem}
     .card p{color:var(--muted);margin:0}
 
-    /* Opiniones */
+    /* Opiniones con flechas azules */
     .reviews{position:relative;margin:36px 0}
     .reviews h2{margin:0 0 14px}
     .reviews-window{position:relative;overflow:hidden}
-    .reviews-window::before,.reviews-window::after{content:"";position:absolute;top:0;bottom:0;width:calc(var(--edgePad) - 8px);pointer-events:none;z-index:3;background:linear-gradient(90deg, rgba(11,15,26,1) 0%, rgba(11,15,26,.7) 55%, rgba(11,15,26,0) 100%)}
+    .reviews-window::before,
+    .reviews-window::after{
+      content:"";position:absolute;top:0;bottom:0;width:calc(var(--edgePad) - 8px);
+      pointer-events:none;z-index:3;
+      background:linear-gradient(90deg, rgba(11,15,26,1) 0%, rgba(11,15,26,.7) 55%, rgba(11,15,26,0) 100%);
+    }
     .reviews-window::before{ left:0 } .reviews-window::after{ right:0; transform:scaleX(-1) }
-    .reviews-track{display:flex;gap:22px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:0 var(--edgePad);scroll-padding:0 var(--edgePad);scrollbar-width:none;overscroll-behavior-x: contain; touch-action: pan-y;}
+    .reviews-track{
+      display:flex;gap:22px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
+      padding:0 var(--edgePad);scroll-padding:0 var(--edgePad);scrollbar-width:none;
+      overscroll-behavior-x: contain; touch-action: pan-y;
+    }
     .reviews-track::-webkit-scrollbar{display:none}
-    .review-card{flex:0 0 clamp(360px, 40vw, 480px);max-width:520px;background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:20px;scroll-snap-align:center;scroll-snap-stop:normal;text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.35);transition:transform .2s ease,border-color .2s ease}
+    .review-card{
+      flex:0 0 clamp(360px, 40vw, 480px);max-width:520px;
+      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+      border:1px solid rgba(255,255,255,.1);
+      border-radius:16px;padding:20px;scroll-snap-align:center;scroll-snap-stop:normal;
+      text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.35);transition:transform .2s ease, border-color .2s ease;
+    }
     .review-card:hover{ transform:translateY(-2px); border-color:rgba(255,255,255,.16) }
     .review-header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
     .review-avatar{width:54px;height:54px;border-radius:999px;overflow:hidden;flex:0 0 54px;border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 22px rgba(124,58,237,.25)}
     .review-avatar img{width:100%;height:100%;object-fit:cover;display:block}
-    .review-name{font-weight:700}.review-stars{color:#fbbf24;font-size:18px;letter-spacing:2px}
+    .review-name{font-weight:700}
+    .review-stars{color:#fbbf24;font-size:18px;letter-spacing:2px}
     .review-text{color:#c9d3e6;margin:6px 0 12px}
+
+    .reviews-nav{
+      position:absolute; top:0; bottom:0; left:0; right:0; pointer-events:none;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0 calc(var(--edgePad) - (var(--arrowSize) / 2));
+      z-index:4;
+    }
+    .nav-btn{
+      pointer-events:auto;border:0;cursor:pointer;width:var(--arrowSize);height:var(--arrowSize);border-radius:999px;
+      display:grid;place-items:center;font-size:22px;font-weight:900;color:#061017;
+      background:radial-gradient(120% 120% at 30% 20%, #3b82f6 .6, #00d4ff .55);
+      box-shadow:0 15px 35px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.08) inset;
+      transition:opacity .2s ease, transform .15s ease;
+    }
+    .nav-btn:active{transform:scale(.97)}
+    .nav-btn.disabled{background:#263241;color:#94a3b8;box-shadow:none;cursor:not-allowed;opacity:.7}
 
     /* FAQ */
     .faq{max-width:900px;margin-inline:auto}
     .acc{border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.02);box-shadow:var(--shadow)}
     .acc-item + .acc-item{border-top:1px solid rgba(255,255,255,.08)}
-    .acc-btn{width:100%;background:transparent;border:0;color:var(--txt);padding:18px 20px;font-size:1rem;font-weight:700;display:flex;justify-content:center;align-items:center;gap:10px;text-align:center}
+    .acc-btn{width:100%;background:transparent;border:0;color:var(--txt);
+      padding:18px 20px;font-size:1rem;font-weight:700;
+      display:flex;justify-content:center;align-items:center;gap:10px;text-align:center}
     .acc-panel{max-height:0;overflow:hidden;transition:max-height .3s ease}
     .acc-panel > div{padding:0 20px 18px;color:var(--muted);text-align:center}
 
@@ -126,37 +165,14 @@
     /* Sociales */
     .socials{padding:24px 0 16px;border-top:1px solid rgba(255,255,255,.06)}
     .socials .row{display:flex;justify-content:center;gap:18px}
-    .socials a{width:54px;height:54px;border-radius:999px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.25);color:#fff;opacity:.95;transition:transform .15s ease, opacity .2s ease, border-color .2s ease}
+    .socials a{width:54px;height:54px;border-radius:999px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.25); color:#fff; opacity:.95;transition:transform .15s ease, opacity .2s ease, border-color .2s ease}
     .socials a:hover{transform:translateY(-2px);opacity:1;border-color:#fff}
+    .socials svg{width:24px;height:24px;display:block}
 
     /* Cookie bar */
     .cookiebar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#0a0f16;color:#dbeafe;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:14px;justify-content:space-between;padding:12px 16px}
     .cookiebar p{margin:0;font-size:.95rem;text-align:left}
     .cookiebar .btn-accept{background:#6366f1;border:0;color:#fff;border-radius:8px;padding:8px 16px;cursor:pointer}
-
-    /* Panel "Mi suscripción" (separado de planes/NFC) */
-    .account{background:var(--bg-2);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:22px;margin-top:18px}
-    .account .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
-    .badge{display:inline-block;font-size:.82rem;font-weight:800;padding:6px 10px;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(255,255,255,.04);color:#cfe3ff;margin-bottom:10px}
-    .mini{font-size:.92rem;color:#9fb0c6}
-
-    /* Modal auth */
-    .modal{position:fixed;inset:0;display:none;place-items:center;z-index:80}
-    .overlay{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(4px)}
-    .dialog{position:relative;width:min(480px,92%);background:#0c1326;border:1px solid rgba(255,255,255,.12);border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,.5);padding:18px}
-    .dialog h3{margin:0 0 4px;text-align:left}
-    .dialog p{margin:0 0 14px;text-align:left;color:#b9c6db}
-    .x{position:absolute;top:10px;right:10px;background:transparent;border:0;color:#cbd5e1;font-size:20px;cursor:pointer}
-    .prov{display:flex;flex-direction:column;gap:10px;margin:10px 0 14px}
-    .btn-line{display:flex;align-items:center;gap:10px;justify-content:center;background:#111a34;border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:10px 12px;cursor:pointer}
-    .btn-line:hover{filter:brightness(1.08)}
-    .btn-line img{width:18px;height:18px}
-    form.auth{display:grid;grid-template-columns:1fr;gap:10px;margin-top:6px}
-    input[type="email"], input[type="text"]{background:#0b1430;border:1px solid rgba(255,255,255,.14);color:#e9eefc;padding:10px 12px;border-radius:10px;outline:none}
-    .hint{font-size:.85rem;color:#8fa0bb}
-
-    /* Toast */
-    .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:90;display:none;background:#0f172a;border:1px solid rgba(255,255,255,.12);color:#e5edff;padding:10px 14px;border-radius:10px}
 
     /* Móvil */
     @media (max-width: 768px){
@@ -187,46 +203,51 @@
   <!-- HEADER -->
   <header>
     <div class="container nav">
-      <a class="brand" href="#top">
+      <!-- LOGO/TÍTULO -> suscripciones.html -->
+      <a class="brand" href="suscripciones.html">
         <span class="brand-logo" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M5 12a7 7 0 1114 0v6.5a2.5 2.5 0 01-5 0V9.75a2.25 2.25 0 10-4.5 0V18.5a2.5 2.5 0 01-5 0V12z" stroke="#061017" stroke-width="1.7"/></svg>
         </span>
         <span>taply</span>
       </a>
+
+      <!-- MENÚ (sin “Mi cuenta”) -->
       <nav class="nav-links">
         <a class="ghost" href="#beneficios">Beneficios</a>
         <a class="ghost" href="#como-funciona">Cómo funciona</a>
         <a class="ghost" href="#reviews">Opiniones</a>
-        <!-- NUEVA ENTRADA: MI SUSCRIPCIÓN (protegida) -->
-        <a class="ghost" href="#mi-suscripcion" data-requires-auth id="navAccount">Mi suscripción</a>
-        <button class="btn" id="btnAbrirLogin">Iniciar sesión</button>
+        <a class="ghost" href="suscripciones.html">Suscripciones</a>
+        <a class="btn" href="suscripciones.html">¡Comenzar ahora!</a>
       </nav>
+
       <button class="menu ghost" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Menú</button>
     </div>
 
-    <!-- MENÚ MÓVIL -->
+    <!-- MENÚ MÓVIL (sin “Mi cuenta”) -->
     <div class="container mobile-menu" id="mobileMenu" role="menu" aria-label="Menú móvil">
       <div class="mobile-links">
         <a class="ghost" href="#beneficios" role="menuitem">Beneficios</a>
         <a class="ghost" href="#como-funciona" role="menuitem">Cómo funciona</a>
         <a class="ghost" href="#reviews" role="menuitem">Opiniones</a>
-        <a class="ghost" href="#mi-suscripcion" data-requires-auth role="menuitem">Mi suscripción</a>
-        <a class="btn" id="btnAbrirLoginMobile" role="menuitem">Iniciar sesión</a>
+        <a class="ghost" href="suscripciones.html" role="menuitem">Suscripciones</a>
+        <a class="btn" href="suscripciones.html" role="menuitem">¡Comenzar ahora!</a>
       </div>
     </div>
   </header>
 
-  <main id="top">
+  <main>
     <!-- HERO -->
     <section class="hero">
       <div class="container hero-grid">
         <div>
           <h1>¿Imaginas subir la valoración de tu negocio <em>SIN HACER NADA</em>?</h1>
-          <p class="lead">Aumenta tus reseñas, protege tu reputación y convierte opiniones en más clientes y más ingresos, sin mover un solo dedo.</p>
+          <p class="lead">
+            Aumenta tus reseñas, protege tu reputación y convierte opiniones en más clientes y más ingresos, sin mover un solo dedo.
+          </p>
           <div class="pills" aria-label="Resultados clave">
             <div class="pill">Mejores reseñas en internet</div><div class="pill">Más clientes</div><div class="pill">Más dinero</div>
           </div>
-          <div class="cta-row"><a class="btn" href="#beneficios">Ver cómo funciona</a></div>
+          <div class="cta-row"><a class="btn" href="suscripciones.html">Ver suscripciones</a></div>
         </div>
       </div>
     </section>
@@ -241,6 +262,7 @@
           <article class="card"><h3>Encuentra los puntos débiles</h3><p>Las reseñas negativas no se publican: se guardan en tu panel para analizarlas, filtrarlas por periodo y mejorar.</p></article>
           <article class="card"><h3>Gana dinero</h3><p>Con mejores valoraciones subes posiciones en el buscador, atraes más clientes y aumentas beneficios.</p></article>
         </div>
+        <div class="cta-row"><a class="btn" href="suscripciones.html">Empezar ahora</a></div>
       </div>
     </section>
 
@@ -248,37 +270,42 @@
     <section class="reviews" id="reviews">
       <div class="container">
         <h2>Valorado 4,8/5 por más de 30 negocios</h2>
+
         <div class="reviews-window">
           <div class="reviews-track" id="reviewsTrack" tabindex="0" aria-label="Opiniones de clientes">
             <article class="review-card">
               <div class="review-header">
-                <div class="review-avatar"><img src="https://i.pravatar.cc/110?img=26" alt="Sara Cordero" width="54" height="54"></div>
+                <div class="review-avatar"><img loading="lazy" decoding="async" fetchpriority="low" src="https://i.pravatar.cc/110?img=26" alt="Sara Cordero" width="54" height="54"></div>
                 <div><div class="review-name">Sara Cordero</div><div class="review-stars">★★★★★</div></div>
               </div>
               <p class="review-text">Instalación en 5 minutos. Los avisos de reseñas negativas nos han permitido corregir fallos de atención al cliente en días.</p>
             </article>
+
             <article class="review-card">
               <div class="review-header">
-                <div class="review-avatar"><img src="https://i.pravatar.cc/110?img=33" alt="Marlon Melara" width="54" height="54"></div>
+                <div class="review-avatar"><img loading="lazy" decoding="async" fetchpriority="low" src="https://i.pravatar.cc/110?img=33" alt="Marlon Melara" width="54" height="54"></div>
                 <div><div class="review-name">Marlon Melara</div><div class="review-stars">★★★★★</div></div>
               </div>
-              <p class="review-text">Una herramienta genial para ahorrar tiempo en reputación online. Muy fácil para el cliente.</p>
+              <p class="review-text">Una herramienta genial para ahorrar tiempo en reseñas y reputación online. Muy fácil de usar por el cliente.</p>
             </article>
+
             <article class="review-card">
               <div class="review-header">
-                <div class="review-avatar"><img src="https://i.pravatar.cc/110?img=12" alt="Joan Blanch" width="54" height="54"></div>
+                <div class="review-avatar"><img loading="lazy" decoding="async" fetchpriority="low" src="https://i.pravatar.cc/110?img=12" alt="Joan Blanch" width="54" height="54"></div>
                 <div><div class="review-name">Joan Blanch</div><div class="review-stars">★★★★★</div></div>
               </div>
-              <p class="review-text">Llevamos semanas subiendo reseñas sin pedirlo. El panel de negativas nos ayudó a mejorar procesos.</p>
+              <p class="review-text">Excelente herramienta. Llevamos semanas subiendo reseñas sin tener que pedirlo. El panel de negativas nos ha ayudado a mejorar procesos internos.</p>
             </article>
+
             <article class="review-card">
               <div class="review-header">
-                <div class="review-avatar"><img src="https://i.pravatar.cc/110?img=5" alt="Eco Abraham" width="54" height="54"></div>
+                <div class="review-avatar"><img loading="lazy" decoding="async" fetchpriority="low" src="https://i.pravatar.cc/110?img=5" alt="Eco Abraham" width="54" height="54"></div>
                 <div><div class="review-name">Eco Abraham</div><div class="review-stars">★★★★★</div></div>
               </div>
-              <p class="review-text">Nunca tantas reseñas reales tan rápido. El flujo NFC es comodísimo.</p>
+              <p class="review-text">Nunca había conseguido tantas reseñas reales tan rápido. El flujo NFC es comodísimo para el cliente.</p>
             </article>
           </div>
+
           <div class="reviews-nav" aria-hidden="true">
             <button class="nav-btn" id="revPrev" aria-label="Anterior">‹</button>
             <button class="nav-btn" id="revNext" aria-label="Siguiente">›</button>
@@ -291,45 +318,92 @@
     <section id="como-funciona">
       <div class="container"><h2>Ahora bien... ¿Cómo funciona Taply?</h2></div>
       <div class="container grid-3">
-        <div class="card"><h3>1) Acerca el móvil</h3><p>Coloca los dispositivos <strong>Taply</strong> en las mesas. El cliente acerca su smartphone y aparece la pantalla de valoración sin apps.</p></div>
-        <div class="card"><h3>2) Enrutado inteligente</h3><p>Si la experiencia es positiva, va a Google; si es negativa, se abre un formulario privado que guardamos para ti.</p></div>
-        <div class="card"><h3>3) Aprende y mejora</h3><p>Verás negativas en una hoja privada con filtros por fecha/categoría para actuar rápido.</p></div>
+        <div class="card">
+          <h3>1) Acerca el móvil</h3>
+          <p>Coloca los dispositivos <strong>Taply</strong> en las mesas de tu local. El cliente acerca su smartphone y de inmediato aparece la pantalla de valoración. Todo ocurre en segundos, sin necesidad de descargas ni aplicaciones extra.</p>
+        </div>
+
+        <div class="card">
+          <h3>2) Enrutado inteligente</h3>
+          <p>En la pantalla se le preguntará al cliente cómo ha sido su experiencia. Si responde que ha sido positiva, irá directamente a tu perfil de Google para dejar una reseña. Si responde que ha sido negativa, se le abrirá un formulario privado diseñado para tu negocio.</p>
+        </div>
+
+        <div class="card">
+          <h3>3) Formulario privado</h3>
+          <p>El formulario se adapta a tu negocio con las preguntas que quieras incluir: atención, tiempos de espera, calidad… Nosotros lo preparamos y conectamos a una hoja privada donde se guardan todas las respuestas.</p>
+        </div>
+
+        <div class="card">
+          <h3>4) Aprende y mejora</h3>
+          <p>Cada respuesta negativa queda registrada en esa hoja privada, que podrás consultar siempre que quieras. Allí verás gráficos, podrás filtrar por fechas y detectar patrones que te ayuden a mejorar sin que afecte a tu puntuación pública.</p>
+        </div>
+
+        <div class="card">
+          <h3>5) Todo suma</h3>
+          <p>Con mejores valoraciones subes en el buscador, aumentas la confianza y atraes más clientes. Puedes incentivar con un pequeño detalle (café, chupito o descuento).</p>
+        </div>
       </div>
     </section>
 
-    <!-- MI SUSCRIPCIÓN (zona independiente y protegida) -->
-    <section id="mi-suscripcion">
+    <!-- FAQ -->
+    <section id="faq">
+      <div class="container faq">
+        <h2>Preguntas frecuentes</h2>
+        <div class="acc" role="tablist">
+          <div class="acc-item">
+            <button class="acc-btn" aria-expanded="false">¿En qué me puede ayudar Taply? <span>+</span></button>
+            <div class="acc-panel"><div>
+              Taply te ayuda a conseguir <strong>mejores reseñas</strong> con un flujo sin fricción y a <strong>escuchar</strong> al cliente:
+              las positivas se publican en Google y las negativas se quedan en una hoja de control privada para que puedas actuar.
+            </div></div>
+          </div>
+          <div class="acc-item">
+            <button class="acc-btn" aria-expanded="false">¿Necesito algo especial para usarlo? <span>+</span></button>
+            <div class="acc-panel"><div>
+              Solo nuestro dispositivo NFC. Funciona con la mayoría de smartphones modernos sin instalar apps. Te mandamos también un QR por si lo prefieres.
+            </div></div>
+          </div>
+          <div class="acc-item">
+            <button class="acc-btn" aria-expanded="false">¿Puedo ver y filtrar reseñas negativas? <span>+</span></button>
+            <div class="acc-panel"><div>
+              Sí. En tu panel podrás <strong>ver todas</strong>, filtrarlas por periodos y detectar <strong>puntos de mejora</strong> del negocio.
+            </div></div>
+          </div>
+          <div class="acc-item">
+            <button class="acc-btn" aria-expanded="false">¿Realmente atraeré más clientes? <span>+</span></button>
+            <div class="acc-panel"><div>
+              Mejores valoraciones elevan tu visibilidad en el buscador y aumentan la confianza. Más visibilidad = más clientes.
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SOCIALES -->
+    <section class="socials">
       <div class="container">
-        <h2>Mi suscripción</h2>
-        <p class="lead">Aquí podrás ver/gestionar tu plan. <span class="mini">Para acceder debes iniciar sesión.</span></p>
-
-        <!-- Si NO está logueado -->
-        <div class="account" id="accountLocked">
-          <span class="badge">Acceso restringido</span>
-          <div class="row">
-            <p class="mini">Debes iniciar sesión para ver tu suscripción.</p>
-            <button class="btn" id="openLoginFromLocked">Iniciar sesión</button>
-          </div>
-        </div>
-
-        <!-- Si SÍ está logueado -->
-        <div class="account" id="accountPanel" style="display:none">
-          <span class="badge">Mi cuenta</span>
-          <div class="row">
-            <div>
-              <p style="margin:.2rem 0 0"><strong id="accEmail">—</strong></p>
-              <p class="mini" id="accName" style="margin:.2rem 0 0"></p>
-              <p class="mini" id="accStatus" style="margin:.4rem 0 0">Cargando estado de suscripción…</p>
-            </div>
-            <div class="row" style="gap:8px">
-              <button class="ghost" id="logoutBtn">Cerrar sesión</button>
-              <button class="btn" id="portalBtn">Gestionar suscripción</button>
-            </div>
-          </div>
+        <div class="row">
+          <a href="#" aria-label="YouTube" title="YouTube">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.92 4 12 4 12 4s-6.92 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29.94 29.94 0 0 0 1 12a29.94 29.94 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.08 20 12 20 12 20s6.92 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29.94 29.94 0 0 0 23 12a29.94 29.94 0 0 0-.46-5.58Z"/><path d="M10 15l5-3-5-3v6z" fill="currentColor" stroke="none"/></svg>
+          </a>
+          <a href="#" aria-label="Instagram" title="Instagram">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><path d="M17.5 6.5h.01"/></svg>
+          </a>
+          <a href="#" aria-label="X / Twitter" title="X / Twitter">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2H21l-6.474 7.39L22 22h-6.828L9.94 14.65 2.9 22H0l6.95-7.93L2 2h6.828l4.01 6.585L18.244 2Zm-2.395 18h2.21L8.27 4h-2.21l9.79 16Z"/></svg>
+          </a>
+          <a href="#" aria-label="Facebook" title="Facebook">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.5 9.9v-7h-2v-2.9h2v-2.2c0-2 1.2-3.1 3-3.1.9 0 1.8.16 1.8.16v2h-1c-1 0-1.3.63-1.3 1.3v1.8h2.3L14.8 14.9h-2v7A10 10 0 0 0 22 12"/></svg>
+          </a>
+          <a href="#" aria-label="Telegram" title="Telegram">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.04 15.49 8.9 20a1 1 0 0 0 1.78.62l2.54-3.18 4.34 3.18a1 1 0 0 0 1.56-.6L22.98 4.1a1 1 0 0 0-1.38-1.1L1.67 10.17a1 1 0 0 0 .1 1.89l5.83 1.9 11.7-7.36-10.26 8.89Z"/></svg>
+          </a>
+          <a href="#" aria-label="Email" title="Email">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+          </a>
         </div>
       </div>
     </section>
-
   </main>
 
   <!-- FOOTER -->
@@ -343,70 +417,91 @@
       </div>
       <div>
         <p><a href="#beneficios">Beneficios</a></p>
-        <p><a href="#como-funciona">Cómo funciona</a></p>
-        <p><a href="#mi-suscripcion" data-requires-auth>Mi suscripción</a></p>
+        <p><a href="suscripciones.html">Suscripciones</a></p>
+        <p><a href="suscripciones.html#cuenta">Mi cuenta</a></p>
       </div>
       <div>
-        <p><a href="#reviews">Opiniones</a></p>
-        <p><a href="#top">Volver arriba</a></p>
+        <p><a href="#como-funciona">Cómo funciona</a></p>
+        <p><a href="suscripciones.html">Comenzar ahora</a></p>
       </div>
     </div>
   </footer>
 
   <!-- Cookie bar -->
   <div class="cookiebar" id="cookiebar" role="dialog" aria-live="polite" aria-label="Aviso de cookies">
-    <p>Usamos cookies en nuestra página web para ver cómo interactúas con ella. Al aceptarlas, estás de acuerdo con nuestro uso de dichas cookies. <a href="#" style="color:#b3e1ff;text-decoration:underline">Política de privacidad</a></p>
+    <p>
+      Usamos cookies en nuestra página web para ver cómo interactúas con ella. 
+      Al aceptarlas, estás de acuerdo con nuestro uso de dichas cookies. 
+      <a href="#" style="color:#b3e1ff;text-decoration:underline">Política de privacidad</a>
+    </p>
     <button class="btn-accept" id="cookieAccept">Aceptar</button>
   </div>
 
-  <!-- Modal de autenticación -->
-  <div class="modal" id="authModal" aria-hidden="true" role="dialog" aria-labelledby="authTitle">
-    <div class="overlay" data-close-modal></div>
-    <div class="dialog">
-      <button class="x" title="Cerrar" data-close-modal aria-label="Cerrar">×</button>
-      <h3 id="authTitle">Inicia sesión</h3>
-      <p>Usa Google o tu correo. Vincularemos tus pagos a este email.</p>
-      <div class="prov">
-        <button class="btn-line" id="googleBtn">
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
-          <span>Continuar con Google</span>
-        </button>
-      </div>
-      <form class="auth" id="emailForm">
-        <input type="email" id="emailInput" placeholder="tu@email.com" required>
-        <input type="text" id="nameInput" placeholder="Nombre del negocio (opcional)">
-        <button class="btn" type="submit">Continuar con correo</button>
-      </form>
-      <p class="hint">¿Problemas? También puedes entrar con correo. Si no hay servidor configurado, usaremos un modo seguro local (no se pierde al recargar).</p>
-    </div>
-  </div>
-
-  <!-- Toast -->
-  <div class="toast" id="toast"></div>
-
   <script>
-    /* ========= Utilidades/UI ========= */
-    const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
-    const showToast = (msg) => { const t = $('#toast'); t.textContent = msg; t.style.display='block'; setTimeout(()=> t.style.display='none', 2600); };
-    const showModal = (id)=>{ const m=$(id); if(!m) return; m.style.display='grid'; m.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; };
-    const hideModal = (id)=>{ const m=$(id); if(!m) return; m.style.display='none'; m.setAttribute('aria-hidden','true'); document.body.style.overflow=''; };
-
+    // Carga suave
     window.addEventListener('load', () => document.body.classList.add('is-loaded'));
 
-    // Menú móvil
-    const menuBtn = $('#menuBtn'); const mobileMenu = $('#mobileMenu');
+    // Menú móvil (toggle + cerrar al elegir)
+    const menuBtn=document.getElementById('menuBtn');
+    const mobileMenu=document.getElementById('mobileMenu');
     menuBtn?.addEventListener('click', ()=> {
       const open = mobileMenu.style.display === 'block';
       mobileMenu.style.display = open ? 'none' : 'block';
       menuBtn.setAttribute('aria-expanded', String(!open));
     });
-    mobileMenu?.addEventListener('click', (e)=>{ const a = e.target.closest('a,button'); if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }});
-    window.addEventListener('resize', ()=>{ if(window.innerWidth > 768){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }});
+    mobileMenu?.addEventListener('click', (e)=>{
+      const a = e.target.closest('a');
+      if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }
+    });
+    window.addEventListener('resize', ()=>{
+      if(window.innerWidth > 768){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }
+    });
 
-    // Cookie bar
+    // FAQ
+    document.querySelectorAll('.acc-btn').forEach(btn=>{
+      btn.setAttribute('aria-expanded','false');
+      const panel=btn.nextElementSibling; if(panel) panel.style.maxHeight='0px';
+      btn.addEventListener('click',()=>{
+        const open=btn.getAttribute('aria-expanded')==='true';
+        document.querySelectorAll('.acc-btn').forEach(b=>{
+          b.setAttribute('aria-expanded','false');
+          const p=b.nextElementSibling; if(p) p.style.maxHeight='0px';
+        });
+        if(!open){btn.setAttribute('aria-expanded','true'); if(panel) panel.style.maxHeight=panel.scrollHeight+'px';}
+      });
+    });
+
+    // Carrusel opiniones
+    (function(){
+      const track=document.getElementById('reviewsTrack');
+      const prev=document.getElementById('revPrev');
+      const next=document.getElementById('revNext');
+      if(!track||!prev||!next) return;
+
+      const step=()=>{
+        const first=track.querySelector('.review-card');
+        const gap=parseInt(getComputedStyle(track).gap||'22',10);
+        const width=first ? Math.round(first.getBoundingClientRect().width) : 360;
+        return width + gap;
+      };
+      const atStart=()=>track.scrollLeft<=2;
+      const atEnd =()=>track.scrollLeft+track.clientWidth>=track.scrollWidth-2;
+
+      function update(){ prev.classList.toggle('disabled',atStart()); next.classList.toggle('disabled',atEnd()); }
+
+      prev.addEventListener('click',()=>{ if(!prev.classList.contains('disabled')) track.scrollBy({left:-step(),behavior:'smooth'}); });
+      next.addEventListener('click',()=>{ if(!next.classList.contains('disabled')) track.scrollBy({left: step(),behavior:'smooth'}); });
+      track.addEventListener('keydown',(e)=>{ if(e.key==='ArrowRight') next.click(); if(e.key==='ArrowLeft') prev.click(); });
+      track.addEventListener('scroll',update,{passive:true});
+      window.addEventListener('resize',update);
+      update();
+    })();
+
+    // Cookies
     (function(){
       const KEY='taply_cookie_consent';
-      const bar=$('#cookiebar'), btn=$('#cookieAccept');
+      const bar=document.getElementById('cookiebar');
+      const btn=document.getElementById('cookieAccept');
       if(localStorage.getItem(KEY)==='1'){ bar.style.display='none'; }
       btn.addEventListener('click',()=>{ localStorage.setItem(KEY,'1'); bar.style.display='none'; });
     })();
@@ -419,189 +514,6 @@
       r.style.left=(e.clientX-rect.left)+'px'; r.style.top=(e.clientY-rect.top)+'px';
       b.appendChild(r); r.addEventListener('animationend',()=>r.remove());
     });
-
-    // Carrusel opiniones
-    (function(){
-      const track=$('#reviewsTrack'), prev=$('#revPrev'), next=$('#revNext');
-      if(!track||!prev||!next) return;
-      const step=()=>{ const first=track.querySelector('.review-card'); const gap=parseInt(getComputedStyle(track).gap||'22',10); const width=first?Math.round(first.getBoundingClientRect().width):360; return width+gap; };
-      const atStart=()=>track.scrollLeft<=2, atEnd=()=>track.scrollLeft+track.clientWidth>=track.scrollWidth-2;
-      const update=()=>{ prev.classList.toggle('disabled',atStart()); next.classList.toggle('disabled',atEnd()); };
-      prev.addEventListener('click',()=>{ if(!prev.classList.contains('disabled')) track.scrollBy({left:-step(),behavior:'smooth'}); });
-      next.addEventListener('click',()=>{ if(!next.classList.contains('disabled')) track.scrollBy({left: step(),behavior:'smooth'}); });
-      track.addEventListener('scroll',update,{passive:true}); window.addEventListener('resize',update); update();
-    })();
-
-    /* ========= Auth: API + Fallback sin “error de red” ========= */
-    const AUTH_COOKIE = 'taply_session';
-    const LOCAL_USER_KEY = 'taply_local_user'; // fallback local
-    const parseCookie = (name)=>{
-      const m = (document.cookie||'').match(new RegExp('(?:^|; )'+name+'=([^;]+)')); return m ? decodeURIComponent(m[1]) : null;
-    };
-
-    async function apiFetch(url, options={}){
-      // Helper robusto: captura fallos y nunca revienta la UI
-      const opts={credentials:'include', headers:{'Content-Type':'application/json', ...(options.headers||{})}, ...options};
-      try{
-        const res = await fetch(url, opts);
-        const ct = res.headers.get('content-type')||'';
-        const data = ct.includes('application/json') ? await res.json().catch(()=> ({})) : {};
-        if(!res.ok) throw new Error(data.message || res.status+' '+res.statusText);
-        return { ok:true, data };
-      }catch(err){
-        // No re-lanzamos para evitar “error de red”: devolvemos estado fallido
-        return { ok:false, error: (err && err.message) || 'Error de red' };
-      }
-    }
-
-    function getLocalUser(){
-      try{ const raw = localStorage.getItem(LOCAL_USER_KEY); return raw ? JSON.parse(raw) : null; }catch{ return null; }
-    }
-    function setLocalUser(user){ try{ localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(user||{})); }catch{} }
-    function clearLocalUser(){ try{ localStorage.removeItem(LOCAL_USER_KEY); }catch{} }
-
-    async function getSession(){
-      // 1) Si el servidor existe, úsalo
-      const me = await apiFetch('/api/auth/me', { method:'GET' });
-      if(me.ok) return me.data;
-      // 2) Si hay cookie, pero el endpoint falla, no podemos leerla -> caer a local
-      const local = getLocalUser();
-      return local || null;
-    }
-
-    async function loginWithEmail(email, name){
-      // Intento real
-      const r = await apiFetch('/api/auth/login', { method:'POST', body: JSON.stringify({email, name}) });
-      if(r.ok){
-        // servidor guardará cookie; por si acaso cacheamos también local
-        setLocalUser({ email, name: name||'' });
-        return true;
-      }
-      // Fallback local: sin servidor
-      setLocalUser({ email, name: name||'' });
-      showToast('Sesión iniciada en modo local.');
-      return true;
-    }
-
-    async function logout(){
-      const r = await apiFetch('/api/auth/logout', { method:'POST' });
-      clearLocalUser();
-      // Si había cookie, el servidor la borrará; no pasa nada si falla
-      return true;
-    }
-
-    async function loginWithGoogle(){
-      // Si existe endpoint para obtener URL de Google, úsalo
-      const r = await apiFetch('/api/auth/google-url', { method:'POST' });
-      if(r.ok && r.data && r.data.url){
-        location.href = r.data.url; // flujo OAuth real
-        return;
-      }
-      // Fallback: demo local
-      setLocalUser({ email: 'demo.google@taply.local', name: 'Usuario Google' });
-      showToast('Google no configurado: usando sesión local.');
-      await onAuthChanged();
-      hideModal('#authModal');
-    }
-
-    /* ========= Protección de la sección ========= */
-    async function requireAuth(){
-      const session = await getSession();
-      if(session && session.email) return session;
-      showModal('#authModal');
-      return null;
-    }
-
-    async function onAuthChanged(){
-      const session = await getSession();
-      const locked = $('#accountLocked');
-      const panel = $('#accountPanel');
-      if(session && session.email){
-        // Mostrar panel
-        locked.style.display = 'none';
-        panel.style.display = '';
-        $('#accEmail').textContent = session.email || '—';
-        $('#accName').textContent = session.name ? session.name : '';
-        // Estado de suscripción (si hay backend). Si no, mostramos placeholder amigable
-        const st = await apiFetch('/api/subscription/status', { method:'GET' });
-        if(st.ok && st.data){
-          if(st.data.active){
-            $('#accStatus').innerHTML = `Plan: <strong>${st.data.tier||'—'}</strong> · ${st.data.interval||''} — <span style="color:${getComputedStyle(document.documentElement).getPropertyValue('--ok')};font-weight:700">Activo</span>`;
-          }else{
-            $('#accStatus').textContent = 'Sin suscripción activa.';
-          }
-        }else{
-          $('#accStatus').textContent = 'Sin suscripción activa (servidor no configurado).';
-        }
-        // Botón cabecera -> cambia a “Mi cuenta”
-        $('#btnAbrirLogin')?.classList.add('ghost');
-        $('#btnAbrirLogin')?.classList.remove('btn');
-        $('#btnAbrirLogin')?.setAttribute('disabled','disabled');
-      }else{
-        locked.style.display = '';
-        panel.style.display = 'none';
-        $('#btnAbrirLogin')?.removeAttribute('disabled');
-        $('#btnAbrirLogin')?.classList.remove('ghost');
-        $('#btnAbrirLogin')?.classList.add('btn');
-      }
-    }
-
-    /* ========= Eventos UI ========= */
-
-    // Abrir login
-    $('#btnAbrirLogin')?.addEventListener('click', ()=> showModal('#authModal'));
-    $('#btnAbrirLoginMobile')?.addEventListener('click', ()=> showModal('#authModal'));
-    $('#openLoginFromLocked')?.addEventListener('click', ()=> showModal('#authModal'));
-    $$('#authModal [data-close-modal]').forEach(el=> el.addEventListener('click', ()=> hideModal('#authModal')));
-
-    // Clicks en enlaces protegidos (Mi suscripción)
-    $$('[data-requires-auth]').forEach(link=>{
-      link.addEventListener('click', async (e)=>{
-        // Evita saltos hasta verificar
-        e.preventDefault();
-        const session = await requireAuth();
-        if(session){
-          // Abre sección de cuenta
-          document.getElementById('mi-suscripcion').scrollIntoView({behavior:'smooth', block:'start'});
-        }
-      });
-    });
-
-    // Form email
-    $('#emailForm')?.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const email = $('#emailInput').value.trim();
-      const name = $('#nameInput').value.trim();
-      if(!email) return showToast('Introduce tu email');
-      const ok = await loginWithEmail(email, name);
-      if(ok){
-        hideModal('#authModal');
-        await onAuthChanged();
-        document.getElementById('mi-suscripcion').scrollIntoView({behavior:'smooth', block:'start'});
-      }
-    });
-
-    // Google
-    $('#googleBtn')?.addEventListener('click', async ()=>{
-      await loginWithGoogle();
-    });
-
-    // Logout
-    $('#logoutBtn')?.addEventListener('click', async ()=>{
-      await logout();
-      await onAuthChanged();
-      showToast('Sesión cerrada.');
-    });
-
-    // Portal de suscripción
-    $('#portalBtn')?.addEventListener('click', async ()=>{
-      const r = await apiFetch('/api/subscription/portal', { method:'POST' });
-      if(r.ok && r.data && r.data.url){ location.href = r.data.url; }
-      else showToast('Portal no disponible (servidor no configurado).');
-    });
-
-    // Inicializa estado
-    (async ()=> { await onAuthChanged(); })();
   </script>
 </body>
 </html>
