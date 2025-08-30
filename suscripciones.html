@@ -2,123 +2,62 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <!-- evita zoom por doble-tap en móvil -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0f1a" />
   <title>Taply — NFC + Suscripción</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    :root{
-      --bg:#0b0f1a; --bg-2:#0e1424; --txt:#e9eefc; --muted:#9fb0c6;
-      --brand-1:#00d4ff; --brand-2:#7c3aed; --ok:#22c55e;
-      --border:rgba(255,255,255,.08); --radius:18px;
-      --shadow:0 12px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%; touch-action:manipulation}
-    body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--txt);opacity:0;transition:.35s}
-    body.is-loaded{opacity:1}
-    a{text-decoration:none;color:inherit}
-    .container{max-width:1100px;width:92%;margin-inline:auto}
-
-    /* HEADER (igual que index) */
+    /* (MISMO ESTILO QUE TENÍAS) */
+    :root{--bg:#0b0f1a;--bg-2:#0e1424;--txt:#e9eefc;--muted:#9fb0c6;--brand-1:#00d4ff;--brand-2:#7c3aed;--border:rgba(255,255,255,.08);--radius:18px;--shadow:0 12px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04)}
+    *{box-sizing:border-box} html,body{height:100%;touch-action:manipulation}
+    body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--txt);opacity:0;transition:.35s} body.is-loaded{opacity:1}
+    a{text-decoration:none;color:inherit} .container{max-width:1100px;width:92%;margin-inline:auto}
     header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px)}
-    .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0; position:relative}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0;position:relative}
     .brand{display:flex;gap:10px;align-items:center;font-weight:800}
     .logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2))}
-    .nav-links{display:flex;gap:22px;align-items:center}
-    .ghost{padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);color:var(--txt)}
-    .btn{
-      background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
-      color:#061017;font-weight:800;border:0;border-radius:999px;cursor:pointer;
-      padding:12px 16px;display:inline-flex;align-items:center;justify-content:center;
-      box-shadow:0 10px 28px rgba(124,58,237,.35),0 4px 14px rgba(0,212,255,.25)
-    }
-    /* botón compacto para + y − */
+    .nav-links{display:flex;gap:22px;align-items:center}.ghost{padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12)}
+    .btn{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-weight:800;border:0;border-radius:999px;cursor:pointer;padding:12px 16px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 10px 28px rgba(124,58,237,.35),0 4px 14px rgba(0,212,255,.25)}
     .btn.sm{padding:6px 12px;min-width:0;line-height:1;border-radius:999px}
-
-    .menu{display:none}
-    .mobile-menu{
-      position:absolute; left:0; right:0; top:100%;
-      display:none; padding:14px; background:#0b0f1a; border-top:1px solid rgba(255,255,255,.08);
-      box-shadow:0 16px 40px rgba(0,0,0,.45)
-    }
-    .mobile-links{display:flex;flex-direction:column;gap:10px}
-    .mobile-links .ghost{background:rgba(255,255,255,.02); border-color:rgba(255,255,255,.18)}
-    .mobile-links .btn{width:100%; justify-content:center}
-
-    /* Página */
-    .hero{text-align:center;padding:40px 0 24px}
-    .h1{font-size:clamp(2rem,5.5vw,3.2rem);margin:0;font-weight:800}
-    .lead{color:var(--muted);max-width:860px;margin:12px auto 0}
-
-    .steps{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0}
-    .step-pill{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.04);font-weight:600}
-    .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-size:12px}
-
+    .menu{display:none}.mobile-menu{position:absolute;left:0;right:0;top:100%;display:none;padding:14px;background:#0b0f1a;border-top:1px solid rgba(255,255,255,.08);box-shadow:0 16px 40px rgba(0,0,0,.45)}
+    .mobile-links{display:flex;flex-direction:column;gap:10px}.mobile-links .ghost{background:rgba(255,255,255,.02);border-color:rgba(255,255,255,.18)}.mobile-links .btn{width:100%}
+    .hero{text-align:center;padding:40px 0 24px}.h1{font-size:clamp(2rem,5.5vw,3.2rem);margin:0;font-weight:800}.lead{color:var(--muted);max-width:860px;margin:12px auto 0}
+    .steps{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0}.step-pill{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.04);font-weight:600}.n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-size:12px}
     .chooser{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:24px auto}
     .card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;justify-content:space-between}
-    .card h3{margin:0 0 6px;font-size:1.2rem}
-    .card p{margin:0;color:var(--muted)}
-    .badge{font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.04);color:#cfe3ff;display:inline-block;margin-bottom:8px}
-    .actions{display:flex;gap:10px;margin-top:14px}
-
     .seg{display:flex;justify-content:center;gap:10px;margin:22px auto}
     .seg button{border:0;padding:10px 18px;border-radius:999px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.06);color:var(--muted)}
     .seg button.active{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017}
-
-    .plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:stretch}
-    .plan{display:flex;flex-direction:column;justify-content:space-between}
-    .price-lg{font-size:32px;font-weight:800;margin:8px 0}
-    .per{color:var(--muted);font-size:14px;font-weight:600}
-    .desc{color:var(--muted);flex:1;margin:8px 0 12px}
-    .plan.rec{outline:2px solid rgba(0,212,255,.25);box-shadow:0 0 0 5px rgba(124,58,237,.08),var(--shadow)}
-
-    footer{text-align:center;padding:28px 0 36px;color:#b7c3d2;border-top:1px solid var(--border)}
-    @media(max-width:700px){.btn{width:100%}}
-
-    .panel{display:none;margin-bottom:40px}
-    .panel.show{display:block}
-    .anchor-offset{position:relative; top:-80px; display:block; height:0}
-
-    @media (max-width: 768px){
-      .nav-links{display:none}
-      .menu{
-        display:block;
-        background:#0f172a; color:#e9eefc;
-        border:1px solid rgba(255,255,255,.28);
-        box-shadow:0 8px 24px rgba(0,0,0,.45);
-        padding:10px 14px; border-radius:999px;
-      }
-      .menu:hover{filter:brightness(1.08)}
-      .menu:active{transform:translateY(1px)}
-    }
+    .plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+    .price-lg{font-size:32px;font-weight:800;margin:8px 0}.per{color:#9fb0c6;font-size:14px;font-weight:600}.desc{color:#9fb0c6;margin:8px 0 12px}
+    .panel{display:none;margin-bottom:40px}.panel.show{display:block}.anchor-offset{position:relative;top:-80px;display:block;height:0}
+    @media (max-width:768px){.nav-links{display:none}.menu{display:block;background:#0f172a;color:#e9eefc;border:1px solid rgba(255,255,255,.28);box-shadow:0 8px 24px rgba(0,0,0,.45);padding:10px 14px;border-radius:999px}.btn{width:100%}}
   </style>
 </head>
 <body>
 <header>
   <div class="container nav">
     <a class="brand" href="index.html" aria-label="Volver al inicio">
-      <span class="logo">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M5 12a7 7 0 1114 0v6.5a2.5 2.5 0 01-5 0V9.75a2.25 2.25 0 10-4.5 0V18.5a2.5 2.5 0 01-5 0V12z" stroke="#061017" stroke-width="1.7"/></svg>
-      </span>
+      <span class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12a7 7 0 1114 0v6.5a2.5 2.5 0 01-5 0V9.75a2.25 2.25 0 10-4.5 0V18.5a2.5 2.5 0 01-5 0V12z" stroke="#061017" stroke-width="1.7"/></svg></span>
       <span>taply</span>
     </a>
-
-    <nav class="nav-links" aria-label="Navegación principal">
+    <nav class="nav-links">
       <a class="ghost" href="index.html#beneficios">Beneficios</a>
       <a class="ghost" href="index.html#como-funciona">Cómo funciona</a>
       <a class="ghost" href="index.html#reviews">Opiniones</a>
+      <a class="ghost" href="suscripciones.html">Suscripciones</a>
+      <a class="ghost" href="suscripciones.html#cuenta">Mi suscripción</a>
       <a class="btn" href="index.html">Volver al inicio</a>
     </nav>
-
     <button class="menu ghost" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Menú</button>
-    <div class="mobile-menu" id="mobileMenu" role="menu" aria-label="Menú móvil">
+    <div class="mobile-menu" id="mobileMenu" role="menu">
       <div class="mobile-links">
-        <a class="ghost" href="index.html#beneficios" role="menuitem">Beneficios</a>
-        <a class="ghost" href="index.html#como-funciona" role="menuitem">Cómo funciona</a>
-        <a class="ghost" href="index.html#reviews" role="menuitem">Opiniones</a>
-        <a class="btn" href="index.html" role="menuitem">Volver al inicio</a>
+        <a class="ghost" href="index.html#beneficios">Beneficios</a>
+        <a class="ghost" href="index.html#como-funciona">Cómo funciona</a>
+        <a class="ghost" href="index.html#reviews">Opiniones</a>
+        <a class="ghost" href="suscripciones.html">Suscripciones</a>
+        <a class="ghost" href="suscripciones.html#cuenta">Mi suscripción</a>
+        <a class="btn" href="index.html">Volver al inicio</a>
       </div>
     </div>
   </div>
@@ -127,7 +66,7 @@
 <section class="hero">
   <div class="container">
     <h1 class="h1">Empieza en dos pasos</h1>
-    <p class="lead">Primero compra los NFC para tus mesas, después activa la suscripción que más te convenga. Son pagos independientes y tras cada compra recibirás un WhatsApp con instrucciones y contacto directo.</p>
+    <p class="lead">Primero compra los NFC… después activa tu suscripción.</p>
     <div class="steps">
       <span class="step-pill"><span class="n">1</span> Comprar NFC</span>
       <span class="step-pill"><span class="n">2</span> Elegir suscripción</span>
@@ -137,18 +76,14 @@
       <article class="card">
         <span class="badge">Paso 1</span>
         <h3>Comprar NFC</h3>
-        <p>Dispositivos que colocas en las mesas o mostradores. Pago único, necesarios para empezar.</p>
-        <div class="actions">
-          <a href="#nfc" id="showNfc" class="btn">Comprar NFC</a>
-        </div>
+        <p>Pago único. Necesarios para empezar.</p>
+        <div class="actions"><a href="#nfc" id="showNfc" class="btn">Comprar NFC</a></div>
       </article>
       <article class="card">
         <span class="badge">Paso 2</span>
         <h3>Activar Suscripción</h3>
-        <p>Elige plan mensual o anual para gestionar reseñas, panel privado y más. Una vez tengas NFC.</p>
-        <div class="actions">
-          <a href="#planes" id="showSub" class="btn">Ver planes</a>
-        </div>
+        <p>Elige plan mensual o anual.</p>
+        <div class="actions"><a href="#planes" id="showSub" class="btn">Ver planes</a></div>
       </article>
     </div>
   </div>
@@ -159,10 +94,9 @@
   <span id="nfc" class="anchor-offset" aria-hidden="true"></span>
   <article class="card">
     <h3>Compra tus NFC</h3>
-    <p class="desc">Selecciona cuántos necesitas. Tras pagar recibirás WhatsApp automático con la guía.</p>
+    <p class="desc">Selecciona cuántos necesitas.</p>
     <div class="actions" style="justify-content:center;gap:16px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);padding:6px;border-radius:999px">
-        <!-- botones + / − con estilo degradado -->
         <button id="minus" class="btn sm" aria-label="Restar">−</button>
         <span id="qty">1</span>
         <button id="plus" class="btn sm" aria-label="Sumar">＋</button>
@@ -183,33 +117,51 @@
   </div>
 
   <div class="plan-grid">
-    <article class="card plan">
+    <article class="card">
       <span class="badge">Basic</span>
       <div class="price-lg"><span id="p-basic">25€</span> <span class="per">/mes</span></div>
-      <p class="desc">Empieza a captar reseñas con tu NFC listo y acceso a tus datos exportables.</p>
+      <p class="desc">Empieza a captar reseñas.</p>
       <div class="actions"><a class="btn plan" data-tier="basic">Elegir Basic</a></div>
     </article>
 
-    <article class="card plan rec">
+    <article class="card" style="outline:2px solid rgba(0,212,255,.25)">
       <span class="badge">Medio · Recomendado</span>
       <div class="price-lg"><span id="p-medio">35€</span> <span class="per">/mes</span></div>
-      <p class="desc">Todo lo de Basic más un panel privado con filtros para controlar mejor tu reputación.</p>
+      <p class="desc">Panel privado y filtros.</p>
       <div class="actions"><a class="btn plan" data-tier="medio">Elegir Medio</a></div>
     </article>
 
-    <article class="card plan">
+    <article class="card">
       <span class="badge">Pro</span>
       <div class="price-lg"><span id="p-pro">45€</span> <span class="per">/mes</span></div>
-      <p class="desc">Todo lo de Medio con integración en Telegram, cambios bajo demanda y opción de incentivo para clientes.</p>
+      <p class="desc">Integraciones y soporte top.</p>
       <div class="actions"><a class="btn plan" data-tier="pro">Elegir Pro</a></div>
     </article>
   </div>
 </section>
 
+<!-- MI CUENTA / MI SUSCRIPCIÓN -->
+<section class="container" id="cuenta">
+  <h2>Mi suscripción</h2>
+  <article class="card" id="accountCard">
+    <div id="accLoggedOut" style="display:none">
+      <p>Para ver y gestionar tu suscripción debes iniciar sesión.</p>
+      <a class="btn" href="account.html#login">Iniciar sesión</a>
+    </div>
+
+    <div id="accInfo" style="display:none">
+      <p id="welcome"></p>
+      <p id="subState">Comprobando estado…</p>
+      <div class="actions" style="gap:10px;flex-wrap:wrap">
+        <button class="btn" id="btnPortal">Gestionar suscripción</button>
+        <button class="btn" id="btnLogout" style="background:linear-gradient(135deg,#ef4444,#f59e0b)">Cerrar sesión</button>
+      </div>
+    </div>
+  </article>
+</section>
+
 <footer>
-  <div class="container">
-    <p>Primero los dispositivos NFC, después la suscripción. Tras cada compra recibirás WhatsApp con instrucciones.</p>
-  </div>
+  <div class="container"><p>Tras cada compra recibirás WhatsApp con instrucciones.</p></div>
 </footer>
 
 <script>
@@ -217,43 +169,24 @@
   const fmt=v=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(v);
   window.addEventListener('load',()=>document.body.classList.add('is-loaded'));
 
-  /* Menú móvil */
-  const menuBtn=document.getElementById('menuBtn');
-  const mobileMenu=document.getElementById('mobileMenu');
+  // Menú móvil
+  const menuBtn=$('#menuBtn'), mobileMenu=$('#mobileMenu');
   menuBtn?.addEventListener('click', ()=> {
     const open = mobileMenu.style.display === 'block';
     mobileMenu.style.display = open ? 'none' : 'block';
     menuBtn.setAttribute('aria-expanded', String(!open));
   });
-  mobileMenu?.addEventListener('click', (e)=>{
-    const a = e.target.closest('a');
-    if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }
+  mobileMenu?.addEventListener('click', e=>{
+    const a=e.target.closest('a'); if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }
   });
-  window.addEventListener('resize', ()=>{
-    if(window.innerWidth > 768){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }
-  });
+  window.addEventListener('resize', ()=>{ if(innerWidth>768){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); } });
 
-  /* Precios y NFC */
+  // Precios / NFC
   const PRICE={nfcUnit:5,monthly:{basic:25,medio:35,pro:45},annualDiscount:.20};
   let qty=1,yearly=false;
-
-  function paintNfc(){
-    $('#qty').textContent=qty;
-    $('#totalNfc').textContent=fmt(qty*PRICE.nfcUnit)+' (pago único)';
-    $('#unitPrice').textContent=fmt(PRICE.nfcUnit)+' por dispositivo';
-  }
+  function paintNfc(){ $('#qty').textContent=qty; $('#totalNfc').textContent=fmt(qty*PRICE.nfcUnit)+' (pago único)'; $('#unitPrice').textContent=fmt(PRICE.nfcUnit)+' por dispositivo'; }
   $('#minus').addEventListener('click',()=>{qty=Math.max(1,qty-1);paintNfc()});
-  $('#plus').addEventListener('click',()=>{qty=Math.min(99,qty+1);paintNfc()});
-  paintNfc();
-
-  $('#buyNfcBtn').addEventListener('click',async()=>{
-    const payload={quantity:qty};
-    try{
-      const res=await fetch('/api/buy-nfc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      const data=await res.json();
-      if(data.url)location.href=data.url;else alert('No se pudo iniciar la compra de NFC.');
-    }catch{alert('Error de red');}
-  });
+  $('#plus').addEventListener('click',()=>{qty=Math.min(99,qty+1);paintNfc()}); paintNfc();
 
   function planAmount(tier){const m=PRICE.monthly[tier];return yearly?Math.round(m*12*(1-PRICE.annualDiscount)):m}
   function paintPrices(){
@@ -266,41 +199,90 @@
   $('#btn-year').addEventListener('click',()=>{yearly=true;$('#btn-year').classList.add('active');$('#btn-month').classList.remove('active');paintPrices()});
   paintPrices();
 
-  $$('.btn.plan').forEach(btn=>btn.addEventListener('click',async()=>{
-    const tier=btn.dataset.tier,payload={tier,frequency:yearly?'annual':'monthly'};
+  // --- auth helper ---
+  async function ensureAuth() {
     try{
-      const res=await fetch('/api/create-checkout-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      const data=await res.json();
-      if(data.url)location.href=data.url;else alert('No se pudo iniciar la suscripción.');
-    }catch{alert('Error de red');}
+      const r = await fetch('/api/auth/me', { credentials:'include' });
+      if (r.ok) return true;
+    }catch{}
+    location.href = '/account.html#login';
+    return false;
+  }
+
+  // Comprar NFC
+  $('#buyNfcBtn').addEventListener('click',async()=>{
+    if(!(await ensureAuth())) return;
+    try{
+      const r = await fetch('/api/buy-nfc', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ quantity: qty }), credentials:'include'
+      });
+      const j = await r.json();
+      if(j.url) location.href = j.url; else alert('No se pudo iniciar la compra de NFC.');
+    }catch{ alert('Error de red'); }
+  });
+
+  // Suscripciones – Checkout
+  $$('.btn.plan').forEach(btn=>btn.addEventListener('click',async()=>{
+    if(!(await ensureAuth())) return;
+    const tier=btn.dataset.tier, payload={tier,frequency:yearly?'annual':'monthly'};
+    try{
+      const r = await fetch('/api/create-checkout-session',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload), credentials:'include'
+      });
+      const j = await r.json();
+      if(j.url) location.href=j.url; else alert('No se pudo iniciar la suscripción.');
+    }catch{ alert('Error de red'); }
   }));
 
-  // Si llegas desde la home, fuerza ir a la parte superior (ignora #planes / #nfc)
-  (function(){
-    try{
-      const ref = document.referrer ? new URL(document.referrer) : null;
-      const fromHome = ref && (ref.pathname === '/' || /\/index\.html?$/.test(ref.pathname));
-      if(fromHome && location.hash){
-        history.replaceState(null,'',location.pathname); // quita el hash
-      }
-    }catch{}
-  })();
+  // Mi cuenta
+  async function initAccount() {
+    const me = await fetch('/api/auth/me', { credentials:'include' });
+    if (!me.ok) { $('#accLoggedOut').style.display='block'; return; }
+    const { user } = await me.json();
+    $('#accInfo').style.display='block';
+    $('#welcome').textContent = `Sesión iniciada como ${user.email}`;
 
-  // Mostrar paneles por hash solo si el hash permanece
+    // Estado de suscripción
+    try{
+      const r = await fetch('/api/subscription-status', { credentials:'include' });
+      const j = await r.json();
+      if(!j.ok) throw 0;
+      if(!j.active){
+        $('#subState').textContent = 'No tienes ninguna suscripción activa.';
+      } else {
+        const date = j.current_period_end ? new Date(j.current_period_end*1000).toLocaleDateString('es-ES') : '';
+        $('#subState').textContent = `Estado: ${j.status} · Plan: ${j.plan_nickname || j.price_id || '—'} · Renueva: ${date}`;
+      }
+    }catch{ $('#subState').textContent='No se pudo consultar el estado.'; }
+
+    // Portal
+    $('#btnPortal').addEventListener('click', async ()=>{
+      try{
+        const r = await fetch('/api/create-portal-session',{ method:'POST', credentials:'include' });
+        const j = await r.json();
+        if(j.url) location.href = j.url; else alert('No se pudo abrir el portal.');
+      }catch{ alert('Error de red'); }
+    });
+
+    // Logout
+    $('#btnLogout').addEventListener('click', async ()=>{
+      await fetch('/api/auth/logout',{ credentials:'include' });
+      location.reload();
+    });
+  }
+  initAccount();
+
+  // Navegación por hash (mostrar paneles)
   function openFromHash() {
     const h = location.hash;
-    if (h === '#nfc') {
-      $('#panel-nfc').classList.add('show');
-      $('#panel-nfc').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else if (h === '#planes') {
-      $('#panel-sub').classList.add('show');
-      $('#panel-sub').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (h === '#nfc') { $('#panel-nfc').classList.add('show'); $('#panel-nfc').scrollIntoView({behavior:'smooth'}); }
+    else if (h === '#planes') { $('#panel-sub').classList.add('show'); $('#panel-sub').scrollIntoView({behavior:'smooth'}); }
   }
-  $('#showNfc').addEventListener('click',(e)=>{e.preventDefault();history.pushState(null,'','#nfc');openFromHash();});
-  $('#showSub').addEventListener('click',(e)=>{e.preventDefault();history.pushState(null,'','#planes');openFromHash();});
-  window.addEventListener('hashchange', openFromHash);
-  openFromHash();
+  $('#showNfc').addEventListener('click',e=>{e.preventDefault();history.pushState(null,'','#nfc');openFromHash();});
+  $('#showSub').addEventListener('click',e=>{e.preventDefault();history.pushState(null,'','#planes');openFromHash();});
+  window.addEventListener('hashchange', openFromHash); openFromHash();
 </script>
 </body>
 </html>
