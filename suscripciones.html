@@ -19,16 +19,32 @@
     a{text-decoration:none;color:inherit}
     .container{max-width:1100px;width:92%;margin-inline:auto}
 
-    /* HEADER */
-    header{padding:14px 0;border-bottom:1px solid var(--border);background:#0a0f16cc;backdrop-filter:blur(10px);position:sticky;top:0;z-index:20}
-    .nav{display:flex;align-items:center;justify-content:space-between}
-    .brand{font-weight:800;display:flex;align-items:center;gap:10px}
+    /* HEADER (igual que index) */
+    header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px)}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0; position:relative}
+    .brand{display:flex;gap:10px;align-items:center;font-weight:800}
     .logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2))}
-    .nav-links{display:flex;gap:14px;align-items:center}
-    .btn{padding:12px 16px;border:0;border-radius:999px;font-weight:800;cursor:pointer;display:inline-flex;justify-content:center;
-      background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;box-shadow:0 10px 28px rgba(124,58,237,.35),0 4px 14px rgba(0,212,255,.25)}
-    .btn.ghost{background:transparent;border:1px solid var(--border);color:#e7eeff;box-shadow:none}
+    .nav-links{display:flex;gap:22px;align-items:center}
+    .ghost{padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);color:var(--txt)}
+    .btn{
+      background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
+      color:#061017;font-weight:800;border:0;border-radius:999px;cursor:pointer;
+      padding:12px 16px;display:inline-flex;align-items:center;justify-content:center;
+      box-shadow:0 10px 28px rgba(124,58,237,.35),0 4px 14px rgba(0,212,255,.25)
+    }
+    .menu{display:none}
 
+    /* MENÚ MÓVIL (igual que index) */
+    .mobile-menu{
+      position:absolute; left:0; right:0; top:100%;
+      display:none; padding:14px; background:#0b0f1a; border-top:1px solid rgba(255,255,255,.08);
+      box-shadow:0 16px 40px rgba(0,0,0,.45)
+    }
+    .mobile-links{display:flex;flex-direction:column;gap:10px}
+    .mobile-links .ghost{background:rgba(255,255,255,.02); border-color:rgba(255,255,255,.18)}
+    .mobile-links .btn{width:100%; justify-content:center}
+
+    /* Página */
     .hero{text-align:center;padding:40px 0 24px}
     .h1{font-size:clamp(2rem,5.5vw,3.2rem);margin:0;font-weight:800}
     .lead{color:var(--muted);max-width:860px;margin:12px auto 0}
@@ -58,14 +74,28 @@
     .plan.rec{outline:2px solid rgba(0,212,255,.25);box-shadow:0 0 0 5px rgba(124,58,237,.08),var(--shadow)}
 
     footer{text-align:center;padding:28px 0 36px;color:#b7c3d2;border-top:1px solid var(--border)}
-    @media(max-width:700px){.btn,.btn.ghost{width:100%}}
+    @media(max-width:700px){.btn{width:100%}}
 
     /* Ocultar paneles por defecto */
     .panel{display:none;margin-bottom:40px}
     .panel.show{display:block}
 
-    /* Offset para anclas bajo header sticky */
+    /* Anclas con header sticky */
     .anchor-offset{position:relative; top:-80px; display:block; height:0}
+
+    /* Responsive: igual que index */
+    @media (max-width: 768px){
+      .nav-links{display:none}
+      .menu{
+        display:block;
+        background:#0f172a; color:#e9eefc;
+        border:1px solid rgba(255,255,255,.28);
+        box-shadow:0 8px 24px rgba(0,0,0,.45);
+        padding:10px 14px; border-radius:999px;
+      }
+      .menu:hover{filter:brightness(1.08)}
+      .menu:active{transform:translateY(1px)}
+    }
   </style>
 </head>
 <body>
@@ -79,13 +109,26 @@
       <span>taply</span>
     </a>
 
-    <!-- Enlaces tipo “píldora” solo para volver a la home -->
+    <!-- Enlaces iguales que en la home -->
     <nav class="nav-links" aria-label="Navegación principal">
-      <a class="btn ghost" href="index.html#beneficios">Beneficios</a>
-      <a class="btn ghost" href="index.html#como-funciona">Cómo funciona</a>
-      <a class="btn ghost" href="index.html#reviews">Opiniones</a>
+      <a class="ghost" href="index.html#beneficios">Beneficios</a>
+      <a class="ghost" href="index.html#como-funciona">Cómo funciona</a>
+      <a class="ghost" href="index.html#reviews">Opiniones</a>
       <a class="btn" href="index.html">Volver al inicio</a>
     </nav>
+
+    <!-- Botón menú móvil -->
+    <button class="menu ghost" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Menú</button>
+
+    <!-- Menú móvil (idéntico estilo) -->
+    <div class="mobile-menu" id="mobileMenu" role="menu" aria-label="Menú móvil">
+      <div class="mobile-links">
+        <a class="ghost" href="index.html#beneficios" role="menuitem">Beneficios</a>
+        <a class="ghost" href="index.html#como-funciona" role="menuitem">Cómo funciona</a>
+        <a class="ghost" href="index.html#reviews" role="menuitem">Opiniones</a>
+        <a class="btn" href="index.html" role="menuitem">Volver al inicio</a>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -127,9 +170,9 @@
     <p class="desc">Selecciona cuántos necesitas. Tras pagar recibirás WhatsApp automático con la guía.</p>
     <div class="actions" style="justify-content:center;gap:16px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);padding:6px;border-radius:999px">
-        <button id="minus" class="btn ghost" style="padding:6px 12px">−</button>
+        <button id="minus" class="ghost" style="padding:8px 14px">−</button>
         <span id="qty">1</span>
-        <button id="plus" class="btn ghost" style="padding:6px 12px">＋</button>
+        <button id="plus" class="ghost" style="padding:8px 14px">＋</button>
       </div>
       <div class="price">Total: <span id="totalNfc">—</span></div>
       <a class="btn" id="buyNfcBtn">Comprar ahora</a>
@@ -181,6 +224,23 @@
   const fmt=v=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(v);
   window.addEventListener('load',()=>document.body.classList.add('is-loaded'));
 
+  /* Menú móvil igual que index */
+  const menuBtn=document.getElementById('menuBtn');
+  const mobileMenu=document.getElementById('mobileMenu');
+  menuBtn?.addEventListener('click', ()=> {
+    const open = mobileMenu.style.display === 'block';
+    mobileMenu.style.display = open ? 'none' : 'block';
+    menuBtn.setAttribute('aria-expanded', String(!open));
+  });
+  mobileMenu?.addEventListener('click', (e)=>{
+    const a = e.target.closest('a');
+    if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }
+  });
+  window.addEventListener('resize', ()=>{
+    if(window.innerWidth > 768){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }
+  });
+
+  /* Lógica NFC */
   const PRICE={nfcUnit:5,monthly:{basic:25,medio:35,pro:45},annualDiscount:.20};
   let qty=1,yearly=false;
 
