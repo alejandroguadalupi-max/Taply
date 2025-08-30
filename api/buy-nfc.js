@@ -1,20 +1,25 @@
 import Stripe from 'stripe';
-import { readJson, getSession } from './_utils';
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+async function readJson(req){
+  return await new Promise((resolve, reject)=>{
+    let data=''; req.on('data', c=>data+=c);
+    req.on('end', ()=>{ try{ resolve(data?JSON.parse(data):{});} catch(e){ reject(e);} });
+    req.on('error', reject);
+  });
+}
 
-  try {
+export default async function handler(req,res){
+  if (req.method !== 'POST') return res.status(405).json({ error:'Method not allowed' });
+  try{
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    const { quantity } = await readJson(req);
-    const q = Number(quantity);
-
+    const body = await readJson(req);
+    const q = Number(body.quantity);
     if (!Number.isInteger(q) || q < 1 || q > 500) {
       return res.status(400).json({ error: 'Cantidad inválida' });
     }
-
-    const sess = getSession(req);
-
+    if (!process.env.PRICE_ID_NFC) {
+      return res.status(500).json({ error: 'PRICE_ID_NFC no configurado' });
+    }
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [{ price: process.env.PRICE_ID_NFC, quantity: q }],
@@ -22,22 +27,17 @@ export default async function handler(req, res) {
       cancel_url: `${process.env.BASE_URL}/cancelado.html`,
       phone_number_collection: { enabled: true },
       shipping_address_collection: { allowed_countries: ['ES'] },
-      custom_fields: [
-        { key: 'business_name', label:{type:'custom', custom:'Nombre del negocio'}, type:'text', optional:false, text:{maximum_length:120} },
-        { key: 'contact_name',  label:{type:'custom', custom:'Nombre de contacto'}, type:'text', optional:false, text:{maximum_length:120} }
-      ],
       billing_address_collection: 'auto',
-      custom_text:{
-        shipping_address:{message:'Usaremos esta dirección para enviar tus dispositivos NFC.'},
-        submit:{message:'El número de teléfono es clave: te contactaremos por WhatsApp ahí.'}
-      },
+      custom_fields: [
+        { key:'business_name', label:{type:'custom', custom:'Nombre del negocio'}, type:'text', optional:false, text:{maximum_length:120} },
+        { key:'contact_name',  label:{type:'custom', custom:'Nombre y apellidos'}, type:'text', optional:false, text:{maximum_length:120} },
+        { key:'contact_phone', label:{type:'custom', custom:'Teléfono (WhatsApp)'}, type:'text', optional:false, text:{maximum_length:30} },
+      ],
       metadata: { nfc_quantity: String(q) },
-      ...(sess?.customerId ? { customer: sess.customerId } : {})
     });
-
     return res.status(200).json({ url: session.url });
-  } catch (e) {
+  }catch(e){
     console.error('buy-nfc error:', e);
-    return res.status(500).json({ error: 'No se pudo crear el checkout' });
+    return res.status(500).json({ error: e?.message || 'No se pudo crear el checkout' });
   }
 }
