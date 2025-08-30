@@ -1,28 +1,43 @@
 // /api/subscription-status.js
-import { requireUser, json, stripe, getOrCreateCustomerId } from './_utils.js';
+import Stripe from 'stripe';
+import { getSessionUser, json } from './_utils.js';
 
-export default async function handler(req, res) {
-  if (req.method !== 'GET') return json(res, 405, { ok:false });
-  const user = requireUser(req, res); if (!user) return;
+export default async function handler(req, res){
+  if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
 
-  try {
-    const customer = await getOrCreateCustomerId(user);
-    const subs = await stripe.subscriptions.list({ customer, status: 'all', expand: ['data.items.price'] });
-    const current = subs.data.find(s => ['active','trialing','past_due','incomplete','incomplete_expired','unpaid'].includes(s.status));
-    if (!current) return json(res, 200, { ok:true, active:false, subscriptions: [] });
+  const user = getSessionUser(req);
+  if (!user?.email) return json(res, 401, { ok:false, error:'UNAUTHORIZED' });
 
-    const item = current.items.data[0];
+  try{
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    let customerId = user.customerId;
+
+    if(!customerId){
+      const existing = await stripe.customers.list({ email: user.email, limit: 1 });
+      customerId = existing?.data?.[0]?.id || null;
+    }
+    if(!customerId) return json(res, 200, { active:false });
+
+    const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
+    const sub = subs.data.find(s => ['active','trialing','past_due','unpaid'].includes(s.status));
+
+    if(!sub) return json(res, 200, { active:false, customerId });
+
+    const price = sub.items.data[0]?.price;
+    const tier = price?.nickname || price?.product || 'Plan';
+    const interval = price?.recurring?.interval || '';
     return json(res, 200, {
-      ok: true,
-      active: ['active','trialing','past_due'].includes(current.status),
-      status: current.status,
-      cancel_at_period_end: current.cancel_at_period_end,
-      current_period_end: current.current_period_end,
-      price_id: item?.price?.id || null,
-      plan_nickname: item?.price?.nickname || item?.price?.id || null
+      ok:true,
+      active: ['active','trialing','past_due','unpaid'].includes(sub.status),
+      status: sub.status,
+      tier,
+      interval,
+      current_period_end: sub.current_period_end,
+      cancel_at_period_end: sub.cancel_at_period_end || false,
+      customerId
     });
-  } catch (e) {
-    console.error('Status error:', e);
+  }catch(e){
+    console.error('subscription-status', e);
     return json(res, 500, { ok:false, error:'SERVER_ERROR' });
   }
 }

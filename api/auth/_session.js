@@ -29,13 +29,20 @@ export function readCookie(req, name=COOKIE){
   const m = raw.split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='));
   return m ? decodeURIComponent(m.split('=').slice(1).join('=')) : null;
 }
+
 export function setCookie(res, token, name=COOKIE, days=30){
   const maxAge = days*24*60*60;
-  const cookie = `${name}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax; Secure`;
-  res.setHeader('Set-Cookie', cookie);
+  const isProd = process.env.NODE_ENV === 'production';
+  const secure = isProd ? ' Secure;' : ''; // solo en producción
+  res.setHeader('Set-Cookie',
+    `${name}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax;${secure}`
+  );
 }
+
 export function clearCookie(res, name=COOKIE){
-  res.setHeader('Set-Cookie', `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`);
+  const isProd = process.env.NODE_ENV === 'production';
+  const secure = isProd ? ' Secure;' : '';
+  res.setHeader('Set-Cookie', `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax;${secure}`);
 }
 
 export function sessionEmail(req){
