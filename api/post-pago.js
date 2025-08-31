@@ -1,13 +1,15 @@
+// TAPLY/api/post-pago.js
+export const config = { api: { bodyParser: false } }; // NECESARIO para firmar con Stripe
+
 import Stripe from 'stripe';
 import getRawBody from 'raw-body';
+import sgMail from '@sendgrid/mail';
 
-// ⚠️ CARGA PEREZOSA DE TWILIO para no romper si falta el módulo
-async function getTwilioClient() {
-  const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) throw new Error('missing_twilio_envs');
-  const twilio = (await import('twilio')).default; // import dinámico
-  return twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-}
+// Config email
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
+const FROM_EMAIL = process.env.EMAIL_FROM || 'Taply <no-reply@taply.local>';
+const REPLY_TO   = process.env.EMAIL_REPLY_TO || '';
+const BCC_EMAIL  = process.env.EMAIL_BCC || '';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method not allowed');
@@ -17,7 +19,7 @@ export default async function handler(req, res) {
 
   const stripe = new Stripe(STRIPE_KEY);
 
-  // 1) Verificar firma
+  // 1) Verificar firma de Stripe con cuerpo RAW
   let event;
   try {
     const sig = req.headers['stripe-signature'];
@@ -43,64 +45,41 @@ export default async function handler(req, res) {
         console.warn('[post-pago] retrieve failed:', e?.message || e);
       }
 
-      // 3) Datos del cliente
+      // 3) Datos cliente
       const d = session.customer_details || {};
+      let email = d.email || null;
       const name = d.name || 'cliente';
-      let phone = d.phone || session?.shipping_details?.phone || null;
 
-      if (!phone && session.customer) {
+      if (!email && session.customer) {
         try {
           const customer = await stripe.customers.retrieve(session.customer);
-          phone = customer?.phone || null;
-        } catch { /* noop */ }
-      }
-      phone = normalizePhone(phone);
-      console.log('[post-pago] phone:', phone || '(none)');
-
-      // 4) Mensaje según tipo
-      let body = null;
-      if (session.mode === 'payment' || session.metadata?.type === 'nfc') {
-        const items = full?.line_items?.data || [];
-        const qty = items.reduce((acc, it) => acc + (it.quantity || 0), 0) || session.metadata?.qty || 1;
-        body =
-`¡Hola ${firstName(name)}! Soy de Taply 👋
-Hemos recibido tu compra de ${qty} NFC ✅
-
-En breve te escribo para confirmar el envío y preparar tu proyecto.
-Si necesitas algo, responde a este WhatsApp.`;
-      } else if (session.mode === 'subscription' || session.metadata?.type === 'subscription') {
-        const it = full?.line_items?.data?.[0];
-        const planName =
-          it?.price?.product?.name ||
-          it?.description ||
-          `${session.metadata?.tier || ''} ${session.metadata?.frequency || ''}`.trim() ||
-          'tu suscripción';
-        body =
-`¡Hola ${firstName(name)}! Soy de Taply 👋
-Tu suscripción (${planName}) está activa ✅
-
-Ahora te envío la guía rápida y configuro tu panel.
-Cualquier duda, respóndeme por aquí.`;
+          email = customer?.email || null;
+        } catch {}
       }
 
-      // 5) Enviar WhatsApp (si no hay phone, usa TEST_WHATSAPP_TO para probar)
-      const toFinal = phone || (process.env.TEST_WHATSAPP_TO || '').trim();
-      if (!toFinal) {
-        console.warn('[post-pago] no phone & no TEST_WHATSAPP_TO → skip send');
-      } else if (body) {
-        try {
-          const client = await getTwilioClient();
-          const from = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886';
-          const toAddr = toFinal.startsWith('whatsapp:') ? toFinal : `whatsapp:${toFinal.startsWith('+') ? toFinal : `+${toFinal}`}`;
-          const msg = await client.messages.create({ from, to: toAddr, body });
-          console.log('[post-pago] WhatsApp sent:', msg.sid);
-        } catch (e) {
-          console.error('[post-pago] Twilio send error:', e?.message || e);
+      if (!email) {
+        console.warn('[post-pago] no email found; skipping mail');
+      } else {
+        // 4) Seleccionar plantilla de email según modo
+        if (session.mode === 'payment' || session.metadata?.type === 'nfc') {
+          const items = full?.line_items?.data || [];
+          const qty = items.reduce((acc, it) => acc + (it.quantity || 0), 0) || session.metadata?.qty || 1;
+          const mail = buildNfcMail({ name, qty });
+          await sendMail({ to: email, ...mail });
+        } else if (session.mode === 'subscription' || session.metadata?.type === 'subscription') {
+          const it = full?.line_items?.data?.[0];
+          const planName =
+            it?.price?.product?.name ||
+            it?.description ||
+            `${session.metadata?.tier || ''} ${session.metadata?.frequency || ''}`.trim() ||
+            'tu suscripción';
+          const mail = buildSubMail({ name, plan: planName });
+          await sendMail({ to: email, ...mail });
         }
       }
     }
 
-    // 👇 Nunca devolvemos 500 a Stripe; así deja de reintentar
+    // Nunca 500 a Stripe
     return res.status(200).json({ received: true });
   } catch (e) {
     console.error('[post-pago] handler error:', e?.message || e);
@@ -108,13 +87,85 @@ Cualquier duda, respóndeme por aquí.`;
   }
 }
 
-/* Helpers */
-function firstName(full){ return String(full || '').trim().split(/\s+/)[0] || 'cliente'; }
-function normalizePhone(raw){
-  if (!raw) return null;
-  let d = String(raw).replace(/\D+/g,'');
-  if (d.startsWith('00')) d = d.slice(2);
-  if (d.length >= 10 && d.length <= 15) return d;      // ya internacional
-  const p = (process.env.WHATSAPP_DEFAULT_PREFIX || '').replace(/\D+/g,'');
-  return p ? p + d : d;
+/* ===== Helpers (emails) ===== */
+
+function buildNfcMail({ name, qty }) {
+  const first = firstName(name);
+  const subject = `¡Gracias, ${first}! Compra de ${qty} NFC recibida ✅`;
+  const text = [
+    `Hola ${first},`,
+    `Hemos recibido tu compra de ${qty} dispositivos NFC.`,
+    `En breve te enviaremos la guía rápida y coordinamos el envío.`,
+    `Si necesitas algo, responde a este correo.`,
+    `— Equipo Taply`
+  ].join('\n');
+
+  const html = baseHtml(`
+    <h1 style="margin:0 0 12px">¡Gracias, ${escapeHtml(first)}!</h1>
+    <p style="margin:0 0 8px">Hemos recibido tu compra de <strong>${escapeHtml(String(qty))} NFC</strong>.</p>
+    <p style="margin:0 0 8px">En breve te enviaremos la guía rápida y coordinamos el envío.</p>
+    <p style="margin:0 0 8px">¿Dudas? Responde a este correo y te ayudamos.</p>
+  `);
+
+  return { subject, text, html };
 }
+
+function buildSubMail({ name, plan }) {
+  const first = firstName(name);
+  const subject = `Tu suscripción (${plan}) está activa ✅`;
+  const text = [
+    `Hola ${first},`,
+    `Tu suscripción (${plan}) está activa.`,
+    `Ahora te enviamos la guía rápida y configuramos tu panel.`,
+    `Si necesitas algo, responde a este correo.`,
+    `— Equipo Taply`
+  ].join('\n');
+
+  const html = baseHtml(`
+    <h1 style="margin:0 0 12px">¡Suscripción activa!</h1>
+    <p style="margin:0 0 8px">Hola ${escapeHtml(first)}, tu suscripción <strong>${escapeHtml(plan)}</strong> está activa.</p>
+    <p style="margin:0 0 8px">Te enviaremos la guía rápida y dejaremos tu panel listo.</p>
+    <p style="margin:0 0 8px">¿Dudas? Responde a este correo y te ayudamos.</p>
+  `);
+
+  return { subject, text, html };
+}
+
+async function sendMail({ to, subject, text, html }) {
+  const msg = {
+    to,
+    from: FROM_EMAIL,
+    subject,
+    text,
+    html,
+    ...(REPLY_TO ? { replyTo: REPLY_TO } : {}),
+    ...(BCC_EMAIL ? { bcc: BCC_EMAIL } : {})
+  };
+  try {
+    await sgMail.send(msg);
+    console.log('[mail] sent to', to, 'subject:', subject);
+  } catch (e) {
+    console.error('[mail] send error:', e?.response?.body || e?.message || e);
+  }
+}
+
+function baseHtml(inner) {
+  return `
+  <div style="font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:#0b0f1a; padding:24px">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;background:#0e1424;border:1px solid rgba(255,255,255,.08);border-radius:16px;color:#e9eefc">
+      <tr><td style="padding:20px 22px">
+        <div style="font-weight:800;margin-bottom:10px">
+          <span style="display:inline-block;width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#00d4ff,#7c3aed);vertical-align:-6px;margin-right:8px"></span>
+          Taply
+        </div>
+        ${inner}
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:16px 0">
+        <p style="margin:0;color:#9fb0c6;font-size:13px">Este correo se envió automáticamente tras tu compra. Si no reconoces esta acción, respóndenos.</p>
+      </td></tr>
+    </table>
+  </div>
+  `;
+}
+
+function firstName(full){ return String(full || '').trim().split(/\s+/)[0] || 'cliente'; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
