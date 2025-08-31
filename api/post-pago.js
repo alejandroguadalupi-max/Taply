@@ -1,11 +1,17 @@
 import Stripe from 'stripe';
 import getRawBody from 'raw-body';
-import twilio from 'twilio';
+
+// ⚠️ CARGA PEREZOSA DE TWILIO para no romper si falta el módulo
+async function getTwilioClient() {
+  const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) throw new Error('missing_twilio_envs');
+  const twilio = (await import('twilio')).default; // import dinámico
+  return twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method not allowed');
 
-  // 0) Clave y modo coherentes (evita 500 si mezclas test/live)
   const STRIPE_KEY = process.env.STRIPE_SECRET_KEY || '';
   if (!STRIPE_KEY) return res.status(500).json({ error: 'missing_stripe_key' });
 
@@ -17,14 +23,7 @@ export default async function handler(req, res) {
     const sig = req.headers['stripe-signature'];
     const raw = await getRawBody(req);
     event = stripe.webhooks.constructEvent(raw, sig, process.env.STRIPE_WEBHOOK_SECRET);
-    // Sugerencia: comprueba coherencia de clave vs modo del evento
-    const live = !!event.livemode;
-    if (live && !STRIPE_KEY.startsWith('sk_live_')) {
-      console.warn('[post-pago] live event with test key');
-    }
-    if (!live && !STRIPE_KEY.startsWith('sk_test_')) {
-      console.warn('[post-pago] test event with live key — retrieve may fail');
-    }
+    console.log('[post-pago] event:', event.type, 'livemode:', event.livemode);
   } catch (err) {
     console.error('[post-pago] signature error:', err?.message || err);
     return res.status(400).json({ error: 'signature_error', detail: err?.message });
@@ -53,13 +52,12 @@ export default async function handler(req, res) {
         try {
           const customer = await stripe.customers.retrieve(session.customer);
           phone = customer?.phone || null;
-        } catch (e) {
-          console.warn('[post-pago] no phone in customer');
-        }
+        } catch { /* noop */ }
       }
       phone = normalizePhone(phone);
+      console.log('[post-pago] phone:', phone || '(none)');
 
-      // 4) Mensajes según tipo con *fallbacks* por si no hay line_items
+      // 4) Mensaje según tipo
       let body = null;
       if (session.mode === 'payment' || session.metadata?.type === 'nfc') {
         const items = full?.line_items?.data || [];
@@ -85,39 +83,38 @@ Ahora te envío la guía rápida y configuro tu panel.
 Cualquier duda, respóndeme por aquí.`;
       }
 
-      // 5) Enviar WhatsApp (si no hay teléfono, usa número de test si lo pones)
+      // 5) Enviar WhatsApp (si no hay phone, usa TEST_WHATSAPP_TO para probar)
       const toFinal = phone || (process.env.TEST_WHATSAPP_TO || '').trim();
       if (!toFinal) {
         console.warn('[post-pago] no phone & no TEST_WHATSAPP_TO → skip send');
       } else if (body) {
-        await sendWhatsApp({ to: toFinal, body, label: phone ? 'user' : 'TEST' });
+        try {
+          const client = await getTwilioClient();
+          const from = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886';
+          const toAddr = toFinal.startsWith('whatsapp:') ? toFinal : `whatsapp:${toFinal.startsWith('+') ? toFinal : `+${toFinal}`}`;
+          const msg = await client.messages.create({ from, to: toAddr, body });
+          console.log('[post-pago] WhatsApp sent:', msg.sid);
+        } catch (e) {
+          console.error('[post-pago] Twilio send error:', e?.message || e);
+        }
       }
     }
 
+    // 👇 Nunca devolvemos 500 a Stripe; así deja de reintentar
     return res.status(200).json({ received: true });
   } catch (e) {
-    console.error('[post-pago] handler error:', e);
-    return res.status(500).json({ error: 'handler_error', detail: e?.message || String(e) });
+    console.error('[post-pago] handler error:', e?.message || e);
+    return res.status(200).json({ received: true, note: 'handled_with_errors' });
   }
 }
 
-/* ===== Helpers ===== */
-function firstName(full) { return String(full || '').trim().split(/\s+/)[0] || 'cliente'; }
-function normalizePhone(raw) {
+/* Helpers */
+function firstName(full){ return String(full || '').trim().split(/\s+/)[0] || 'cliente'; }
+function normalizePhone(raw){
   if (!raw) return null;
-  let d = String(raw).replace(/\D+/g, '');
+  let d = String(raw).replace(/\D+/g,'');
   if (d.startsWith('00')) d = d.slice(2);
-  if (d.length >= 10 && d.length <= 15) return d;
-  const p = (process.env.WHATSAPP_DEFAULT_PREFIX || '').replace(/\D+/g, '');
+  if (d.length >= 10 && d.length <= 15) return d;      // ya internacional
+  const p = (process.env.WHATSAPP_DEFAULT_PREFIX || '').replace(/\D+/g,'');
   return p ? p + d : d;
-}
-async function sendWhatsApp({ to, body, label='user' }) {
-  const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM } = process.env;
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_WHATSAPP_FROM) {
-    console.warn('[post-pago] missing Twilio envs → skip'); return;
-  }
-  const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-  const toAddr = to.startsWith('whatsapp:') ? to : `whatsapp:${to.startsWith('+') ? to : `+${to}`}`;
-  const msg = await client.messages.create({ from: TWILIO_WHATSAPP_FROM, to: toAddr, body });
-  console.log(`[post-pago] WhatsApp sent (${label}):`, msg.sid);
 }

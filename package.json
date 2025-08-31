@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "stripe": "^14.24.0",
-    "raw-body": "^2.5.2"
+    "raw-body": "^2.5.2",
+    "twilio": "^4.22.0"
   }
 }
