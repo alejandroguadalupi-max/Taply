@@ -6,6 +6,7 @@
   "dependencies": {
     "stripe": "^14.24.0",
     "raw-body": "^2.5.2",
-    "@sendgrid/mail": "^8.1.0"
+    "@sendgrid/mail": "^8.1.0",
+    "googleapis": "^128.0.0"
   }
 }

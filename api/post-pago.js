@@ -1,11 +1,13 @@
 // TAPLY/api/post-pago.js
-export const config = { api: { bodyParser: false } }; // NECESARIO para firmar con Stripe
+// NECESARIO para verificar la firma de Stripe (cuerpo RAW)
+export const config = { api: { bodyParser: false } };
 
 import Stripe from 'stripe';
 import getRawBody from 'raw-body';
 import sgMail from '@sendgrid/mail';
+import { appendOrderToSheets } from '../lib/google-sheets.js'; // 👈 AÑADIDO
 
-// Config email
+// ==== Config email ====
 sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
 const FROM_EMAIL = process.env.EMAIL_FROM || 'Taply <no-reply@taply.local>';
 const REPLY_TO   = process.env.EMAIL_REPLY_TO || '';
@@ -57,10 +59,24 @@ export default async function handler(req, res) {
         } catch {}
       }
 
+      // 4) Si es suscripción, recuperamos detalles (estado/periodos)
+      let subscription = null;
+      try {
+        if (session.subscription) {
+          subscription = await stripe.subscriptions.retrieve(
+            typeof session.subscription === 'string'
+              ? session.subscription
+              : session.subscription.id
+          );
+        }
+      } catch (e) {
+        console.warn('[post-pago] could not retrieve subscription:', e?.message || e);
+      }
+
+      // 5) Envío de email según modo
       if (!email) {
         console.warn('[post-pago] no email found; skipping mail');
       } else {
-        // 4) Seleccionar plantilla de email según modo
         if (session.mode === 'payment' || session.metadata?.type === 'nfc') {
           const items = full?.line_items?.data || [];
           const qty = items.reduce((acc, it) => acc + (it.quantity || 0), 0) || session.metadata?.qty || 1;
@@ -77,9 +93,16 @@ export default async function handler(req, res) {
           await sendMail({ to: email, ...mail });
         }
       }
+
+      // 6) Apuntar a Google Sheets (NFC / SUSCRIPCIONES con cabeceras distintas)
+      if (session.mode === 'payment' || session.metadata?.type === 'nfc') {
+        await appendOrderToSheets({ type: 'nfc', session, full, event });
+      } else if (session.mode === 'subscription' || session.metadata?.type === 'subscription') {
+        await appendOrderToSheets({ type: 'subscription', session, full, event, subscription });
+      }
     }
 
-    // Nunca 500 a Stripe
+    // Nunca 500 a Stripe (evitamos reintentos y retrasos)
     return res.status(200).json({ received: true });
   } catch (e) {
     console.error('[post-pago] handler error:', e?.message || e);
@@ -139,11 +162,16 @@ async function sendMail({ to, subject, text, html }) {
     text,
     html,
     ...(REPLY_TO ? { replyTo: REPLY_TO } : {}),
-    ...(BCC_EMAIL ? { bcc: BCC_EMAIL } : {})
+    ...(BCC_EMAIL ? { bcc: BCC_EMAIL } : {}),
+    // Recomendado para transaccionales (menos "olor" a marketing)
+    trackingSettings: { clickTracking: { enable: false }, openTracking: { enable: false } },
+    mailSettings: { sandboxMode: { enable: false } }
   };
   try {
-    await sgMail.send(msg);
-    console.log('[mail] sent to', to, 'subject:', subject);
+    const [resp] = await sgMail.send(msg);
+    const status = resp?.statusCode;
+    const id = resp?.headers?.['x-message-id'] || resp?.headers?.['X-Message-Id'];
+    console.log('[mail] sent to', to, 'status:', status, 'id:', id, 'subject:', subject);
   } catch (e) {
     console.error('[mail] send error:', e?.response?.body || e?.message || e);
   }
