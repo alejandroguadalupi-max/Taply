@@ -1,13 +1,11 @@
 // TAPLY/api/post-pago.js
-// NECESARIO para verificar la firma de Stripe (cuerpo RAW)
-export const config = { api: { bodyParser: false } };
+export const config = { api: { bodyParser: false } }; // NECESARIO para firmar con Stripe
 
 import Stripe from 'stripe';
 import getRawBody from 'raw-body';
 import sgMail from '@sendgrid/mail';
-import { appendOrderToSheets } from '../lib/google-sheets.js'; // 👈 AÑADIDO
 
-// ==== Config email ====
+// Config email
 sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
 const FROM_EMAIL = process.env.EMAIL_FROM || 'Taply <no-reply@taply.local>';
 const REPLY_TO   = process.env.EMAIL_REPLY_TO || '';
@@ -41,7 +39,7 @@ export default async function handler(req, res) {
       let full = { line_items: { data: [] } };
       try {
         full = await stripe.checkout.sessions.retrieve(session.id, {
-          expand: ['line_items.data.price.product']
+          expand: ['line_items.data.price.product', 'payment_intent']
         });
       } catch (e) {
         console.warn('[post-pago] retrieve failed:', e?.message || e);
@@ -56,24 +54,12 @@ export default async function handler(req, res) {
         try {
           const customer = await stripe.customers.retrieve(session.customer);
           email = customer?.email || null;
-        } catch {}
-      }
-
-      // 4) Si es suscripción, recuperamos detalles (estado/periodos)
-      let subscription = null;
-      try {
-        if (session.subscription) {
-          subscription = await stripe.subscriptions.retrieve(
-            typeof session.subscription === 'string'
-              ? session.subscription
-              : session.subscription.id
-          );
+        } catch (e) {
+          console.warn('[post-pago] customer retrieve failed:', e?.message || e);
         }
-      } catch (e) {
-        console.warn('[post-pago] could not retrieve subscription:', e?.message || e);
       }
 
-      // 5) Envío de email según modo
+      // 4) Envío de email (si tenemos correo)
       if (!email) {
         console.warn('[post-pago] no email found; skipping mail');
       } else {
@@ -93,16 +79,9 @@ export default async function handler(req, res) {
           await sendMail({ to: email, ...mail });
         }
       }
-
-      // 6) Apuntar a Google Sheets (NFC / SUSCRIPCIONES con cabeceras distintas)
-      if (session.mode === 'payment' || session.metadata?.type === 'nfc') {
-        await appendOrderToSheets({ type: 'nfc', session, full, event });
-      } else if (session.mode === 'subscription' || session.metadata?.type === 'subscription') {
-        await appendOrderToSheets({ type: 'subscription', session, full, event, subscription });
-      }
     }
 
-    // Nunca 500 a Stripe (evitamos reintentos y retrasos)
+    // Nunca 500 a Stripe
     return res.status(200).json({ received: true });
   } catch (e) {
     console.error('[post-pago] handler error:', e?.message || e);
@@ -162,16 +141,11 @@ async function sendMail({ to, subject, text, html }) {
     text,
     html,
     ...(REPLY_TO ? { replyTo: REPLY_TO } : {}),
-    ...(BCC_EMAIL ? { bcc: BCC_EMAIL } : {}),
-    // Recomendado para transaccionales (menos "olor" a marketing)
-    trackingSettings: { clickTracking: { enable: false }, openTracking: { enable: false } },
-    mailSettings: { sandboxMode: { enable: false } }
+    ...(BCC_EMAIL ? { bcc: BCC_EMAIL } : {})
   };
   try {
-    const [resp] = await sgMail.send(msg);
-    const status = resp?.statusCode;
-    const id = resp?.headers?.['x-message-id'] || resp?.headers?.['X-Message-Id'];
-    console.log('[mail] sent to', to, 'status:', status, 'id:', id, 'subject:', subject);
+    await sgMail.send(msg);
+    console.log('[mail] sent to', to, 'subject:', subject);
   } catch (e) {
     console.error('[mail] send error:', e?.response?.body || e?.message || e);
   }
