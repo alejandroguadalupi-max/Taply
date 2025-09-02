@@ -24,6 +24,9 @@ function baseUrl(req) {
   const host  = req.headers['x-forwarded-host'] || req.headers.host;
   return `${proto}://${host}`;
 }
+function appBase(req){
+  return process.env.APP_BASE_URL || process.env.BASE_URL || baseUrl(req);
+}
 function getBody(req) {
   if (!req.body) return {};
   return (typeof req.body === 'string') ? JSON.parse(req.body) : req.body;
@@ -32,6 +35,9 @@ function getCookies(req){
   try { return cookie.parse(req.headers.cookie || ''); } catch { return {}; }
 }
 function setSession(res, payload){
+  if(!process.env.APP_SECRET){
+    throw new Error('missing APP_SECRET');
+  }
   const token = jwt.sign(payload, process.env.APP_SECRET, { expiresIn: '90d' });
   const isProd = process.env.NODE_ENV === 'production';
   res.setHeader('Set-Cookie', cookie.serialize(COOKIE_NAME, token, {
@@ -57,7 +63,11 @@ function routeOf(req){
 
 // Stripe helpers
 function getStripe(){
-  if (!process.env.STRIPE_SECRET_KEY) throw new Error('missing STRIPE_SECRET_KEY');
+  if (!process.env.STRIPE_SECRET_KEY) {
+    const e = new Error('missing STRIPE_SECRET_KEY');
+    e.statusCode = 500;
+    throw e;
+  }
   return new Stripe(process.env.STRIPE_SECRET_KEY);
 }
 async function ensureCustomerId(stripe, sess){
@@ -86,25 +96,29 @@ async function hasValidSubscription(stripe, customerId){
 
 /* ========= ENVÍOS (SendGrid y WhatsApp opcionales) ========= */
 async function sendEmail({to, subject, text, html}){
-  if(!process.env.SENDGRID_API_KEY || !process.env.EMAIL_FROM) return;
-  const { default: sgMail } = await import('@sendgrid/mail');
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  await sgMail.send({
-    to,
-    from: process.env.EMAIL_FROM,
-    replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM,
-    subject,
-    text: text || (html ? html.replace(/<[^>]+>/g,' ') : ''),
-    html: html || `<p>${text || ''}</p>`
-  });
+  try{
+    if(!process.env.SENDGRID_API_KEY || !process.env.EMAIL_FROM) return;
+    const { default: sgMail } = await import('@sendgrid/mail');
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    await sgMail.send({
+      to,
+      from: process.env.EMAIL_FROM,
+      replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM,
+      subject,
+      text: text || (html ? html.replace(/<[^>]+>/g,' ') : ''),
+      html: html || `<p>${text || ''}</p>`
+    });
+  }catch(e){ console.error('sendEmail error', e); }
 }
 async function sendWhatsApp({toNumber, body}){
-  if(!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM || !toNumber) return;
-  const { default: Twilio } = await import('twilio');
-  const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  const from = 'whatsapp:' + process.env.TWILIO_WHATSAPP_FROM;
-  const to   = 'whatsapp:' + (toNumber.startsWith('+') ? toNumber : `${process.env.WHATSAPP_DEFAULT_PREFIX || '+34'}${toNumber}`);
-  await client.messages.create({ from, to, body });
+  try{
+    if(!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM || !toNumber) return;
+    const { default: Twilio } = await import('twilio');
+    const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    const from = 'whatsapp:' + process.env.TWILIO_WHATSAPP_FROM;
+    const to   = 'whatsapp:' + (toNumber.startsWith('+') ? toNumber : `${process.env.WHATSAPP_DEFAULT_PREFIX || '+34'}${toNumber}`);
+    await client.messages.create({ from, to, body });
+  }catch(e){ console.error('sendWhatsApp error', e); }
 }
 
 /* ================== Handlers ================== */
@@ -179,7 +193,7 @@ async function createPortalSession(req, res){
   const stripe = getStripe();
   const portal = await stripe.billingPortal.sessions.create({
     customer: sess.customerId,
-    return_url: (process.env.APP_BASE_URL || process.env.BASE_URL || baseUrl(req)) + '/suscripciones.html#cuenta'
+    return_url: appBase(req) + '/suscripciones.html#cuenta'
   });
   return res.status(200).json({ url: portal.url });
 }
@@ -202,8 +216,8 @@ async function createCheckoutSession(req, res){
     mode: 'subscription',
     ui_mode: 'hosted',
     line_items: [{ price, quantity: 1 }],
-    success_url: `${process.env.BASE_URL || baseUrl(req)}/exito.html`, // si quieres, añade ?session_id={CHECKOUT_SESSION_ID}
-    cancel_url:  `${process.env.BASE_URL || baseUrl(req)}/cancelado.html`,
+    success_url: `${appBase(req)}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:  `${appBase(req)}/cancelado.html`,
     phone_number_collection: { enabled: true },
     metadata: { type: 'subscription', tier, frequency },
     ...(customerId ? { customer: customerId } : {})
@@ -234,8 +248,8 @@ async function buyNfc(req, res){
     mode: 'payment',
     ui_mode: 'hosted',
     line_items: [{ price: process.env.PRICE_ID_NFC, quantity: qty }],
-    success_url: `${process.env.BASE_URL || baseUrl(req)}/exito.html`, // si quieres, añade ?session_id={CHECKOUT_SESSION_ID}
-    cancel_url:  `${process.env.BASE_URL || baseUrl(req)}/cancelado.html`,
+    success_url: `${appBase(req)}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:  `${appBase(req)}/cancelado.html`,
     allow_promotion_codes: true,
     phone_number_collection: { enabled: true },
     shipping_address_collection: { allowed_countries: ['ES'] },
@@ -247,10 +261,7 @@ async function buyNfc(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-/* ========= POST /api/post-pago  (EMAIL/WHATSAPP tras compra) =========
-   - Puedes llamarlo desde exito.html (opcional) o confiar solo en webhooks.
-   - Si recibimos ?session_id=... recuperamos detalles del checkout.
-*/
+/* ========= POST /api/post-pago  (EMAIL/WHATSAPP tras compra) ========= */
 async function postPago(req, res){
   const stripe = getStripe();
   const url = new URL(req.url, 'http://x');
@@ -329,12 +340,13 @@ export default async function handler(req, res){
       if (route === 'create-portal-session') return createPortalSession(req,res);
       if (route === 'create-checkout-session') return createCheckoutSession(req,res);
       if (route === 'buy-nfc') return buyNfc(req,res);
-      if (route === 'post-pago') return postPago(req,res); // 👈 añadido aquí
+      if (route === 'post-pago') return postPago(req,res);
     }
 
     return res.status(404).json({ error:'not_found', route, method:req.method });
   }catch(e){
+    const code = e?.statusCode || 500;
     console.error('api error', e);
-    return res.status(500).json({ error:'server_error', detail: e?.message || String(e) });
+    return res.status(code).json({ error:'server_error', detail: e?.message || String(e) });
   }
 }

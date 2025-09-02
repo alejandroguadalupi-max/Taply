@@ -3,9 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "stripe": "^14.24.0",
+    "@sendgrid/mail": "^8.1.0",
+    "bcryptjs": "^2.4.3",
+    "cookie": "^0.6.0",
+    "jsonwebtoken": "^9.0.2",
     "raw-body": "^2.5.2",
-    "@sendgrid/mail": "^8.1.0"
+    "stripe": "^14.24.0",
+    "twilio": "^4.21.0"
   }
 }
