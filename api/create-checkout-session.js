@@ -1,4 +1,8 @@
 import Stripe from 'stripe';
+import jwt from 'jsonwebtoken';
+import cookie from 'cookie';
+
+const COOKIE_NAME = 'taply_session';
 
 const PRICES = {
   monthly: {
@@ -23,6 +27,26 @@ function getBody(req) {
   return (typeof req.body === 'string') ? JSON.parse(req.body) : req.body;
 }
 
+/* === Helpers sesión === */
+function getCookies(req){
+  try { return cookie.parse(req.headers.cookie || ''); } catch { return {}; }
+}
+function getSessionFromCookie(req){
+  const token = getCookies(req)[COOKIE_NAME];
+  if(!token) return null;
+  if(!process.env.APP_SECRET) return null;
+  try { return jwt.verify(token, process.env.APP_SECRET); } catch { return null; }
+}
+// Si no viene customerId pero sí email, buscamos/creamos el Customer en Stripe.
+async function ensureCustomerId(stripe, sess){
+  if(sess?.customerId) return sess.customerId;
+  if(!sess?.email) return null;
+  const found = await stripe.customers.search({ query: `email:'${sess.email}'`, limit: 1 });
+  if(found.data.length) return found.data[0].id;
+  const created = await stripe.customers.create({ email: sess.email, name: sess.name || undefined, metadata:{ app:'taply' }});
+  return created.id;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
 
@@ -35,7 +59,15 @@ export default async function handler(req, res) {
     const price = PRICES?.[frequency]?.[tier];
     if (!price) return res.status(400).json({ error: 'price_not_found' });
 
+    // === ADDED: exigir sesión (login)
+    const sess = getSessionFromCookie(req);
+    if(!sess) return res.status(401).json({ error: 'auth_required' });
+
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    // === ADDED: adjuntar el customer a la sesión de checkout
+    const customerId = await ensureCustomerId(stripe, sess);
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       ui_mode: 'hosted',
@@ -47,7 +79,11 @@ export default async function handler(req, res) {
       phone_number_collection: { enabled: true },
 
       // opcional: metadata para distinguir
-      metadata: { type: 'subscription', tier, frequency }
+      metadata: { type: 'subscription', tier, frequency },
+
+      // === ADDED: vincular con el mismo Customer del usuario
+      ...(customerId ? { customer: customerId } : {}),
+      // (Si quieres prellenar, también se podría: customer_email: sess.email)
     });
 
     if (!session?.url) return res.status(500).json({ error: 'no_session_url' });

@@ -196,6 +196,31 @@
     @media (prefers-reduced-motion: reduce){
       *{animation:none !important; transition:none !important}
     }
+
+    /* === ADDON CUENTA (no rompe estilos existentes) === */
+    #acct-modal.acct-hidden{display:none!important}
+    #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.6);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
+    .acct-dialog{width:min(520px,92%);background:var(--bg-2,#0e1424);color:var(--txt,#e9eefc);
+      border:1px solid var(--border,rgba(255,255,255,.08));border-radius:16px;box-shadow:var(--shadow);
+      padding:20px}
+    .acct-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+    .acct-x{background:transparent;border:0;color:inherit;font-size:22px;cursor:pointer}
+    .acct-tabs{display:flex;gap:8px;margin:10px 0 12px}
+    .acct-tab{border:1px solid var(--border,rgba(255,255,255,.12));background:rgba(255,255,255,.04);
+      border-radius:999px;padding:8px 12px;cursor:pointer;color:inherit;font-weight:700}
+    .acct-tab.acct-tab-active{background:linear-gradient(135deg,var(--brand-1,#00d4ff),var(--brand-2,#7c3aed));
+      color:#061017}
+    .acct-form{display:grid;gap:10px}
+    .acct-form label{display:grid;gap:6px;font-weight:600}
+    .acct-form input{background:#0a0f16;border:1px solid var(--border,rgba(255,255,255,.12));color:inherit;
+      border-radius:12px;padding:12px}
+    .acct-msg{color:#cfe3ff;margin:0 0 8px;font-size:.95rem}
+    .acct-err{color:#fca5a5}
+    .acct-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .acct-badge{display:inline-block;border:1px solid var(--border,rgba(255,255,255,.12));
+      background:rgba(255,255,255,.04);padding:6px 10px;border-radius:999px;font-weight:800}
+    .acct-small{color:var(--muted,#9fb0c6);font-size:.92rem;margin-top:6px}
+    .acct-link{color:#b3e1ff;text-decoration:underline;cursor:pointer}
   </style>
 </head>
 
@@ -211,19 +236,21 @@
         <span>taply</span>
       </a>
 
-      <!-- MENÚ (sin “Mi cuenta”) -->
+      <!-- MENÚ (se completa con “Tu plan / Mi suscripción” si hay sesión) -->
       <nav class="nav-links">
         <a class="ghost" href="#beneficios">Beneficios</a>
         <a class="ghost" href="#como-funciona">Cómo funciona</a>
         <a class="ghost" href="#reviews">Opiniones</a>
         <a class="ghost" href="suscripciones.html">Suscripciones</a>
         <a class="btn" href="suscripciones.html">¡Comenzar ahora!</a>
+        <!-- Slot dinámico -->
+        <span id="acct-nav-slot" style="display:inline-flex;gap:10px;align-items:center"></span>
       </nav>
 
       <button class="menu ghost" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Menú</button>
     </div>
 
-    <!-- MENÚ MÓVIL (sin “Mi cuenta”) -->
+    <!-- MENÚ MÓVIL -->
     <div class="container mobile-menu" id="mobileMenu" role="menu" aria-label="Menú móvil">
       <div class="mobile-links">
         <a class="ghost" href="#beneficios" role="menuitem">Beneficios</a>
@@ -231,6 +258,8 @@
         <a class="ghost" href="#reviews" role="menuitem">Opiniones</a>
         <a class="ghost" href="suscripciones.html" role="menuitem">Suscripciones</a>
         <a class="btn" href="suscripciones.html" role="menuitem">¡Comenzar ahora!</a>
+        <!-- Slot dinámico móvil -->
+        <span id="acct-nav-slot-mobile" style="display:inline-flex;gap:10px;align-items:center;margin-top:8px"></span>
       </div>
     </div>
   </header>
@@ -514,6 +543,147 @@
       r.style.left=(e.clientX-rect.left)+'px'; r.style.top=(e.clientY-rect.top)+'px';
       b.appendChild(r); r.addEventListener('animationend',()=>r.remove());
     });
+  </script>
+
+  <!-- === MODAL CUENTA (login/registro) === -->
+  <div id="acct-modal" class="acct-hidden" role="dialog" aria-modal="true" aria-labelledby="acct-title">
+    <div class="acct-dialog">
+      <div class="acct-head">
+        <h3 id="acct-title" style="margin:0">Accede a tu cuenta</h3>
+        <button id="acct-close" class="acct-x" aria-label="Cerrar">×</button>
+      </div>
+      <p id="acct-msg" class="acct-msg"></p>
+      <div class="acct-tabs">
+        <button class="acct-tab acct-tab-active" data-tab="login">Iniciar sesión</button>
+        <button class="acct-tab" data-tab="register">Registrarse</button>
+      </div>
+
+      <form id="acct-form-login" class="acct-form" autocomplete="on">
+        <label>Email <input id="acct-login-email" type="email" required autocomplete="email"></label>
+        <label>Contraseña <input id="acct-login-pass" type="password" required autocomplete="current-password"></label>
+        <button type="submit" class="btn">Entrar</button>
+        <div class="acct-small">¿Olvidaste la contraseña? <span id="acct-forgot" class="acct-link">Recuperar</span></div>
+        <p id="acct-error-login" class="acct-err" style="display:none"></p>
+      </form>
+
+      <form id="acct-form-register" class="acct-form acct-hidden" autocomplete="on">
+        <label>Nombre (opcional) <input id="acct-reg-name" type="text" autocomplete="name"></label>
+        <label>Email <input id="acct-reg-email" type="email" required autocomplete="email"></label>
+        <label>Contraseña <input id="acct-reg-pass" type="password" required minlength="6" autocomplete="new-password"></label>
+        <button type="submit" class="btn">Crear cuenta</button>
+        <p id="acct-error-register" class="acct-err" style="display:none"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- === ADDON CUENTA: menú “Tu plan / Mi suscripción”, login, portal === -->
+  <script>
+  (function(){
+    const S = { user:null };
+
+    const $ = s => document.querySelector(s);
+    const $$ = s => Array.from(document.querySelectorAll(s));
+    const getPlanName = (u) =>
+      u?.subscription?.plan?.nickname || u?.subscription?.price?.nickname ||
+      u?.subscription?.tier || u?.subscription_tier || u?.plan || '';
+    // Modal
+    const modal = $('#acct-modal');
+    const msg = $('#acct-msg');
+    const closeBtn = $('#acct-close');
+    const tabBtns = $$('#acct-modal .acct-tab');
+    const formLogin = $('#acct-form-login');
+    const formReg = $('#acct-form-register');
+    const errLogin = $('#acct-error-login');
+    const errReg = $('#acct-error-register');
+
+    function showModal(text){
+      msg.textContent = text || 'Inicia sesión para continuar';
+      modal.classList.remove('acct-hidden');
+      setTab('login');
+      setTimeout(()=>$('#acct-login-email')?.focus(),50);
+    }
+    function hideModal(){ modal.classList.add('acct-hidden'); errLogin.style.display='none'; errReg.style.display='none'; }
+    function setTab(name){
+      const onLogin = name === 'login';
+      formLogin?.classList.toggle('acct-hidden', !onLogin);
+      formReg?.classList.toggle('acct-hidden', onLogin);
+      tabBtns.forEach(b => b.classList.toggle('acct-tab-active', b.dataset.tab === name));
+    }
+    closeBtn?.addEventListener('click', hideModal);
+    modal?.addEventListener('click', e=>{ if(e.target === modal) hideModal(); });
+    tabBtns.forEach(b => b.addEventListener('click', ()=> setTab(b.dataset.tab)));
+
+    async function api(method, url, body){
+      const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):undefined });
+      let data=null; try{ data = await res.json(); }catch{}
+      if(!res.ok) throw (data?.error || `HTTP ${res.status}`);
+      return data;
+    }
+    async function getSession(){
+      try{ const data = await api('GET','/api/session'); setUser(data?.user || null); }
+      catch{ setUser(null); }
+    }
+    function setUser(u){
+      S.user = u;
+      try{ localStorage.setItem('acct_user', u ? JSON.stringify(u) : ''); }catch{}
+      paintNav();
+    }
+
+    function paintNav(){
+      const slot1 = document.getElementById('acct-nav-slot');
+      const slot2 = document.getElementById('acct-nav-slot-mobile');
+      const plan = getPlanName(S.user);
+      const label = plan ? `Tu plan: ${plan}` : 'Mi suscripción';
+
+      const htmlLogged = `
+        <a class="ghost" href="suscripciones.html#cuenta" title="${S.user?.email || 'cuenta'}">${label}</a>
+        <a class="ghost" id="acct-logout-nav">Salir</a>
+      `;
+      const htmlAnon = `<a class="ghost" id="acct-open-nav">Iniciar sesión</a>`;
+
+      if(slot1) slot1.innerHTML = S.user ? htmlLogged : htmlAnon;
+      if(slot2) slot2.innerHTML = S.user ? htmlLogged : htmlAnon;
+
+      document.querySelectorAll('#acct-open-nav').forEach(el => el.addEventListener('click', ()=> showModal()));
+      document.querySelectorAll('#acct-logout-nav').forEach(el => el.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        try{ await api('POST','/api/logout',{}); }catch{}
+        setUser(null);
+        alert('Sesión cerrada');
+      }));
+    }
+
+    formLogin?.addEventListener('submit', async (e)=>{
+      e.preventDefault(); errLogin.style.display='none';
+      const email = $('#acct-login-email').value.trim();
+      const password = $('#acct-login-pass').value;
+      try{
+        const data = await api('POST','/api/login',{ email, password });
+        setUser(data?.user || null);
+        hideModal();
+      }catch(err){ errLogin.textContent = String(err); errLogin.style.display='block'; }
+    });
+
+    formReg?.addEventListener('submit', async (e)=>{
+      e.preventDefault(); errReg.style.display='none';
+      const name = $('#acct-reg-name').value.trim() || undefined;
+      const email = $('#acct-reg-email').value.trim();
+      const password = $('#acct-reg-pass').value;
+      try{
+        const data = await api('POST','/api/register',{ name, email, password });
+        setUser(data?.user || null);
+        hideModal();
+      }catch(err){ errReg.textContent = String(err); errReg.style.display='block'; }
+    });
+
+    // Abridores
+    document.body.addEventListener('click',(e)=>{
+      const a = e.target.closest('a[href="suscripciones.html#cuenta"]');
+      if(a && !S.user){ e.preventDefault(); showModal('Inicia sesión para ver tu suscripción.'); }
+    });
+
+    getSession();
+  })();
   </script>
 </body>
 </html>

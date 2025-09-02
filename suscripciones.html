@@ -1,4 +1,4 @@
-<!doctype html>
+<!doctype html> 
 <html lang="es">
 <head>
   <meta charset="utf-8" />
@@ -20,7 +20,7 @@
     .container{max-width:1100px;width:92%;margin-inline:auto}
 
     header{padding:14px 0;border-bottom:1px solid var(--border);background:#0a0f16cc;backdrop-filter:blur(10px)}
-    .brand{font-weight:800;display:flex;align-items:center;gap:8px}
+    .brand{font-weight:800;display:flex;align-items:center;gap:8px;justify-content:space-between}
     .logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2))}
 
     .hero{text-align:center;padding:40px 0 24px}
@@ -57,13 +57,42 @@
 
     .panel{display:none;margin-bottom:40px}
     .panel.show{display:block}
+
+    /* === ADDON CUENTA (no rompe estilos existentes) === */
+    #acct-modal.acct-hidden{display:none!important}
+    #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.6);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
+    .acct-dialog{width:min(520px,92%);background:var(--bg-2,#0e1424);color:var(--txt,#e9eefc);
+      border:1px solid var(--border,rgba(255,255,255,.08));border-radius:16px;box-shadow:var(--shadow);
+      padding:20px}
+    .acct-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+    .acct-x{background:transparent;border:0;color:inherit;font-size:22px;cursor:pointer}
+    .acct-tabs{display:flex;gap:8px;margin:10px 0 12px}
+    .acct-tab{border:1px solid var(--border,rgba(255,255,255,.12));background:rgba(255,255,255,.04);
+      border-radius:999px;padding:8px 12px;cursor:pointer;color:inherit;font-weight:700}
+    .acct-tab.acct-tab-active{background:linear-gradient(135deg,var(--brand-1,#00d4ff),var(--brand-2,#7c3aed));
+      color:#061017}
+    .acct-form{display:grid;gap:10px}
+    .acct-form label{display:grid;gap:6px;font-weight:600}
+    .acct-form input{background:#0a0f16;border:1px solid var(--border,rgba(255,255,255,.12));color:inherit;
+      border-radius:12px;padding:12px}
+    .acct-msg{color:#cfe3ff;margin:0 0 8px;font-size:.95rem}
+    .acct-err{color:#fca5a5}
+    .acct-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .acct-badge{display:inline-block;border:1px solid var(--border,rgba(255,255,255,.12));
+      background:rgba(255,255,255,.04);padding:6px 10px;border-radius:999px;font-weight:800}
+    .acct-small{color:var(--muted,#9fb0c6);font-size:.92rem;margin-top:6px}
+    .acct-link{color:#b3e1ff;text-decoration:underline;cursor:pointer}
   </style>
 </head>
 <body>
 <header>
   <div class="container brand">
-    <span class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12a7 7 0 1114 0v6.5a2.5 2.5 0 01-5 0V9.75a2.25 2.25 0 10-4.5 0V18.5a2.5 2.5 0 01-5 0V12z" stroke="#061017" stroke-width="1.7"/></svg></span>
-    <span>taply</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12a7 7 0 1114 0v6.5a2.5 2.5 0 01-5 0V9.75a2.25 2.25 0 10-4.5 0V18.5a2.5 2.5 0 01-5 0V12z" stroke="#061017" stroke-width="1.7"/></svg></span>
+      <span>taply</span>
+    </div>
+    <!-- Slot de cuenta (se rellena por JS si hay sesión) -->
+    <nav class="nav-links" style="display:flex;gap:12px;align-items:center"></nav>
   </div>
 </header>
 
@@ -144,11 +173,65 @@
   </div>
 </section>
 
+<!-- === MI SUSCRIPCIÓN / MI CUENTA === -->
+<section id="cuenta" class="container" style="padding:40px 0">
+  <article class="card">
+    <h3 style="margin:0 0 6px">Mi suscripción</h3>
+    <p class="desc">Gestiona tu suscripción y tus datos de acceso.</p>
+
+    <div class="acct-row" style="margin:12px 0 6px">
+      <div>
+        <div id="acct-status" class="acct-badge">Sesión no iniciada</div>
+        <div id="acct-email" class="acct-small">—</div>
+        <div id="acct-plan" class="acct-small"></div>
+      </div>
+      <div class="actions">
+        <button id="acct-portal" class="btn">Gestionar suscripción</button>
+        <button id="acct-logout" class="btn ghost">Cerrar sesión</button>
+      </div>
+    </div>
+
+    <p id="acct-renews" class="acct-small"></p>
+    <p class="acct-small">¿No tienes cuenta? <a id="acct-open-from-section" class="acct-link">Inicia sesión o regístrate</a>.</p>
+  </article>
+</section>
+
 <footer>
   <div class="container">
     <p>Primero los dispositivos NFC, después la suscripción. Tras cada compra recibirás WhatsApp con instrucciones.</p>
   </div>
 </footer>
+
+<!-- === MODAL CUENTA === -->
+<div id="acct-modal" class="acct-hidden" role="dialog" aria-modal="true" aria-labelledby="acct-title">
+  <div class="acct-dialog">
+    <div class="acct-head">
+      <h3 id="acct-title" style="margin:0">Accede a tu cuenta</h3>
+      <button id="acct-close" class="acct-x" aria-label="Cerrar">×</button>
+    </div>
+    <p id="acct-msg" class="acct-msg"></p>
+    <div class="acct-tabs">
+      <button class="acct-tab acct-tab-active" data-tab="login">Iniciar sesión</button>
+      <button class="acct-tab" data-tab="register">Registrarse</button>
+    </div>
+
+    <form id="acct-form-login" class="acct-form" autocomplete="on">
+      <label>Email <input id="acct-login-email" type="email" required autocomplete="email"></label>
+      <label>Contraseña <input id="acct-login-pass" type="password" required autocomplete="current-password"></label>
+      <button type="submit" class="btn">Entrar</button>
+      <div class="acct-small">¿Olvidaste la contraseña? <span id="acct-forgot" class="acct-link">Recuperar</span></div>
+      <p id="acct-error-login" class="acct-err" style="display:none"></p>
+    </form>
+
+    <form id="acct-form-register" class="acct-form acct-hidden" autocomplete="on">
+      <label>Nombre (opcional) <input id="acct-reg-name" type="text" autocomplete="name"></label>
+      <label>Email <input id="acct-reg-email" type="email" required autocomplete="email"></label>
+      <label>Contraseña <input id="acct-reg-pass" type="password" required minlength="6" autocomplete="new-password"></label>
+      <button type="submit" class="btn">Crear cuenta</button>
+      <p id="acct-error-register" class="acct-err" style="display:none"></p>
+    </form>
+  </div>
+</div>
 
 <script>
   const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -239,6 +322,237 @@
       alert('Error de red al iniciar la suscripción');
     }
   }));
+</script>
+
+<!-- === ADDON CUENTA (captura de clics + nav + portal) === -->
+<script>
+(function(){
+  const S = { user:null, bypassId:null, pendingTargetId:null };
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const fmtDate = ts => {
+    try { const d = typeof ts === 'number' ? new Date(ts*1000) : new Date(ts);
+      return new Intl.DateTimeFormat('es-ES',{dateStyle:'medium', timeStyle:'short'}).format(d);
+    } catch { return ''; }
+  };
+  const getPlanName = (u) =>
+    u?.subscription?.plan?.nickname || u?.subscription?.price?.nickname ||
+    u?.subscription?.tier || u?.subscription_tier || u?.plan || '';
+
+  const isSubActive = (u) => {
+    const s1 = u?.subscription?.status;
+    const s2 = u?.subscription_status;
+    const flag = u?.isSubscribed;
+    const status = (s1 || s2 || '').toLowerCase();
+    return flag === true || status === 'active' || status === 'trialing' || status === 'past_due';
+  };
+
+  // Modal
+  const modal = $('#acct-modal');
+  const msg = $('#acct-msg');
+  const closeBtn = $('#acct-close');
+  const tabBtns = $$('#acct-modal .acct-tab');
+  const formLogin = $('#acct-form-login');
+  const formReg = $('#acct-form-register');
+  const errLogin = $('#acct-error-login');
+  const errReg = $('#acct-error-register');
+
+  function showModal(text){
+    if(!modal) return;
+    msg.textContent = text || 'Inicia sesión para continuar';
+    modal.classList.remove('acct-hidden');
+    setTab('login');
+    setTimeout(()=>$('#acct-login-email')?.focus(),50);
+  }
+  function hideModal(){ modal?.classList.add('acct-hidden'); errLogin.style.display='none'; errReg.style.display='none'; }
+  function setTab(name){
+    const onLogin = name === 'login';
+    formLogin?.classList.toggle('acct-hidden', !onLogin);
+    formReg?.classList.toggle('acct-hidden', onLogin);
+    tabBtns.forEach(b => b.classList.toggle('acct-tab-active', b.dataset.tab === name));
+  }
+  closeBtn?.addEventListener('click', hideModal);
+  modal?.addEventListener('click', e=>{ if(e.target === modal) hideModal(); });
+  tabBtns.forEach(b => b.addEventListener('click', ()=> setTab(b.dataset.tab)));
+
+  // API
+  async function api(method, url, body){
+    const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):undefined });
+    let data=null; try{ data = await res.json(); }catch{}
+    if(!res.ok) throw (data?.error || `HTTP ${res.status}`);
+    return data;
+  }
+  async function getSession(){
+    try{ const data = await api('GET','/api/session'); setUser(data?.user || null); }
+    catch{ setUser(null); }
+  }
+  function setUser(u){
+    S.user = u;
+    try{ localStorage.setItem('acct_user', u ? JSON.stringify(u) : ''); }catch{}
+    paintNav();
+    paintAccountSection();
+  }
+  async function openPortal(){
+    try{
+      const data = await api('POST','/api/create-portal-session',{});
+      if(data?.url) location.href = data.url;
+      else alert('No se generó la URL del portal de suscripción');
+    }catch(err){ console.error(err); alert('No se pudo abrir el portal de suscripción'); }
+  }
+
+  // Forms
+  formLogin?.addEventListener('submit', async (e)=>{
+    e.preventDefault(); errLogin.style.display='none';
+    const email = $('#acct-login-email').value.trim();
+    const password = $('#acct-login-pass').value;
+    try{
+      const data = await api('POST','/api/login',{ email, password });
+      setUser(data?.user || null);
+      hideModal();
+      if(S.pendingTargetId){
+        S.bypassId = S.pendingTargetId;
+        const t = document.getElementById(S.pendingTargetId);
+        S.pendingTargetId = null;
+        setTimeout(()=> t?.click(), 0);
+      }
+    }catch(err){ errLogin.textContent = String(err); errLogin.style.display='block'; }
+  });
+
+  formReg?.addEventListener('submit', async (e)=>{
+    e.preventDefault(); errReg.style.display='none';
+    const name = $('#acct-reg-name').value.trim() || undefined;
+    const email = $('#acct-reg-email').value.trim();
+    const password = $('#acct-reg-pass').value;
+    try{
+      const data = await api('POST','/api/register',{ name, email, password });
+      setUser(data?.user || null);
+      hideModal();
+      if(S.pendingTargetId){
+        S.bypassId = S.pendingTargetId;
+        const t = document.getElementById(S.pendingTargetId);
+        S.pendingTargetId = null;
+        setTimeout(()=> t?.click(), 0);
+      }
+    }catch(err){ errReg.textContent = String(err); errReg.style.display='block'; }
+  });
+
+  // Nav (este archivo no tenía menú; añadimos un slot simple arriba)
+  function ensureAccountLink(container){
+    if(!container) return null;
+    let slot = container.querySelector('#acct-nav-slot');
+    if(!slot){
+      slot = document.createElement('span');
+      slot.id = 'acct-nav-slot';
+      slot.style.display='inline-flex';
+      slot.style.gap='10px';
+      slot.style.alignItems='center';
+      container.appendChild(slot);
+    }
+    return slot;
+  }
+  function paintNav(){
+    const desktop = document.querySelector('nav.nav-links');
+    const slot = ensureAccountLink(desktop);
+    const plan = getPlanName(S.user);
+    const label = plan ? `Tu plan: ${plan}` : 'Mi suscripción';
+
+    const htmlLogged = `
+      <a class="ghost" href="suscripciones.html#cuenta" title="${S.user?.email || 'cuenta'}">${label}</a>
+      <a class="ghost" id="acct-logout-nav">Salir</a>
+    `;
+    const htmlAnon = `<a class="ghost" id="acct-open-nav">Iniciar sesión</a>`;
+
+    if(slot){ slot.innerHTML = S.user ? htmlLogged : htmlAnon; }
+    document.querySelectorAll('#acct-open-nav').forEach(el => el.addEventListener('click', ()=> showModal()));
+    document.querySelectorAll('#acct-logout-nav').forEach(el => el.addEventListener('click', doLogout));
+  }
+
+  async function doLogout(e){
+    e?.preventDefault?.();
+    try{ await api('POST','/api/logout',{}); }catch{}
+    setUser(null);
+    alert('Sesión cerrada');
+  }
+
+  function paintAccountSection(){
+    const emailEl = $('#acct-email');
+    const statusEl = $('#acct-status');
+    const renewsEl = $('#acct-renews');
+    const planEl = $('#acct-plan');
+    const portalBtn = $('#acct-portal');
+    const logoutBtn = $('#acct-logout');
+
+    if(!emailEl || !statusEl) return;
+
+    if(!S.user){
+      emailEl.textContent = '—';
+      statusEl.textContent = 'Sesión no iniciada';
+      renewsEl.textContent = '';
+      planEl.textContent = '';
+      portalBtn?.setAttribute('disabled','disabled');
+      logoutBtn?.setAttribute('disabled','disabled');
+      return;
+    }
+    emailEl.textContent = S.user.email || '—';
+    const st = (S.user.subscription?.status || S.user.subscription_status || 'none').toLowerCase();
+    const pretty = isSubActive(S.user) ? 'Suscripción activa' : (st==='canceled'?'Suscripción cancelada':'Sin suscripción');
+    statusEl.textContent = pretty;
+
+    const plan = getPlanName(S.user);
+    planEl.textContent = plan ? `Plan: ${plan}` : '';
+
+    const end = S.user.subscription?.current_period_end || S.user.current_period_end;
+    renewsEl.textContent = end ? `Renovación / fin de periodo: ${fmtDate(end)}.` : '';
+
+    portalBtn?.removeAttribute('disabled');
+    logoutBtn?.removeAttribute('disabled');
+    portalBtn?.addEventListener('click', openPortal);
+    logoutBtn?.addEventListener('click', doLogout);
+  }
+
+  // Interceptores para forzar login/suscripción ANTES de ir a pasarela
+  // 1) NFC: requiere login + suscripción activa
+  const nfcBtn = document.getElementById('buyNfcBtn');
+  nfcBtn?.addEventListener('click', (e)=>{
+    if(S.bypassId === 'buyNfcBtn'){ S.bypassId=null; return; }
+    if(!S.user){
+      e.stopImmediatePropagation(); e.preventDefault();
+      S.pendingTargetId = 'buyNfcBtn';
+      showModal('Para comprar necesitas iniciar sesión o registrarte.');
+      return;
+    }
+    if(!isSubActive(S.user)){
+      e.stopImmediatePropagation(); e.preventDefault();
+      alert('Necesitas una suscripción activa para comprar los NFC. Elige un plan.');
+      const ps = document.getElementById('panel-sub');
+      const pn = document.getElementById('panel-nfc');
+      ps?.classList.add('show'); pn?.classList.remove('show');
+      ps?.scrollIntoView?.({behavior:'smooth'});
+      return;
+    }
+  }, true); // CAPTURA
+
+  // 2) Planes: requiere login (pero permite crear la suscripción)
+  $$('.btn.plan').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      if(S.bypassId === b.id){ S.bypassId=null; return; }
+      if(!S.user){
+        e.stopImmediatePropagation(); e.preventDefault();
+        if(!b.id){ b.id = 'planbtn_' + (b.dataset.tier || '') + '_' + Math.random().toString(36).slice(2,7); }
+        S.pendingTargetId = b.id;
+        showModal('Inicia sesión o regístrate para vincular tu suscripción.');
+        return;
+      }
+    }, true);
+  });
+
+  // Abridores
+  document.getElementById('acct-open-from-section')?.addEventListener('click', ()=> showModal());
+
+  // Boot
+  getSession();
+})();
 </script>
 </body>
 </html>
