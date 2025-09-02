@@ -22,6 +22,7 @@ const PRICES = {
 };
 const PRICE_ID_NFC = process.env.PRICE_ID_NFC;
 
+/* ============ Utils base ============ */
 function assertEnv() {
   if (!process.env.APP_SECRET) throw Object.assign(new Error('missing APP_SECRET'), { statusCode: 500 });
   if (!process.env.STRIPE_SECRET_KEY) throw Object.assign(new Error('missing STRIPE_SECRET_KEY'), { statusCode: 500 });
@@ -37,7 +38,8 @@ function appBase(req){
 }
 function getBody(req) {
   if (!req.body) return {};
-  return (typeof req.body === 'string') ? JSON.parse(req.body) : req.body;
+  if (typeof req.body === 'object') return req.body;
+  try { return JSON.parse(req.body); } catch { return {}; }
 }
 function getCookies(req){
   try { return cookie.parse(req.headers.cookie || ''); } catch { return {}; }
@@ -74,29 +76,38 @@ function routeOf(req){
   return p.startsWith('api/') ? p.slice(4) : p;
 }
 
-// Stripe helpers
+/* ============ Stripe helpers ============ */
+let stripeSingleton = null;
 function getStripe(){
   if (!process.env.STRIPE_SECRET_KEY) {
     const e = new Error('missing STRIPE_SECRET_KEY');
     e.statusCode = 500;
     throw e;
   }
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
+  if (!stripeSingleton) {
+    stripeSingleton = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-06-20',
+    });
+  }
+  return stripeSingleton;
+}
+// Evita inyección en customers.search
+function escapeStripeQueryValue(v=''){
+  return String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 async function ensureCustomerId(stripe, sess){
   if(sess?.customerId) return sess.customerId;
   if(!sess?.email) return null;
-  // Buscar por email
-  const found = await stripe.customers.search({ query: `email:'${sess.email}'`, limit: 1 });
+  const q = `email:'${escapeStripeQueryValue(sess.email)}'`;
+  const found = await stripe.customers.search({ query: q, limit: 1 });
   if(found.data.length) {
     const id = found.data[0].id;
-    // si no tiene name y nosotros sí, completamos
+    // completa name si falta
     if (sess.name && !found.data[0].name) {
-      await stripe.customers.update(id, { name: sess.name });
+      try { await stripe.customers.update(id, { name: sess.name }); } catch {}
     }
     return id;
   }
-  // crear
   const created = await stripe.customers.create({ email: sess.email, name: sess.name || undefined, metadata:{ app:'taply' }});
   return created.id;
 }
@@ -137,7 +148,7 @@ function addMonthsPreservingDay(date, months){
   return new Date(targetYear, monthIndex, day, date.getHours(), date.getMinutes(), date.getSeconds());
 }
 
-/* ========= ENVÍOS (SendGrid y WhatsApp opcionales) ========= */
+/* ========= Envíos (SendGrid / WhatsApp opcional) ========= */
 async function sendEmail({to, subject, text, html}){
   try{
     if(!process.env.SENDGRID_API_KEY || !process.env.EMAIL_FROM) return;
@@ -167,9 +178,6 @@ async function sendWhatsApp({toNumber, body}){
 /* ================== Handlers ================== */
 
 // POST /api/register
-// - nombre obligatorio
-// - si el email ya tiene cuenta (hash), 409 email_in_use
-// - si existe en Stripe sin hash, reclamamos (añadimos hash + nombre)
 async function register(req, res){
   const rawEmail = getBody(req).email;
   const email = normalizeEmail(rawEmail);
@@ -178,7 +186,8 @@ async function register(req, res){
   if(password.length < 6) return res.status(400).json({ error:'weak_password' });
 
   const stripe = getStripe();
-  const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
+  const q = `email:'${escapeStripeQueryValue(email)}'`;
+  const found = await stripe.customers.search({ query: q, limit: 1 });
 
   if(found.data.length){
     const customer = found.data[0];
@@ -207,7 +216,8 @@ async function login(req, res){
   const { password } = getBody(req);
   if(!email || !password) return res.status(400).json({ error:'email_and_password_required' });
   const stripe = getStripe();
-  const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
+  const q = `email:'${escapeStripeQueryValue(email)}'`;
+  const found = await stripe.customers.search({ query: q, limit: 1 });
   if(!found.data.length) return res.status(401).json({ error:'account_not_found' });
   const customer = found.data[0];
   const hash = customer.metadata?.taply_pass_hash;
@@ -230,15 +240,19 @@ async function session(req, res){
   if(!sess) return res.status(200).json({ user:null });
   const stripe = getStripe();
 
-  // Cliente (para metadata: nfc_qty)
-  const customer = await stripe.customers.retrieve(sess.customerId);
-  const nfcQty = parseInt(customer?.metadata?.taply_nfc_qty || '0', 10) || 0;
+  let nfcQty = 0;
+  let customer = null;
+  try {
+    customer = await stripe.customers.retrieve(sess.customerId);
+    nfcQty = parseInt(customer?.metadata?.taply_nfc_qty || '0', 10) || 0;
+  } catch {
+    // cliente inexistente/borrado: devolvemos sesión mínima
+    return res.status(200).json({ user: { email: sess.email, name: sess.name || null, customerId: null, subscription: null, subscription_status: null, nfc_qty: 0 }});
+  }
 
-  // Mejor suscripción
   const best = await getBestSubscription(stripe, sess.customerId);
   const sub = normalizeSub(best);
 
-  // Cálculo de “próxima renovación” por el mismo día del mes (aparente)
   let nextGuess = null;
   if (sub?.current_period_start) {
     const start = new Date((sub.current_period_start * 1000));
@@ -248,13 +262,13 @@ async function session(req, res){
       nextGuess = addMonthsPreservingDay(start, 1).getTime()/1000;
     }
   } else if (sub?.current_period_end) {
-    nextGuess = sub.current_period_end; // fallback
+    nextGuess = sub.current_period_end;
   }
 
   return res.status(200).json({
     user: {
       email: sess.email,
-      name: sess.name || null,
+      name: sess.name || (customer?.name || null),
       customerId: sess.customerId,
       subscription: sub,
       subscription_status: sub?.status || null,
@@ -266,16 +280,15 @@ async function session(req, res){
   });
 }
 
-// === Recuperación de contraseña ===
 // POST /api/request-password-reset {email}
 async function requestPasswordReset(req, res){
   const email = normalizeEmail(getBody(req).email);
   if(!email) return res.status(400).json({ error:'email_required' });
 
   const stripe = getStripe();
-  const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
+  const q = `email:'${escapeStripeQueryValue(email)}'`;
+  const found = await stripe.customers.search({ query: q, limit: 1 });
   if(!found.data.length){
-    // No revelamos existencia
     return res.status(200).json({ ok:true });
   }
   const customer = found.data[0];
@@ -309,7 +322,8 @@ async function resetPassword(req, res){
   if(password.length < 6) return res.status(400).json({ error:'weak_password' });
 
   const stripe = getStripe();
-  const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
+  const q = `email:'${escapeStripeQueryValue(email)}'`;
+  const found = await stripe.customers.search({ query: q, limit: 1 });
   if(!found.data.length) return res.status(400).json({ error:'invalid_token' });
 
   const customer = found.data[0];
@@ -358,7 +372,6 @@ async function createCheckoutSession(req, res){
   const stripe = getStripe();
   const customerId = await ensureCustomerId(stripe, sess);
 
-  // Evitar duplicar suscripción
   const already = await hasValidSubscription(stripe, customerId);
   if (already) {
     const best = await getBestSubscription(stripe, customerId);
@@ -385,7 +398,7 @@ async function createCheckoutSession(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-// POST /api/buy-nfc  (pago único, REQUIERE login; NO requiere suscripción activa)
+// POST /api/buy-nfc  (pago único)
 async function buyNfc(req, res){
   if (!PRICE_ID_NFC) return res.status(500).json({ error: 'missing_nfc_price_id' });
 
@@ -443,7 +456,6 @@ async function postPago(req, res){
     }
   }
 
-  // Fallback a email de sesión
   const sess = getSessionFromCookie(req);
   if(!buyerEmail && sess?.email) buyerEmail = sess.email;
 

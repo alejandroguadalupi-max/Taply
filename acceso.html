@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+  <title>Acceso — Taply</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12);
+           --brand1:#00d4ff; --brand2:#7c3aed; }
+    *{box-sizing:border-box} html,body{height:100%} html{-webkit-text-size-adjust:100%}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui;display:grid;place-items:center}
+    .wrap{width:min(960px,94%);margin:24px auto}
+    h1{margin:0 0 16px;text-align:center}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .card{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:22px}
+    label{display:grid;gap:6px;margin:10px 0;font-weight:600}
+    .in{position:relative}
+    input{background:#0a0f16;border:1px solid var(--b);color:inherit;border-radius:12px;padding:12px 44px 12px 12px;font-size:16px}
+    .eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
+    .btn{width:100%;padding:12px 16px;border:0;border-radius:999px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017;margin-top:10px}
+    .ghost{width:100%;padding:12px 16px;border:1px solid var(--b);background:transparent;color:inherit;border-radius:999px;margin-top:8px}
+    .row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .err{color:#fca5a5;margin-top:6px}
+    .muted{color:var(--muted);font-size:.95rem}
+    @media (max-width: 780px){ .grid{grid-template-columns:1fr} }
+    a{color:#b3e1ff}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Accede a tu cuenta</h1>
+    <div class="grid">
+      <!-- LOGIN -->
+      <section class="card">
+        <h2 style="margin:0 0 8px">Iniciar sesión</h2>
+        <form id="form-login" autocomplete="on">
+          <label>Email <input id="login-email" type="email" required autocomplete="email" inputmode="email"></label>
+          <label>Contraseña
+            <span class="in">
+              <input id="login-pass" type="password" required autocomplete="current-password">
+              <button class="eye" type="button" data-t="#login-pass">👁</button>
+            </span>
+          </label>
+          <button class="btn" type="submit">Entrar</button>
+          <p class="row" style="margin:10px 0 0">
+            <span class="muted">¿Has olvidado la contraseña?</span>
+            <a id="forgotLink" href="#">Recuperar acceso</a>
+          </p>
+          <p id="err-login" class="err" style="display:none"></p>
+        </form>
+      </section>
+
+      <!-- REGISTER -->
+      <section class="card">
+        <h2 style="margin:0 0 8px">Crear cuenta</h2>
+        <form id="form-register" autocomplete="on" novalidate>
+          <label>Nombre <input id="reg-name" type="text" required minlength="2" maxlength="60" autocomplete="name"></label>
+          <label>Email <input id="reg-email" type="email" required autocomplete="email" inputmode="email"></label>
+          <label>Contraseña (mín. 6)
+            <span class="in">
+              <input id="reg-pass" type="password" required minlength="6" autocomplete="new-password">
+              <button class="eye" type="button" data-t="#reg-pass">👁</button>
+            </span>
+          </label>
+          <label>Confirmar contraseña
+            <span class="in">
+              <input id="reg-pass2" type="password" required minlength="6" autocomplete="new-password">
+              <button class="eye" type="button" data-t="#reg-pass2">👁</button>
+            </span>
+          </label>
+          <button class="btn" type="submit">Crear cuenta</button>
+          <p class="muted" style="margin-top:8px">Al crear la cuenta aceptas nuestras condiciones.</p>
+          <p id="err-reg" class="err" style="display:none"></p>
+        </form>
+      </section>
+    </div>
+    <p class="muted" style="text-align:center;margin-top:16px"><a href="suscripciones.html">Volver a suscripciones</a></p>
+  </main>
+
+  <script>
+    const $=s=>document.querySelector(s);
+    document.querySelectorAll('.eye').forEach(b=>b.addEventListener('click',()=>{const i=document.querySelector(b.dataset.t); if(i) i.type=i.type==='password'?'text':'password';}));
+
+    async function api(method, url, body){
+      const res = await fetch(url,{method,headers:{'Content-Type':'application/json'},body: body?JSON.stringify(body):undefined});
+      let data=null; try{ data=await res.json(); }catch{}
+      if(!res.ok) throw (data?.error||'error');
+      return data;
+    }
+
+    $('#form-login').addEventListener('submit', async (e)=>{
+      e.preventDefault(); $('#err-login').style.display='none';
+      const email=$('#login-email').value.trim(); const password=$('#login-pass').value;
+      try{ await api('POST','/api/login',{email,password}); location.href='gestionar.html'; }
+      catch(err){ const s=String(err); $('#err-login').textContent = s==='account_not_found'?'No existe esa cuenta.': s==='invalid_credentials'?'Contraseña incorrecta.': s==='password_not_set'?'Esa cuenta no tiene contraseña, usa recuperar.': s; $('#err-login').style.display='block'; }
+    });
+
+    $('#forgotLink').addEventListener('click', async (e)=>{
+      e.preventDefault();
+      const email = ($('#login-email').value||'').trim();
+      if(!email){ alert('Escribe tu email en el campo de arriba y pulsa “Recuperar acceso”.'); return; }
+      try{ await api('POST','/api/request-password-reset',{email}); alert('Si el correo existe, te hemos enviado instrucciones.'); }
+      catch{ alert('Si el correo existe, te hemos enviado instrucciones.'); }
+    });
+
+    $('#form-register').addEventListener('submit', async (e)=>{
+      e.preventDefault(); const err=$('#err-reg'); err.style.display='none';
+      const name=$('#reg-name').value.trim(); const email=$('#reg-email').value.trim();
+      const p1=$('#reg-pass').value; const p2=$('#reg-pass2').value;
+      if(!name || name.length<2){ err.textContent='El nombre es obligatorio.'; return void(err.style.display='block'); }
+      if(p1.length<6){ err.textContent='La contraseña debe tener al menos 6 caracteres.'; return void(err.style.display='block'); }
+      if(p1!==p2){ err.textContent='Las contraseñas no coinciden.'; return void(err.style.display='block'); }
+      try{ await api('POST','/api/register',{name,email,password:p1}); location.href='gestionar.html'; }
+      catch(ex){ const s=String(ex); err.textContent = s==='email_in_use'?'Ese correo ya tiene cuenta. Inicia sesión.': s; err.style.display='block'; }
+    });
+  </script>
+</body>
+</html>

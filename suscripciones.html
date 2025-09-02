@@ -146,9 +146,9 @@
     <p class="desc">Selecciona cuántos necesitas. Tras pagar recibirás WhatsApp automático con la guía.</p>
     <div class="actions" style="justify-content:center;gap:16px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);padding:6px;border-radius:999px">
-        <button id="minus" class="btn ghost" style="padding:6px 12px" aria-label="Quitar uno" data-repeat>−</button>
-        <span id="qty" aria-live="polite" style="min-width:2ch;text-align:center">1</span>
-        <button id="plus" class="btn ghost" style="padding:6px 12px" aria-label="Añadir uno" data-repeat>＋</button>
+        <button id="minus" class="btn ghost" style="padding:6px 12px" aria-label="Quitar uno">−</button>
+        <span id="qty" aria-live="polite" style="min-width:2ch;text-align:center;display:inline-block">1</span>
+        <button id="plus" class="btn ghost" style="padding:6px 12px" aria-label="Añadir uno">＋</button>
       </div>
       <div class="price">Total: <span id="totalNfc">—</span></div>
       <a class="btn" id="buyNfcBtn">Comprar ahora</a>
@@ -200,7 +200,7 @@
         <div id="acct-plan" class="acct-small"></div>
       </div>
       <div class="actions">
-        <a href="gestionar.html" id="acct-manage" class="btn">Gestionar suscripción</a>
+        <a href="gestionar.html" id="acct-manage" class="btn acct-guard">Gestionar suscripción</a>
         <button id="acct-logout" class="btn ghost">Cerrar sesión</button>
       </div>
     </div>
@@ -307,7 +307,7 @@
     $('#panel-sub').scrollIntoView({behavior:'smooth'});
   });
 
-  // NFC UX (sin zoom + autorepeat)
+  // NFC UX (pointer events sin dobles/ghost click)
   function paintNfc(){
     $('#qty').textContent=qty;
     $('#totalNfc').textContent=fmt(qty*PRICE.nfcUnit)+' (pago único)';
@@ -316,16 +316,17 @@
   function clamp(n,min,max){ return Math.max(min, Math.min(max,n)); }
   function changeQty(delta){ qty = clamp(qty + delta, 1, 999); paintNfc(); }
 
-  // Autorepeat con pointer events (evita doble-tap zoom)
-  function attachAutoRepeat(btn, delta){
-    let t1=null, t2=null;
-    const start=()=>{ changeQty(delta); t1=setTimeout(()=>{ t2=setInterval(()=>changeQty(delta), 60); }, 300); };
-    const stop =()=>{ clearTimeout(t1); clearInterval(t2); t1=null; t2=null; };
-    ['pointerdown','mousedown','touchstart'].forEach(ev=>btn.addEventListener(ev, e=>{ e.preventDefault(); start(); }, {passive:false}));
-    ['pointerup','pointerleave','mouseleave','touchend','touchcancel','mouseup','blur'].forEach(ev=>btn.addEventListener(ev, ()=>stop()));
+  function attachStepper(btn, delta){
+    let t1=null, t2=null, pressed=false;
+    const start=()=>{ pressed=true; changeQty(delta); t1=setTimeout(()=>{ t2=setInterval(()=>changeQty(delta), 60); }, 300); };
+    const stop =()=>{ pressed=false; clearTimeout(t1); clearInterval(t2); t1=t2=null; };
+    btn.addEventListener('pointerdown', e=>{ e.preventDefault(); start(); });
+    ['pointerup','pointercancel','pointerleave','blur'].forEach(ev=>btn.addEventListener(ev, stop));
+    // Evita click fantasma tras pointerup
+    btn.addEventListener('click', e=>{ if(pressed){ e.preventDefault(); e.stopPropagation(); } }, true);
   }
-  attachAutoRepeat($('#minus'), -1);
-  attachAutoRepeat($('#plus'), +1);
+  attachStepper($('#minus'), -1);
+  attachStepper($('#plus'), +1);
   paintNfc();
 
   // Toggle mensual/anual
@@ -348,7 +349,7 @@
   });
   paintPrices();
 
-  // Pago NFC (requiere login; NO requiere tener suscripción)
+  // Pago NFC (la captura de sesión se hace en el script de AUTH abajo)
   $('#buyNfcBtn').addEventListener('click', async () => {
     try {
       const res = await fetch('/api/buy-nfc', {
@@ -383,7 +384,13 @@
         body: JSON.stringify({ tier, frequency })
       });
       const data = await res.json();
-      if (!res.ok) { alert(data?.error || 'Error iniciando la suscripción'); return; }
+      if (!res.ok) {
+        if (data?.error === 'already_subscribed') {
+          if (confirm('Ya tienes una suscripción activa. ¿Abrir la página de gestión?')) location.href='gestionar.html';
+          return;
+        }
+        alert(data?.error || 'Error iniciando la suscripción'); return;
+      }
       if (data?.url) location.href = data.url; else alert('No se generó la URL de Stripe (no_session_url)');
     } catch { alert('Error de red al iniciar la suscripción'); }
   }));
@@ -571,6 +578,12 @@
       if(!b.id) b.id = 'planbtn_' + (b.dataset.tier || '') + '_' + Math.random().toString(36).slice(2,7);
       b.addEventListener('click', (e)=>{ requireLogin(e,b.id); }, true);
     });
+
+    // Bloquear enlaces "gestionar" si no hay sesión
+    document.body.addEventListener('click',(e)=>{
+      const a = e.target.closest('a.acct-guard');
+      if(a && !S.user){ e.preventDefault(); openModal('Inicia sesión para gestionar tu suscripción.'); }
+    });
   }
 
   // Forms
@@ -688,3 +701,4 @@
 </script>
 </body>
 </html>
+
