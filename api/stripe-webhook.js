@@ -20,6 +20,8 @@ async function sendEmail({to, subject, html}) {
   });
 }
 
+function parseIntSafe(v, def=0){ const n = parseInt(v,10); return Number.isFinite(n) ? n : def; }
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method not allowed');
 
@@ -32,18 +34,59 @@ export default async function handler(req, res) {
     const raw = await getRawBody(req);
     const event = stripe.webhooks.constructEvent(raw, sig, process.env.STRIPE_WEBHOOK_SECRET);
 
+    // Helper: suma cuántos NFC hay en los line_items (por PRICE_ID_NFC)
+    async function sumNfcFromSession(cs){
+      if (!process.env.PRICE_ID_NFC) return 0;
+      const full = await stripe.checkout.sessions.retrieve(cs.id, { expand: ['line_items'] });
+      const items = full.line_items?.data || [];
+      return items.reduce((acc, it) => {
+        const isNfc = it.price?.id === process.env.PRICE_ID_NFC;
+        return acc + (isNfc ? (it.quantity || 0) : 0);
+      }, 0);
+    }
+
+    async function upsertCustomerMeta(customerId, patchMeta){
+      const cust = await stripe.customers.retrieve(customerId);
+      const meta = Object.assign({}, cust.metadata || {});
+      const newMeta = Object.assign(meta, patchMeta);
+      await stripe.customers.update(customerId, { metadata: newMeta });
+    }
+
     if (event.type === 'checkout.session.completed') {
       const cs = event.data.object; // Checkout Session
       const email = cs.customer_details?.email || null;
-      const isSub = cs.mode === 'subscription';
-      const title = isSub ? 'Suscripción activada' : 'Pago recibido';
+      const title = cs.mode === 'subscription' ? 'Suscripción activada' : 'Pago recibido';
+
+      // Actualiza teléfono/nombre en Stripe si vienen del checkout
+      try{
+        if (cs.customer) {
+          const patch = {};
+          if (cs.customer_details?.phone) patch.phone = cs.customer_details.phone;
+          if (cs.customer_details?.name)  patch.name  = cs.customer_details.name;
+          if (Object.keys(patch).length) await stripe.customers.update(cs.customer, patch);
+        }
+      }catch(e){ console.error('customer update from checkout err', e?.message || e); }
+
+      // Si es compra NFC (pago único), suma a taply_nfc_qty
+      if (cs.mode === 'payment' && cs.customer) {
+        try{
+          const addQty = await sumNfcFromSession(cs);
+          if (addQty > 0) {
+            const cust = await stripe.customers.retrieve(cs.customer);
+            const prev = parseIntSafe(cust?.metadata?.taply_nfc_qty, 0);
+            await upsertCustomerMeta(cs.customer, { taply_nfc_qty: String(prev + addQty) });
+          }
+        }catch(e){ console.error('sum NFC error', e?.message || e); }
+      }
+
+      // Emails
+      const amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '-';
       const html = `
         <h2>${title}</h2>
         <p>Gracias por tu compra en Taply.</p>
-        <p>Importe: ${cs.amount_total ? (cs.amount_total/100).toFixed(2) + ' ' + (cs.currency||'').toUpperCase() : '-'}</p>
+        <p>Importe: ${amountText}</p>
       `;
       if(email) await sendEmail({ to: email, subject: `Taply — ${title}`, html });
-      // Aviso interno
       if(process.env.EMAIL_FROM) await sendEmail({ to: process.env.EMAIL_FROM, subject: `Taply — ${title}`, html: `<p>${title}</p><p>Cliente: ${email || '—'}</p>` });
     }
 
@@ -53,3 +96,4 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err?.message || 'unknown'}`);
   }
 }
+

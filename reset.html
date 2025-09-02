@@ -2,19 +2,22 @@
 <html lang="es">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
   <title>Restablecer contraseña — Taply</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.1);
            --brand1:#00d4ff; --brand2:#7c3aed; }
-    *{box-sizing:border-box} html,body{height:100%}
+    *{box-sizing:border-box} html,body{height:100%} html{-webkit-text-size-adjust:100%}
     body{margin:0;display:grid;place-items:center;background:var(--bg);color:var(--txt);font-family:Inter,system-ui}
     .card{width:min(520px,92%);background:var(--card);border:1px solid var(--b);border-radius:18px;padding:22px}
     h1{margin:0 0 6px}
     p{color:var(--muted)}
     label{display:grid;gap:6px;margin:10px 0;font-weight:600}
-    input{background:#0a0f16;border:1px solid var(--b);color:inherit;border-radius:12px;padding:12px}
+    .in{position:relative}
+    input{background:#0a0f16;border:1px solid var(--b);color:inherit;border-radius:12px;padding:12px 44px 12px 12px;font-size:16px}
+    button, input{font-size:16px}
+    .eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
     .btn{width:100%;padding:12px 16px;border:0;border-radius:999px;font-weight:800;cursor:pointer;
       background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017;margin-top:10px}
     .err{color:#fca5a5}
@@ -26,12 +29,18 @@
     <h1>Restablecer contraseña</h1>
     <p>Escribe tu nueva contraseña. El enlace caduca a la hora.</p>
 
-    <form id="form">
+    <form id="form" autocomplete="on">
       <label>Nueva contraseña
-        <input type="password" id="pass" minlength="6" required autocomplete="new-password">
+        <span class="in">
+          <input type="password" id="pass" minlength="6" required autocomplete="new-password">
+          <button class="eye" type="button" data-t="#pass">👁</button>
+        </span>
       </label>
       <label>Confirmar contraseña
-        <input type="password" id="pass2" minlength="6" required autocomplete="new-password">
+        <span class="in">
+          <input type="password" id="pass2" minlength="6" required autocomplete="new-password">
+          <button class="eye" type="button" data-t="#pass2">👁</button>
+        </span>
       </label>
       <button class="btn" type="submit">Guardar</button>
     </form>
@@ -45,25 +54,35 @@
     const token = qs.get('token'); const email = qs.get('email');
     const $ = s=>document.querySelector(s); const msg=$('#msg');
 
+    document.querySelectorAll('.eye').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        const i = document.querySelector(b.dataset.t);
+        if(!i) return; i.type = i.type === 'password' ? 'text' : 'password';
+      });
+    });
+
     if(!token || !email){
-      msg.textContent = 'Enlace inválido.'; msg.className='err';
-      document.querySelector('#form').style.display='none';
+      msg.textContent = 'Enlace inválido o incompleto.'; msg.className='err';
+      $('#form').style.display='none';
     }
 
-    document.querySelector('#form').addEventListener('submit', async (e)=>{
+    $('#form').addEventListener('submit', async (e)=>{
       e.preventDefault();
-      const p1 = document.querySelector('#pass').value;
-      const p2 = document.querySelector('#pass2').value;
+      const p1 = $('#pass').value;
+      const p2 = $('#pass2').value;
+      if(p1.length < 6){ msg.textContent='La contraseña debe tener al menos 6 caracteres.'; msg.className='err'; return; }
       if(p1 !== p2){ msg.textContent='Las contraseñas no coinciden.'; msg.className='err'; return; }
       try{
         const res = await fetch('/api/reset-password', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ email, token, password: p1 }) });
+          body: JSON.stringify({ email: String(email).trim().toLowerCase(), token, password: p1 }) });
         const data = await res.json();
         if(!res.ok) throw (data?.error || 'No se pudo actualizar');
         msg.textContent = 'Contraseña actualizada. Ya puedes iniciar sesión.'; msg.className='ok';
-        (document.querySelector('#form')).style.display='none';
+        $('#form').style.display='none';
       }catch(err){
-        msg.textContent = String(err); msg.className='err';
+        const s = String(err);
+        msg.textContent = (s.includes('invalid')||s.includes('expired')) ? 'El enlace no es válido o ha caducado.' : s;
+        msg.className='err';
       }
     });
   </script>

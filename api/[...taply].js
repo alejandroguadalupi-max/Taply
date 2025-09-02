@@ -6,7 +6,7 @@ import cookie from 'cookie';
 import crypto from 'node:crypto';
 
 const COOKIE_NAME = 'taply_session';
-const RESET_TTL_SECONDS = 60 * 60; // 1 hora para el token de recuperación
+const RESET_TTL_SECONDS = 60 * 60; // 1 hora
 
 const PRICES = {
   monthly: {
@@ -20,6 +20,12 @@ const PRICES = {
     pro:   process.env.PRICE_ID_PRO_YEAR,
   },
 };
+const PRICE_ID_NFC = process.env.PRICE_ID_NFC;
+
+function assertEnv() {
+  if (!process.env.APP_SECRET) throw Object.assign(new Error('missing APP_SECRET'), { statusCode: 500 });
+  if (!process.env.STRIPE_SECRET_KEY) throw Object.assign(new Error('missing STRIPE_SECRET_KEY'), { statusCode: 500 });
+}
 
 function baseUrl(req) {
   const proto = req.headers['x-forwarded-proto'] || 'https';
@@ -35,6 +41,9 @@ function getBody(req) {
 }
 function getCookies(req){
   try { return cookie.parse(req.headers.cookie || ''); } catch { return {}; }
+}
+function normalizeEmail(email=''){
+  return String(email).trim().toLowerCase();
 }
 function setSession(res, payload){
   if(!process.env.APP_SECRET){
@@ -77,25 +86,55 @@ function getStripe(){
 async function ensureCustomerId(stripe, sess){
   if(sess?.customerId) return sess.customerId;
   if(!sess?.email) return null;
+  // Buscar por email
   const found = await stripe.customers.search({ query: `email:'${sess.email}'`, limit: 1 });
-  if(found.data.length) return found.data[0].id;
+  if(found.data.length) {
+    const id = found.data[0].id;
+    // si no tiene name y nosotros sí, completamos
+    if (sess.name && !found.data[0].name) {
+      await stripe.customers.update(id, { name: sess.name });
+    }
+    return id;
+  }
+  // crear
   const created = await stripe.customers.create({ email: sess.email, name: sess.name || undefined, metadata:{ app:'taply' }});
   return created.id;
 }
 function normalizeSub(sub){
   if(!sub) return null;
   const price = sub.items?.data?.[0]?.price || null;
+  const interval = price?.recurring?.interval || sub.plan?.interval || null;
   return {
     id: sub.id,
     status: sub.status,
     current_period_end: sub.current_period_end,
-    plan: { nickname: price?.nickname || null },
-    price: { id: price?.id || null, nickname: price?.nickname || null }
+    current_period_start: sub.current_period_start,
+    plan: { nickname: price?.nickname || sub.plan?.nickname || null },
+    price: { id: price?.id || null, nickname: price?.nickname || null, interval: interval || null }
   };
+}
+async function getBestSubscription(stripe, customerId){
+  const subs = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'all',
+    expand: ['data.items.data.price']
+  });
+  const order = { active:3, trialing:2, past_due:1 };
+  const best = subs.data.sort((a,b)=> (order[b.status]||0)-(order[a.status]||0) || (b.current_period_end||0)-(a.current_period_end||0))[0];
+  return best || null;
 }
 async function hasValidSubscription(stripe, customerId){
   const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
   return subs.data.some(s => ['active','trialing','past_due'].includes(s.status));
+}
+function addMonthsPreservingDay(date, months){
+  const y = date.getFullYear(), m = date.getMonth(), d = date.getDate();
+  const targetMonth = m + months;
+  const targetYear = y + Math.floor(targetMonth/12);
+  const monthIndex = (targetMonth % 12 + 12) % 12;
+  const daysInTarget = new Date(targetYear, monthIndex+1, 0).getDate();
+  const day = Math.min(d, daysInTarget);
+  return new Date(targetYear, monthIndex, day, date.getHours(), date.getMinutes(), date.getSeconds());
 }
 
 /* ========= ENVÍOS (SendGrid y WhatsApp opcionales) ========= */
@@ -130,9 +169,11 @@ async function sendWhatsApp({toNumber, body}){
 // POST /api/register
 // - nombre obligatorio
 // - si el email ya tiene cuenta (hash), 409 email_in_use
-// - si existe en Stripe sin hash (p. ej. compró antes), lo "reclamamos" añadiendo hash + nombre
+// - si existe en Stripe sin hash, reclamamos (añadimos hash + nombre)
 async function register(req, res){
-  const { email, password, name } = getBody(req);
+  const rawEmail = getBody(req).email;
+  const email = normalizeEmail(rawEmail);
+  const { password, name } = getBody(req);
   if(!email || !password || !name) return res.status(400).json({ error:'name_email_password_required' });
   if(password.length < 6) return res.status(400).json({ error:'weak_password' });
 
@@ -145,7 +186,6 @@ async function register(req, res){
     if(already){
       return res.status(409).json({ error:'email_in_use' });
     } else {
-      // reclamar cliente existente (sin contraseña previa)
       const hash = await bcrypt.hash(password, 10);
       const meta = Object.assign({}, customer.metadata||{}, { taply_pass_hash: hash, app:'taply' });
       const updated = await stripe.customers.update(customer.id, { name, metadata: meta });
@@ -154,16 +194,17 @@ async function register(req, res){
     }
   }
 
-  // crear nuevo
   const hash = await bcrypt.hash(password, 10);
-  const customer = await stripe.customers.create({ email, name, metadata:{ app:'taply', taply_pass_hash: hash }});
+  const customer = await stripe.customers.create({ email, name, metadata:{ app:'taply', taply_pass_hash: hash, taply_nfc_qty: '0' }});
   setSession(res, { email, name, customerId: customer.id });
   return res.status(200).json({ user:{ email, name, customerId: customer.id }});
 }
 
 // POST /api/login
 async function login(req, res){
-  const { email, password } = getBody(req);
+  const rawEmail = getBody(req).email;
+  const email = normalizeEmail(rawEmail);
+  const { password } = getBody(req);
   if(!email || !password) return res.status(400).json({ error:'email_and_password_required' });
   const stripe = getStripe();
   const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
@@ -188,19 +229,39 @@ async function session(req, res){
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(200).json({ user:null });
   const stripe = getStripe();
-  const subs = await stripe.subscriptions.list({
-    customer: sess.customerId, status: 'all', expand: ['data.items.data.price']
-  });
-  const order = { active:3, trialing:2, past_due:1 };
-  const best = subs.data.sort((a,b)=> (order[b.status]||0)-(order[a.status]||0) || (b.current_period_end||0)-(a.current_period_end||0))[0];
+
+  // Cliente (para metadata: nfc_qty)
+  const customer = await stripe.customers.retrieve(sess.customerId);
+  const nfcQty = parseInt(customer?.metadata?.taply_nfc_qty || '0', 10) || 0;
+
+  // Mejor suscripción
+  const best = await getBestSubscription(stripe, sess.customerId);
+  const sub = normalizeSub(best);
+
+  // Cálculo de “próxima renovación” por el mismo día del mes (aparente)
+  let nextGuess = null;
+  if (sub?.current_period_start) {
+    const start = new Date((sub.current_period_start * 1000));
+    if ((sub.price?.interval || 'month') === 'year') {
+      nextGuess = new Date(start.getFullYear()+1, start.getMonth(), start.getDate()).getTime()/1000;
+    } else {
+      nextGuess = addMonthsPreservingDay(start, 1).getTime()/1000;
+    }
+  } else if (sub?.current_period_end) {
+    nextGuess = sub.current_period_end; // fallback
+  }
+
   return res.status(200).json({
     user: {
       email: sess.email,
       name: sess.name || null,
       customerId: sess.customerId,
-      subscription: normalizeSub(best),
-      subscription_status: best?.status || null,
-      current_period_end: best?.current_period_end || null
+      subscription: sub,
+      subscription_status: sub?.status || null,
+      current_period_end: sub?.current_period_end || null,
+      current_period_start: sub?.current_period_start || null,
+      nfc_qty: nfcQty,
+      next_period_anchor_guess: nextGuess
     }
   });
 }
@@ -208,13 +269,13 @@ async function session(req, res){
 // === Recuperación de contraseña ===
 // POST /api/request-password-reset {email}
 async function requestPasswordReset(req, res){
-  const { email } = getBody(req);
+  const email = normalizeEmail(getBody(req).email);
   if(!email) return res.status(400).json({ error:'email_required' });
 
   const stripe = getStripe();
   const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
   if(!found.data.length){
-    // no revelamos si existe o no; respondemos ok
+    // No revelamos existencia
     return res.status(200).json({ ok:true });
   }
   const customer = found.data[0];
@@ -242,7 +303,8 @@ async function requestPasswordReset(req, res){
 
 // POST /api/reset-password {email, token, password}
 async function resetPassword(req, res){
-  const { email, token, password } = getBody(req);
+  const email = normalizeEmail(getBody(req).email);
+  const { token, password } = getBody(req);
   if(!email || !token || !password) return res.status(400).json({ error:'missing_params' });
   if(password.length < 6) return res.status(400).json({ error:'weak_password' });
 
@@ -296,48 +358,58 @@ async function createCheckoutSession(req, res){
   const stripe = getStripe();
   const customerId = await ensureCustomerId(stripe, sess);
 
+  // Evitar duplicar suscripción
+  const already = await hasValidSubscription(stripe, customerId);
+  if (already) {
+    const best = await getBestSubscription(stripe, customerId);
+    const sub = normalizeSub(best);
+    return res.status(409).json({ error: 'already_subscribed', current: sub });
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     ui_mode: 'hosted',
     line_items: [{ price, quantity: 1 }],
+    allow_promotion_codes: true,
     success_url: `${appBase(req)}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url:  `${appBase(req)}/cancelado.html`,
     phone_number_collection: { enabled: true },
-    metadata: { type: 'subscription', tier, frequency },
-    ...(customerId ? { customer: customerId } : {})
+    customer: customerId,
+    subscription_data: {
+      metadata: { type: 'subscription', tier, frequency, app:'taply' }
+    },
+    metadata: { type: 'subscription', tier, frequency, app:'taply' }
   });
 
   if (!session?.url) return res.status(500).json({ error: 'no_session_url' });
   return res.status(200).json({ url: session.url });
 }
 
-// POST /api/buy-nfc  (pago único, requiere suscripción activa)
+// POST /api/buy-nfc  (pago único, REQUIERE login; NO requiere suscripción activa)
 async function buyNfc(req, res){
-  if (!process.env.PRICE_ID_NFC) return res.status(500).json({ error: 'missing_nfc_price_id' });
+  if (!PRICE_ID_NFC) return res.status(500).json({ error: 'missing_nfc_price_id' });
 
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error: 'auth_required' });
 
   const { quantity = 1 } = getBody(req);
-  const qty = Math.max(1, Math.min(Number(quantity) || 1, 99));
+  const qty = Math.max(1, Math.min(Number(quantity) || 1, 999));
 
   const stripe = getStripe();
   const customerId = await ensureCustomerId(stripe, sess);
   if(!customerId) return res.status(401).json({ error:'auth_required' });
 
-  const ok = await hasValidSubscription(stripe, customerId);
-  if(!ok) return res.status(403).json({ error: 'subscription_required' });
-
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
     ui_mode: 'hosted',
-    line_items: [{ price: process.env.PRICE_ID_NFC, quantity: qty }],
+    line_items: [{ price: PRICE_ID_NFC, quantity: qty }],
     success_url: `${appBase(req)}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url:  `${appBase(req)}/cancelado.html`,
     allow_promotion_codes: true,
     phone_number_collection: { enabled: true },
+    billing_address_collection: 'auto',
     shipping_address_collection: { allowed_countries: ['ES'] },
-    metadata: { type: 'nfc', qty: String(qty) },
+    metadata: { type: 'nfc', qty: String(qty), app:'taply' },
     customer: customerId
   });
 
@@ -345,7 +417,7 @@ async function buyNfc(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-/* ========= POST /api/post-pago  (EMAIL/WHATSAPP tras compra) ========= */
+/* ========= POST /api/post-pago (opcional; emails tras compra) ========= */
 async function postPago(req, res){
   const stripe = getStripe();
   const url = new URL(req.url, 'http://x');
@@ -371,11 +443,10 @@ async function postPago(req, res){
     }
   }
 
-  // Fallback a email de sesión si no tenemos uno del checkout
+  // Fallback a email de sesión
   const sess = getSessionFromCookie(req);
   if(!buyerEmail && sess?.email) buyerEmail = sess.email;
 
-  // ===== Email al comprador (si tenemos email)
   if(buyerEmail){
     const subj = '¡Gracias! Hemos recibido tu compra';
     const html = `
@@ -388,7 +459,6 @@ async function postPago(req, res){
     await sendEmail({ to: buyerEmail, subject: subj, html });
   }
 
-  // ===== Email al administrador (EMAIL_FROM)
   if(process.env.EMAIL_FROM){
     const subjAdm = 'Nueva compra recibida';
     const htmlAdm = `
@@ -402,7 +472,6 @@ async function postPago(req, res){
     await sendEmail({ to: process.env.EMAIL_FROM, subject: subjAdm, html: htmlAdm });
   }
 
-  // ===== WhatsApp (opcional)
   if(buyerPhone){
     await sendWhatsApp({ toNumber: buyerPhone, body: '¡Gracias! Hemos recibido tu compra. Te escribimos ahora con los pasos.' });
   }
@@ -413,6 +482,7 @@ async function postPago(req, res){
 /* ================== Router ================== */
 export default async function handler(req, res){
   try{
+    assertEnv();
     const route = routeOf(req);
 
     if (req.method === 'GET' && route === 'session') return session(req,res);
