@@ -3,8 +3,10 @@ import Stripe from 'stripe';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import cookie from 'cookie';
+import crypto from 'node:crypto';
 
 const COOKIE_NAME = 'taply_session';
+const RESET_TTL_SECONDS = 60 * 60; // 1 hora para el token de recuperación
 
 const PRICES = {
   monthly: {
@@ -36,7 +38,9 @@ function getCookies(req){
 }
 function setSession(res, payload){
   if(!process.env.APP_SECRET){
-    throw new Error('missing APP_SECRET');
+    const e = new Error('missing APP_SECRET');
+    e.statusCode = 500;
+    throw e;
   }
   const token = jwt.sign(payload, process.env.APP_SECRET, { expiresIn: '90d' });
   const isProd = process.env.NODE_ENV === 'production';
@@ -124,36 +128,51 @@ async function sendWhatsApp({toNumber, body}){
 /* ================== Handlers ================== */
 
 // POST /api/register
+// - nombre obligatorio
+// - si el email ya tiene cuenta (hash), 409 email_in_use
+// - si existe en Stripe sin hash (p. ej. compró antes), lo "reclamamos" añadiendo hash + nombre
 async function register(req, res){
   const { email, password, name } = getBody(req);
-  if(!email || !password || password.length<6) return res.status(400).json({ error:'Email y contraseña (mín. 6) requeridos' });
+  if(!email || !password || !name) return res.status(400).json({ error:'name_email_password_required' });
+  if(password.length < 6) return res.status(400).json({ error:'weak_password' });
+
   const stripe = getStripe();
-
   const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
-  let customer = found.data[0];
-  if(!customer){
-    customer = await stripe.customers.create({ email, name, metadata:{ app:'taply' }});
-  }
-  const hash = await bcrypt.hash(password, 10);
-  const meta = Object.assign({}, customer.metadata||{}, { taply_pass_hash: hash, app:'taply' });
-  await stripe.customers.update(customer.id, { metadata: meta, name: name || customer.name || undefined });
 
-  setSession(res, { email, name: customer.name || name || null, customerId: customer.id });
-  return res.status(200).json({ user:{ email, name: customer.name || name || null, customerId: customer.id }});
+  if(found.data.length){
+    const customer = found.data[0];
+    const already = customer.metadata?.taply_pass_hash;
+    if(already){
+      return res.status(409).json({ error:'email_in_use' });
+    } else {
+      // reclamar cliente existente (sin contraseña previa)
+      const hash = await bcrypt.hash(password, 10);
+      const meta = Object.assign({}, customer.metadata||{}, { taply_pass_hash: hash, app:'taply' });
+      const updated = await stripe.customers.update(customer.id, { name, metadata: meta });
+      setSession(res, { email, name: updated.name || name, customerId: customer.id });
+      return res.status(200).json({ user:{ email, name: updated.name || name, customerId: customer.id }});
+    }
+  }
+
+  // crear nuevo
+  const hash = await bcrypt.hash(password, 10);
+  const customer = await stripe.customers.create({ email, name, metadata:{ app:'taply', taply_pass_hash: hash }});
+  setSession(res, { email, name, customerId: customer.id });
+  return res.status(200).json({ user:{ email, name, customerId: customer.id }});
 }
 
 // POST /api/login
 async function login(req, res){
   const { email, password } = getBody(req);
-  if(!email || !password) return res.status(400).json({ error:'Email y contraseña requeridos' });
+  if(!email || !password) return res.status(400).json({ error:'email_and_password_required' });
   const stripe = getStripe();
   const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
-  if(!found.data.length) return res.status(401).json({ error:'Cuenta no encontrada' });
+  if(!found.data.length) return res.status(401).json({ error:'account_not_found' });
   const customer = found.data[0];
   const hash = customer.metadata?.taply_pass_hash;
-  if(!hash) return res.status(401).json({ error:'Cuenta sin contraseña. Regístrate de nuevo.' });
+  if(!hash) return res.status(401).json({ error:'password_not_set' });
   const ok = await bcrypt.compare(password, hash);
-  if(!ok) return res.status(401).json({ error:'Credenciales inválidas' });
+  if(!ok) return res.status(401).json({ error:'invalid_credentials' });
   setSession(res, { email, name: customer.name || null, customerId: customer.id });
   return res.status(200).json({ user:{ email, name: customer.name || null, customerId: customer.id }});
 }
@@ -184,6 +203,71 @@ async function session(req, res){
       current_period_end: best?.current_period_end || null
     }
   });
+}
+
+// === Recuperación de contraseña ===
+// POST /api/request-password-reset {email}
+async function requestPasswordReset(req, res){
+  const { email } = getBody(req);
+  if(!email) return res.status(400).json({ error:'email_required' });
+
+  const stripe = getStripe();
+  const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
+  if(!found.data.length){
+    // no revelamos si existe o no; respondemos ok
+    return res.status(200).json({ ok:true });
+  }
+  const customer = found.data[0];
+  const token = crypto.randomBytes(24).toString('hex');
+  const exp = Math.floor(Date.now()/1000) + RESET_TTL_SECONDS;
+
+  await stripe.customers.update(customer.id, {
+    metadata: Object.assign({}, customer.metadata||{}, {
+      taply_reset_token: token,
+      taply_reset_exp: String(exp),
+    })
+  });
+
+  const link = `${appBase(req)}/reset.html?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+  await sendEmail({
+    to: email,
+    subject: 'Recupera tu contraseña — Taply',
+    html: `<p>Para restablecer tu contraseña haz clic en el botón:</p>
+           <p><a href="${link}" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#7c3aed;color:#fff;text-decoration:none">Establecer nueva contraseña</a></p>
+           <p>Este enlace caduca en 1 hora.</p>`
+  });
+
+  return res.status(200).json({ ok:true });
+}
+
+// POST /api/reset-password {email, token, password}
+async function resetPassword(req, res){
+  const { email, token, password } = getBody(req);
+  if(!email || !token || !password) return res.status(400).json({ error:'missing_params' });
+  if(password.length < 6) return res.status(400).json({ error:'weak_password' });
+
+  const stripe = getStripe();
+  const found = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
+  if(!found.data.length) return res.status(400).json({ error:'invalid_token' });
+
+  const customer = found.data[0];
+  const meta = customer.metadata || {};
+  const saved = meta.taply_reset_token;
+  const exp = Number(meta.taply_reset_exp || '0');
+
+  if(!saved || saved !== token || exp < Math.floor(Date.now()/1000)){
+    return res.status(400).json({ error:'invalid_or_expired_token' });
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+  const newMeta = Object.assign({}, meta, {
+    taply_pass_hash: hash,
+    taply_reset_token: '',
+    taply_reset_exp: ''
+  });
+
+  await stripe.customers.update(customer.id, { metadata: newMeta });
+  return res.status(200).json({ ok:true });
 }
 
 // POST /api/create-portal-session
@@ -337,6 +421,8 @@ export default async function handler(req, res){
       if (route === 'register') return register(req,res);
       if (route === 'login') return login(req,res);
       if (route === 'logout') return logout(req,res);
+      if (route === 'request-password-reset') return requestPasswordReset(req,res);
+      if (route === 'reset-password') return resetPassword(req,res);
       if (route === 'create-portal-session') return createPortalSession(req,res);
       if (route === 'create-checkout-session') return createCheckoutSession(req,res);
       if (route === 'buy-nfc') return buyNfc(req,res);
