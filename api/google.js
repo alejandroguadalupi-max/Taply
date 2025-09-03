@@ -57,7 +57,7 @@ export default async function handler(req, res) {
   const stripeSecret = process.env.STRIPE_SECRET_KEY;
   const appSecret    = process.env.APP_SECRET;
 
-  // Debug opcional
+  // Debug
   const url = new URL(req.url, base || "http://x");
   if (url.searchParams.get("debug") === "1") {
     return res.status(200).json({
@@ -157,25 +157,21 @@ export default async function handler(req, res) {
     const hasGoogle = (meta.taply_google === "1" || meta.taply_google === "true");
 
     if (from === "login") {
-      // Si NO existe → no registrado
       if (!exists) {
         clearStateCookie(res, isHttps);
         res.writeHead(302, { Location: `/suscripciones.html#google=err&code=not_registered&from=login` });
         return res.end();
       }
-      // Si existe con contraseña pero NO vinculado a Google → mensaje de "ya está registrado" (con password)
       if (hasPass && !hasGoogle) {
         clearStateCookie(res, isHttps);
         res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use_password&from=login` });
         return res.end();
       }
-      // Si existe, sin pass y sin google (huérfano por checkout, etc.)
       if (!hasPass && !hasGoogle) {
         clearStateCookie(res, isHttps);
         res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use&from=login` });
         return res.end();
       }
-      // Tiene Google → login OK
       try {
         await stripe.customers.update(exists.id, {
           name: exists.name || name || undefined,
@@ -200,7 +196,6 @@ export default async function handler(req, res) {
         res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use_password&from=register` });
         return res.end();
       }
-      // existe “huérfano” → en uso
       clearStateCookie(res, isHttps);
       res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use&from=register` });
       return res.end();
@@ -216,7 +211,6 @@ export default async function handler(req, res) {
     return res.end();
   } catch (e) {
     console.error("google oauth error:", e);
-    const isHttps = (process.env.APP_BASE_URL || "").startsWith("https://");
     clearStateCookie(res, isHttps);
     res.writeHead(302, { Location: `/suscripciones.html#google=err&code=server_error&from=login` });
     return res.end();

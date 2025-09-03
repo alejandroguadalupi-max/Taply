@@ -24,7 +24,7 @@
 
     header{padding:14px 0;border-bottom:1px solid var(--border);background:#0a0f16cc;backdrop-filter:blur(10px)}
     .brand{font-weight:800;display:flex;align-items:center;gap:8px;justify-content:space-between}
-    .logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2))}
+    .logo-img{width:34px;height:34px;border-radius:10px;object-fit:cover;display:block}
 
     .hero{text-align:center;padding:40px 0 24px}
     .h1{font-size:clamp(2rem,5.5vw,3.2rem);margin:0;font-weight:800}
@@ -100,7 +100,6 @@
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .acct-actions{display:grid;gap:10px}
 
-    /* Chips */
     .plan-badge{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;
       background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-weight:800}
     .nfc-chip{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:10px 14px;border-radius:14px;
@@ -113,7 +112,7 @@
   <div class="container brand">
     <div style="display:flex;align-items:center;gap:8px">
       <a href="index.html" aria-label="Inicio" style="display:flex;align-items:center;gap:8px;color:inherit">
-        <span class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12a7 7 0 1114 0v6.5a2.5 2.5 0 01-5 0V9.75a2.25 2.25 0 10-4.5 0V18.5a2.5 2.5 0 01-5 0V12z" stroke="#061017" stroke-width="1.7"/></svg></span>
+        <img src="/assets/logo-taply.png" alt="Taply" class="logo-img">
         <span>taply</span>
       </a>
     </div>
@@ -260,8 +259,8 @@
 
         <div class="acct-actions">
           <button type="submit" class="btn">Iniciar sesión</button>
-          <!-- Los listeners JS gestionan la apertura (misma pestaña en móvil/in-app, popup en desktop) -->
-          <a id="btn-google-login" href="/api/google?from=login" rel="noopener" class="btn btn-google">Continuar con Google</a>
+          <!-- Misma pestaña; el JS intercepta el click -->
+          <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google">Continuar con Google</a>
           <p id="acct-error-login" class="acct-err" style="display:none"></p>
         </div>
       </form>
@@ -289,7 +288,7 @@
         <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
         <div class="acct-actions">
           <button type="submit" class="btn">Crear cuenta</button>
-          <a id="btn-google-register" href="/api/google?from=register" rel="noopener" class="btn btn-google">Registrarme con Google</a>
+          <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google">Registrarme con Google</a>
           <p id="acct-error-register" class="acct-err" style="display:none"></p>
         </div>
       </form>
@@ -354,8 +353,8 @@
 
     const fmtDate = (d)=> new Intl.DateTimeFormat('es-ES',{dateStyle:'medium'}).format(d);
     const KEY='acct_user';
-    const saveUser=u=>{try{localStorage.setItem(KEY,u?JSON.stringify(u):'')}catch{}};
-    const readUser=()=>{try{const v=localStorage.getItem(KEY)||'';return v?JSON.parse(v):null}catch{return null}};
+    const saveUser=u=>{ try{ localStorage.setItem(KEY,u?JSON.stringify(u):""); }catch(e){} };
+    const readUser=()=>{ try{ const v=localStorage.getItem(KEY)||''; return v?JSON.parse(v):null; }catch(e){ return null; } };
 
     const modal = $('#acct-modal'), title = $('#acct-title'), sub = $('#acct-sub');
     const forms = { login:$('#acct-form-login'), register:$('#acct-form-register'), recover:$('#acct-form-recover') };
@@ -414,10 +413,10 @@
       if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
     }
 
-    // Centraliza set de usuario (S + localStorage + window.taplyAuth)
+    // Centraliza set de usuario (S + LS + window.taplyAuth)
     function setUser(u){
       S.user = u || null;
-      try { localStorage.setItem(KEY, u ? JSON.stringify(u) : ""); } catch {}
+      try { localStorage.setItem(KEY, u ? JSON.stringify(u) : ""); } catch(e){}
       window.taplyAuth = window.taplyAuth || {};
       window.taplyAuth.user = S.user;
     }
@@ -463,12 +462,7 @@
       }
     });
 
-    // -------- Google: abrir (misma pestaña en móvil/in-app) + polling --------
-    function shouldOpenSameTab(){
-      const ua = navigator.userAgent || "";
-      return /FBAN|FBAV|Instagram|Line|MicroMessenger|Twitter|TikTok|Snapchat|Pinterest/i.test(ua)
-          || /iPhone|iPad|iPod/i.test(ua);
-    }
+    // -------- Google: UNA pestaña (misma pestaña siempre) + polling --------
     function startGooglePolling(){
       if(S.polling) clearInterval(S.polling);
       let tries=0;
@@ -483,24 +477,25 @@
             clearInterval(S.polling); S.polling=null;
           }
         }catch{}
-        if(tries>30){ clearInterval(S.polling); S.polling=null; } // ~60s
+        if(tries>30){ clearInterval(S.polling); S.polling=null; }
       },2000);
     }
-    function openGoogle(from){
-      try{ startGooglePolling(); }catch{}
-      const url = `/api/google?from=${encodeURIComponent(from)}`;
-      if (shouldOpenSameTab()){
-        location.href = url; // móvil / in-app → misma pestaña
-      } else {
-        const w = window.open(url, "taply_google", "noopener,noreferrer,width=480,height=640");
-        if(!w) location.href = url; // si bloquea popup
-      }
+    function bindGoogle(id, from){
+      const el=document.getElementById(id);
+      if(!el) return;
+      el.removeAttribute('target');
+      const handler=(e)=>{
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        try{ startGooglePolling(); }catch{}
+        location.href = `/api/google?from=${encodeURIComponent(from)}`; // siempre misma pestaña
+        return false;
+      };
+      el.addEventListener('click', handler, true);
+      el.addEventListener('mousedown', (e)=>{ e.preventDefault(); }, true); // evita aperturas raras en móviles
     }
-    document.getElementById('btn-google-login')?.addEventListener('click', (e)=>{ e.preventDefault(); openGoogle('login'); });
-    document.getElementById('btn-google-register')?.addEventListener('click', (e)=>{ e.preventDefault(); openGoogle('register'); });
-
-    // También escuchar postMessage si algún día mandas mensajes desde el callback
-    window.addEventListener('message', (e)=>{ if(e?.data?.type==='taply_auth_success'){ forceSessionRefresh(); }});
+    bindGoogle('btn-google-login','login');
+    bindGoogle('btn-google-register','register');
 
     // -------- Menú / sesión / gating --------
     function paintNav(){
@@ -603,7 +598,6 @@
         const g=e.target.closest('.acct-guard'); if(g && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); }
       }, true);
 
-      // Maneja éxito/errores de Google (hash)
       await handleGoogleHash();
     }
 
@@ -624,7 +618,6 @@
     const tier = btn.dataset.tier;
     const frequency = (document.querySelector('#btn-year')?.classList.contains('active')) ? 'annual' : 'monthly';
 
-    // Si ya hay sesión + sub activa, avisar
     if (window.taplyAuth?.user && (window.taplyAuth.user.subscription || window.taplyAuth.user.isSubscribed)) {
       const u = window.taplyAuth.user;
       const planName = (u.subscription && (u.subscription.plan?.nickname||u.subscription.price?.nickname)) || 'actual';
