@@ -1,107 +1,96 @@
-// /api/google.js
-// Hace el inicio del flujo OAuth y también recibe el callback.
+// /api/google.js  (Vercel: pages/api/google.js o api/google.js)
+import crypto from "crypto";
 
-const crypto = require("crypto");
+export default async function handler(req, res) {
+  const base = process.env.APP_BASE_URL;               // p.ej. https://taply-zeta.vercel.app
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = `${base}/api/google`;           // UN SOLO redirect, coincide con Google Cloud
 
-// Leer cookie simple
-function getCookie(req, name) {
-  const raw = req.headers.cookie || "";
-  const parts = raw.split(";").map((s) => s.trim());
-  for (const p of parts) {
-    const [k, ...rest] = p.split("=");
-    if (k === name) return decodeURIComponent(rest.join("="));
-  }
-  return "";
-}
+  const url = new URL(req.url, base);
+  const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
+  const from  = url.searchParams.get("from") || "login";
+  const cookieName = "g_state";
 
-module.exports = async (req, res) => {
-  try {
-    const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost:3000";
-    const protocol = host.includes("localhost") ? "http" : "https";
-    const here = new URL(`${protocol}://${host}${req.url}`);
-    const code = here.searchParams.get("code");
-    const stateParam = here.searchParams.get("state");
-
-    const BASE = process.env.APP_BASE_URL; // p.ej. https://taply-zeta.vercel.app
-    const CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
-    const CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-    if (!BASE || !CLIENT_ID || !CLIENT_SECRET) {
-      res.statusCode = 500;
-      return res.end("Faltan APP_BASE_URL / GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET");
-    }
-
-    const REDIRECT_URI = `${BASE}/api/google`;
-
-    // === CALLBACK (Google nos devuelve ?code=...)
-    if (code) {
-      const stateCookie = getCookie(req, "g_state");
-      if (!stateParam || !stateCookie || stateParam !== stateCookie) {
-        res.statusCode = 400;
-        return res.end("state inválido");
-      }
-
-      // Intercambio code -> tokens
-      const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          code,
-          client_id: CLIENT_ID,
-          client_secret: CLIENT_SECRET,
-          redirect_uri: REDIRECT_URI,
-          grant_type: "authorization_code",
-        }),
-      });
-      const tokens = await tokenResp.json();
-      if (!tokenResp.ok || !tokens.id_token) {
-        res.statusCode = 400;
-        return res.end("No se pudo obtener tokens de Google");
-      }
-
-      // Pasamos el id_token a tu endpoint existente para crear la sesión
-      const loginResp = await fetch(`${BASE}/api/google-login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential: tokens.id_token }),
-        redirect: "manual",
-      });
-
-      // Propagamos la cookie de sesión al navegador
-      const setCookie = loginResp.headers.get("set-cookie");
-      if (setCookie) res.setHeader("Set-Cookie", setCookie);
-
-      // Eliminamos la cookie de estado
-      res.setHeader("Set-Cookie", "g_state=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax; Secure");
-
-      // Redirigimos a la página
-      res.writeHead(302, { Location: `${BASE}/suscripciones.html#google=ok` });
-      return res.end();
-    }
-
-    // === START (sin code: lanzamos chooser de cuentas)
-    const state = crypto.randomBytes(16).toString("hex");
-    const expires = new Date(Date.now() + 10 * 60 * 1000).toUTCString();
-    res.setHeader(
-      "Set-Cookie",
-      `g_state=${state}; Path=/; HttpOnly; SameSite=Lax; Secure; Expires=${expires}`
+  // Helpers cookies
+  const readCookies = () =>
+    Object.fromEntries(
+      (req.headers.cookie || "")
+        .split(/; */)
+        .filter(Boolean)
+        .map(c => {
+          const [k, ...r] = c.split("=");
+          return [k, decodeURIComponent(r.join("="))];
+        })
     );
 
-    const params = new URLSearchParams({
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      response_type: "code",
-      scope: "openid email profile",
-      prompt: "select_account",
-      access_type: "offline",
-      include_granted_scopes: "true",
-      state,
-    });
+  // 1) INICIO: no hay `code` -> redirige a Google
+  if (!code) {
+    const st = crypto.randomUUID();
+    res.setHeader(
+      "Set-Cookie",
+      `${cookieName}=${encodeURIComponent(st)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`
+    );
 
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-    res.writeHead(302, { Location: authUrl });
-    res.end();
-  } catch (e) {
-    res.statusCode = 500;
-    res.end("google error");
+    const auth = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    auth.searchParams.set("client_id", clientId);
+    auth.searchParams.set("redirect_uri", redirectUri);
+    auth.searchParams.set("response_type", "code");
+    auth.searchParams.set("scope", "openid email profile");
+    auth.searchParams.set("access_type", "offline");
+    auth.searchParams.set("prompt", "select_account");
+    auth.searchParams.set("state", `${st}|${from}`);
+
+    res.writeHead(302, { Location: auth.toString() });
+    return res.end();
   }
-};
+
+  // 2) CALLBACK: viene `code` -> canjea token y crea sesión
+  try {
+    const cookies = readCookies();
+    const expected = cookies[cookieName];
+    if (!expected || !state || !state.startsWith(expected)) {
+      return res.status(400).send("Invalid state");
+    }
+
+    // Intercambia el code por tokens
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+      }),
+    });
+    const token = await tokenRes.json();
+    if (!token.id_token) return res.status(401).json({ error: "google_auth_failed" });
+
+    // Decodifica el id_token (JWT) para obtener email y nombre
+    const payload = JSON.parse(
+      Buffer.from(token.id_token.split(".")[1], "base64").toString("utf8")
+    );
+    const email = payload.email;
+    const name = payload.name || payload.given_name || email;
+
+    // TODO: aquí integra con TU sistema:
+    // - Busca/crea usuario por email
+    // - Si ya existía como "normal", NO crees otro (mismo email = misma cuenta)
+    // - Crea la cookie de sesión como haces en /api/login
+    //   p.ej.: res.setHeader("Set-Cookie", "taply_session=...; Path=/; HttpOnly; Secure; SameSite=Lax");
+
+    // Limpia cookie de state
+    res.setHeader("Set-Cookie", `${cookieName}=; Path=/; Max-Age=0`);
+
+    // Vuelve a la página y deja pista para refrescar sesión
+    res.writeHead(302, { Location: "/suscripciones.html#google=ok" });
+    return res.end();
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "google_auth_failed" });
+  }
+}
+
