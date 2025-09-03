@@ -1,40 +1,49 @@
-// Forzar runtime Node (no Edge)
-export const config = { runtime: 'nodejs' };
+// Fuerza runtime Node (no Edge)
+export const config = { runtime: "nodejs" };
 
 import crypto from "crypto";
 
 export default async function handler(req, res) {
-  // --- BASE URL: usa APP_BASE_URL si existe; si no, infiere del request ---
-  const proto = (req.headers["x-forwarded-proto"] || "https").toString().split(",")[0];
-  const host  = (req.headers["x-forwarded-host"]  || req.headers.host || "").toString().split(",")[0];
-  const envBase = process.env.APP_BASE_URL?.replace(/\/$/, "");   // p.ej. https://taply-zeta.vercel.app
-  const base = envBase || (host ? `${proto}://${host}` : "");
+  // 1) Base URL: APP_BASE_URL sin / final; si no existe, toma host del request
+  const envBase = process.env.APP_BASE_URL?.replace(/\/$/, "");
+  const proto   = String(req.headers["x-forwarded-proto"] || "https").split(",")[0];
+  const host    = String(req.headers["x-forwarded-host"]  || req.headers.host || "").split(",")[0];
+  const base    = envBase || (host ? `${proto}://${host}` : "");
   const redirectUri = `${base}/api/google`;
 
+  // 2) Credenciales
   const clientId     = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 
-  // --- Validaciones tempranas: evita la pantalla "invalid_client" de Google ---
+  // 3) Modo debug: /api/google?debug=1  (no expone secretos)
+  const url = new URL(req.url, base || "http://local.invalid");
+  if (url.searchParams.get("debug") === "1") {
+    return res.status(200).json({
+      ok: true,
+      base,
+      redirectUri,
+      clientIdLooksOk: !!(clientId && clientId.endsWith(".apps.googleusercontent.com")),
+      clientIdTail: clientId ? clientId.slice(-18) : null, // última parte para comprobar visualmente
+      hasClientSecret: !!clientSecret,
+      note: "Si clientIdLooksOk=false, revisa variables en Vercel y vuelve a desplegar.",
+    });
+  }
+
+  // 4) Validaciones tempranas: así no llegas a la pantalla 'invalid_client' de Google
+  if (!base) return res.status(500).json({ error: "missing_base_url", hint: "Define APP_BASE_URL o asegúrate de que llega Host." });
   if (!clientId || !clientId.endsWith(".apps.googleusercontent.com")) {
     return res.status(500).json({
       error: "misconfigured_google_client_id",
-      hint: "GOOGLE_CLIENT_ID vacío o NO es un OAuth 2.0 Client ID de tipo Web. Debe acabar en .apps.googleusercontent.com",
+      hint: "GOOGLE_CLIENT_ID vacío o incorrecto. Debe terminar en .apps.googleusercontent.com",
     });
   }
-  if (!clientSecret) {
-    return res.status(500).json({ error: "missing_GOOGLE_CLIENT_SECRET" });
-  }
-  if (!base) {
-    return res.status(500).json({ error: "missing_APP_BASE_URL_or_host" });
-  }
+  if (!clientSecret) return res.status(500).json({ error: "missing_GOOGLE_CLIENT_SECRET" });
 
-  const url   = new URL(req.url, base);
   const code  = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const from  = url.searchParams.get("from") || "login";
-
   const cookieName = "g_state";
-  const isHttps    = base.startsWith("https://");
+  const isHttps = base.startsWith("https://");
   const cookieFlags = `Path=/; HttpOnly; SameSite=Lax${isHttps ? "; Secure" : ""}`;
 
   const readCookies = () =>
@@ -48,7 +57,7 @@ export default async function handler(req, res) {
         })
     );
 
-  // 1) INICIO: no hay `code` -> redirige a Google
+  // 5) Primer paso: redirigir a Google
   if (!code) {
     const st = crypto.randomUUID();
     res.setHeader("Set-Cookie", `${cookieName}=${encodeURIComponent(st)}; Max-Age=600; ${cookieFlags}`);
@@ -66,7 +75,7 @@ export default async function handler(req, res) {
     return res.end();
   }
 
-  // 2) CALLBACK: viene `code` -> canjea token y crea sesión
+  // 6) Callback: canjear código por tokens
   try {
     const cookies  = readCookies();
     const expected = cookies[cookieName];
@@ -95,20 +104,15 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "missing_id_token", details: token });
     }
 
-    // Decodificar id_token (JWT)
     const payload = JSON.parse(Buffer.from(token.id_token.split(".")[1], "base64").toString("utf8"));
     const email   = payload.email;
     const name    = payload.name || payload.given_name || email;
 
-    // TODO: integra con tu sistema de sesión:
-    // - Busca/crea usuario por email
-    // - Crea cookie de sesión (mismo cookieFlags)
+    // TODO: crea tu cookie de sesión aquí (igual que en /api/login)
     // res.setHeader("Set-Cookie", `taply_session=...; ${cookieFlags}`);
 
-    // Limpia cookie de state
+    // Limpia estado y vuelve a la app
     res.setHeader("Set-Cookie", `${cookieName}=; Max-Age=0; ${cookieFlags}`);
-
-    // Redirige de vuelta a tu app
     res.writeHead(302, { Location: "/suscripciones.html#google=ok" });
     return res.end();
   } catch (e) {
