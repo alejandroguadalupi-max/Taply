@@ -1,4 +1,4 @@
-<!doctype html> 
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8"/>
@@ -68,11 +68,14 @@
         <button id="updateCard" class="ghost">Actualizar tarjeta</button>
         <button id="invoices" class="ghost">Ver facturas</button>
       </div>
-      <p class="muted" style="margin-top:8px">Estas acciones se abren en el portal de Stripe.</p>
+      <p class="muted" style="margin-top:8px">Se abrirá el portal de Stripe (puedes cancelar <em>inmediatamente</em>, al <em>final del periodo</em> o en una <em>fecha personalizada</em> según tu configuración).</p>
     </section>
   </main>
 
   <script>
+    // 👇 Fallback directo al login del portal (tu enlace):
+    const PORTAL_LOGIN_URL = "https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00";
+
     const $=s=>document.querySelector(s);
 
     async function api(method, url, body){
@@ -139,7 +142,6 @@
       const st=(u?.subscription?.status||'').toLowerCase();
       const cancelAtEnd=!!u?.subscription?.cancel_at_period_end;
 
-      // Botones
       if(st==='active' || st==='trialing' || st==='past_due'){
         $('#btnCancel').style.display = cancelAtEnd ? 'none' : 'inline-flex';
         $('#btnResume').style.display = cancelAtEnd ? 'inline-flex' : 'none';
@@ -151,14 +153,16 @@
       if(!paintOnly){ $('#msg').textContent=''; }
     }
 
-    // Ejecuta fallback de post-pago si venimos de Stripe con ?session_id=...
+    // Si venimos de Stripe con ?session_id=..., guardamos cookie y ejecutamos post-pago
     async function runPostPagoIfNeeded(){
       const qs = new URLSearchParams(location.search);
       const sid = qs.get('session_id');
       if(!sid) return;
-      try{ await api('POST','/api/post-pago',{ session_id: sid }); await refreshUser(true); }
-      catch(e){ /* silencioso */ }
-      // Limpia el parámetro de la URL
+      try{
+        try{ await api('POST','/api/store-customer-from-session',{ session_id: sid }); }catch{}
+        try{ await api('POST','/api/post-pago',{ session_id: sid }); }catch{}
+        await refreshUser(true);
+      }catch(e){ /* silencioso */ }
       try{
         qs.delete('session_id');
         const url = location.pathname + (qs.toString()?('?'+qs.toString()):'');
@@ -166,15 +170,25 @@
       }catch{}
     }
 
-    // Portal (alias estable). Si falla, mostramos instrucción
+    // Abrir portal (preferimos backend; si falla, vamos al login fijo)
     async function openPortal(){
+      // 1) Backend (que ya devolverá PORTAL_LOGIN_URL si está en .env)
       try{
         const r=await api('POST','/api/create-portal-session',{});
-        if(r?.url) location.href=r.url; else throw 'portal_unavailable';
-      }catch(e){
-        $('#msg').innerHTML = 'No se pudo abrir el portal. <span class="err">Revisa que estés logueado y las variables STRIPE estén configuradas.</span>';
-        alert('No se pudo abrir el portal');
-      }
+        if(r?.url){ location.href=r.url; return; }
+      }catch(e){ /* seguimos al fallback */ }
+
+      // 2) Fallback directo
+      let url = PORTAL_LOGIN_URL;
+      // (Stripe IGNORA parámetros extra, pero intentamos pre-rellenar por si en el futuro lo soportan)
+      try{
+        if(USER?.email){
+          const u = new URL(url);
+          u.searchParams.set('prefilled_email', USER.email);
+          url = u.toString();
+        }
+      }catch{}
+      location.href = url;
     }
 
     // Acciones
@@ -183,25 +197,25 @@
     $('#updateCard').addEventListener('click', openPortal);
     $('#invoices').addEventListener('click', openPortal);
 
-    // Cancelar al final del periodo (sin portal)
+    // Cancelar al final del periodo (desde tu API sin portal)
     $('#btnCancel').addEventListener('click', async ()=>{
       try{
         await api('POST','/api/subscription/cancel',{ at_period_end:true });
         $('#msg').innerHTML = '<span class="warn">Tu suscripción seguirá activa hasta fin de periodo.</span>';
         await refreshUser();
       }catch(e){
-        alert('No se pudo cancelar. Abriremos el portal.'); openPortal();
+        alert('No se pudo cancelar aquí. Te llevamos al portal para completarlo.'); openPortal();
       }
     });
 
-    // Reanudar (quitar cancel_at_period_end)
+    // Reanudar
     $('#btnResume').addEventListener('click', async ()=>{
       try{
         await api('POST','/api/subscription/resume',{});
         $('#msg').innerHTML = '<span class="ok">La suscripción seguirá renovándose.</span>';
         await refreshUser();
       }catch(e){
-        alert('No se pudo reanudar. Abriremos el portal.'); openPortal();
+        alert('No se pudo reanudar aquí. Te llevamos al portal.'); openPortal();
       }
     });
 
@@ -221,7 +235,6 @@
     });
 
     (async function init(){
-      // Si venimos de Stripe, suma NFC / cierra ciclo
       await runPostPagoIfNeeded();
       await refreshUser();
     })();

@@ -22,6 +22,12 @@ const PRICES = {
 };
 const PRICE_ID_NFC = process.env.PRICE_ID_NFC;
 
+// 👇 NUEVO: si pones esto en .env, usaremos el login del portal directamente
+// Ej.: STRIPE_PORTAL_LOGIN_URL="https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00"
+const PORTAL_LOGIN_URL =
+  process.env.STRIPE_PORTAL_LOGIN_URL ||
+  process.env.PORTAL_LOGIN_URL || null;
+
 /* ============ Utils base ============ */
 function assertEnv() {
   if (!process.env.APP_SECRET) throw Object.assign(new Error('missing APP_SECRET'), { statusCode: 500 });
@@ -76,7 +82,6 @@ function getStripe(){
   }
   return stripeSingleton;
 }
-// Evita inyección en customers.search
 function escapeStripeQueryValue(v=''){
   return String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
@@ -122,7 +127,7 @@ async function hasValidSubscription(stripe, customerId){
   return subs.data.some(s => ['active','trialing','past_due'].includes(s.status));
 }
 
-/* ===== util fechas: mensual = 30 días exactos (tu requerimiento) ===== */
+/* ===== util fechas: mensual = 30 días exactos ===== */
 function addDays(d, days){ return new Date(d.getTime() + days*24*60*60*1000); }
 
 /* ========= Envíos opcionales ========= */
@@ -301,6 +306,12 @@ async function resetPassword(req, res){
 /* ======== Portal de facturación ======== */
 // POST /api/create-portal-session (+ alias /api/portal y /api/create-billing-portal)
 async function createPortalSession(req, res){
+  // Si tienes un login del portal configurado, úsalo y listo (email OTP de Stripe)
+  if (PORTAL_LOGIN_URL) {
+    return res.status(200).json({ url: PORTAL_LOGIN_URL });
+  }
+
+  // Si no hay login URL, creamos sesión de portal normal (cliente ya logueado en tu web)
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error:'auth_required' });
   const stripe = getStripe();
@@ -320,7 +331,6 @@ async function createPortalSession(req, res){
 }
 
 /* ======== Suscripciones: cancelar / reanudar / cambiar plan ======== */
-// POST /api/subscription/cancel  { at_period_end?: boolean }
 async function subscriptionCancel(req, res){
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error:'auth_required' });
@@ -329,12 +339,10 @@ async function subscriptionCancel(req, res){
   const sub = await getBestSubscription(stripe, sess.customerId);
   if(!sub) return res.status(400).json({ error:'no_active_subscription' });
 
-  const atPeriodEnd = (getBody(req).at_period_end !== false); // por defecto: true
+  const atPeriodEnd = (getBody(req).at_period_end !== false);
   const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: !!atPeriodEnd });
   return res.status(200).json({ subscription: normalizeSub(updated) });
 }
-
-// POST /api/subscription/resume
 async function subscriptionResume(req, res){
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error:'auth_required' });
@@ -346,8 +354,6 @@ async function subscriptionResume(req, res){
   const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: false });
   return res.status(200).json({ subscription: normalizeSub(updated) });
 }
-
-// POST /api/subscription/swap { priceId }
 async function subscriptionSwap(req, res){
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error:'auth_required' });
@@ -369,7 +375,6 @@ async function subscriptionSwap(req, res){
 }
 
 /* ======== Checkout ======== */
-// POST /api/create-checkout-session  (suscripciones)
 async function createCheckoutSession(req, res){
   const { tier, frequency } = getBody(req);
   if (!tier || !frequency) return res.status(400).json({ error: 'missing_params' });
@@ -409,7 +414,7 @@ async function createCheckoutSession(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-// POST /api/buy-nfc  (pago único)
+/* Pago único NFC */
 async function buyNfc(req, res){
   if (!PRICE_ID_NFC) return res.status(500).json({ error: 'missing_nfc_price_id' });
 
@@ -441,7 +446,7 @@ async function buyNfc(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-/* ========= POST /api/post-pago  (fallback por si el webhook no corre) ========= */
+/* ========= POST /api/post-pago ========= */
 async function postPago(req, res){
   const stripe = getStripe();
   const url = new URL(req.url, 'http://x');
@@ -461,7 +466,6 @@ async function postPago(req, res){
       lineSummary = li.map(i => `${i.quantity} × ${i.description || i.price?.nickname || i.price?.id}`).join(', ');
       amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '';
 
-      // Fallback: sumar NFC aquí también
       if (cs.mode === 'payment' && PRICE_ID_NFC && customerId) {
         const addQty = li.reduce((acc, it) => acc + ((it.price?.id === PRICE_ID_NFC) ? (it.quantity || 0) : 0), 0);
         if(addQty > 0){
@@ -471,7 +475,7 @@ async function postPago(req, res){
         }
       }
     }catch(e){
-      console.error('post-pago retrieve error', e?.message || e);
+      console.error('post-pago retrieve error', e);
     }
   }
 
@@ -506,12 +510,7 @@ async function postPago(req, res){
   return res.status(200).json({ ok:true });
 }
 
-/* ======== NUEVO: POST /api/store-customer-from-session =========
-   - Usa session_id de Stripe para:
-     * recuperar el customer y su email/nombre
-     * crear cookie de sesión (si no existe)
-     * devolver user “flat” para el front
-*/
+/* ======== POST /api/store-customer-from-session ======== */
 async function storeCustomerFromSession(req, res){
   const { session_id } = getBody(req);
   if(!session_id) return res.status(400).json({ error:'missing_params' });
@@ -529,14 +528,11 @@ async function storeCustomerFromSession(req, res){
       return res.status(400).json({ error:'no_customer_in_session' });
     }
 
-    // Si el customer existe pero no tiene nombre y ahora sí, lo actualizamos
     if(name && custObj && !custObj.name){
       try{ await stripe.customers.update(customerId, { name }); }catch{}
     }
 
-    // Guarda cookie de sesión para la web
     setSession(res, { email, name: name || null, customerId });
-
     return res.status(200).json({ user: { email, name: name || null, customerId }});
   }catch(e){
     console.error('storeCustomerFromSession error', e?.message || e);
@@ -550,7 +546,6 @@ export default async function handler(req, res){
     assertEnv();
     const route = routeOf(req);
 
-    // Preflight muy básico si alguna vez incrustas el API cross-origin
     if (req.method === 'OPTIONS') {
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -566,7 +561,7 @@ export default async function handler(req, res){
       if (route === 'request-password-reset') return requestPasswordReset(req,res);
       if (route === 'reset-password') return resetPassword(req,res);
 
-      // Portal (alias válidos)
+      // Portal
       if (route === 'create-portal-session' || route === 'portal' || route === 'create-billing-portal')
         return createPortalSession(req,res);
 
@@ -579,7 +574,7 @@ export default async function handler(req, res){
       if (route === 'create-checkout-session') return createCheckoutSession(req,res);
       if (route === 'buy-nfc') return buyNfc(req,res);
 
-      // Post-pago (fallback) + compat
+      // Post-pago + compat
       if (route === 'post-pago') return postPago(req,res);
       if (route === 'store-customer-from-session') return storeCustomerFromSession(req,res);
     }
