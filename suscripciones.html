@@ -415,6 +415,14 @@
       if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
     }
 
+    // Centraliza set de usuario (S + localStorage + window.taplyAuth)
+    function setUser(u){
+      S.user = u || null;
+      saveUser(S.user);
+      window.taplyAuth = window.taplyAuth || {};
+      window.taplyAuth.user = S.user;
+    }
+
     // -------- Formularios --------
     forms.recover?.addEventListener('submit', async e=>{
       e.preventDefault(); errs.recover.style.display='none'; okRecover.style.display='none';
@@ -428,7 +436,7 @@
       const email=$('#acct-login-email').value.trim(); const password=$('#acct-login-pass').value;
       try{
         const data=await api('POST','/api/login',{email,password});
-        S.user=data?.user||null; saveUser(S.user); await forceSessionRefresh(); closeModal();
+        setUser(data?.user||null); await forceSessionRefresh(); closeModal();
       }catch(err){
         errs.login.textContent=(err==='account_not_found')?'No existe una cuenta con ese email.':
                                (err==='invalid_credentials')?'Contraseña incorrecta.':
@@ -446,7 +454,7 @@
       if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
       try{
         const data=await api('POST','/api/register',{name,email,password:p1});
-        S.user=data?.user||null; saveUser(S.user); await forceSessionRefresh(); closeModal();
+        setUser(data?.user||null); await forceSessionRefresh(); closeModal();
       }catch(err){
         errs.register.textContent=(err==='email_in_use_google')?'Ese correo ya existe como cuenta Google. Inicia sesión con Google.':
                                  (err==='email_in_use')?'Ese correo ya tiene una cuenta. Inicia sesión.':
@@ -465,7 +473,7 @@
         try{
           const data=await api('GET','/api/session');
           if(data?.user){
-            S.user=data.user; saveUser(S.user);
+            setUser(data.user);
             paintNav(); paintAccountSection();
             closeModal();
             clearInterval(S.polling); S.polling=null;
@@ -476,6 +484,11 @@
     }
     document.getElementById('btn-google-login')?.addEventListener('click', startGooglePolling);
     document.getElementById('btn-google-register')?.addEventListener('click', startGooglePolling);
+
+    // También escuchar postMessage desde la pestaña de callback (si se abrió como popup)
+    window.addEventListener('message', (e)=>{
+      if(e?.data?.type==='taply_auth_success'){ forceSessionRefresh(); }
+    });
 
     // -------- Menú / sesión / gating --------
     function paintNav(){
@@ -499,7 +512,7 @@
       userBtn?.addEventListener('click', toggle);
       document.addEventListener('click', e=>{ if(!slot.contains(e.target)){ if(pop) pop.style.display='none'; }});
       slot.querySelector('#acct-logout-nav')?.addEventListener('click', async e=>{
-        e.preventDefault(); try{ await api('POST','/api/logout',{});}catch{} S.user=null; saveUser(null); paintNav(); paintAccountSection();
+        e.preventDefault(); try{ await api('POST','/api/logout',{});}catch{} setUser(null); paintNav(); paintAccountSection();
       });
     }
 
@@ -509,7 +522,7 @@
         statusEl.textContent='Sesión no iniciada'; nfcEl.textContent='NFC comprados: 0'; renewsEl.textContent=''; logoutBtn?.setAttribute('disabled','disabled'); return;
       }
       logoutBtn?.removeAttribute('disabled');
-      logoutBtn.onclick = async ()=>{ try{ await api('POST','/api/logout',{}); }catch{} S.user=null; saveUser(null); paintNav(); paintAccountSection(); alert('Sesión cerrada'); };
+      logoutBtn.onclick = async ()=>{ try{ await api('POST','/api/logout',{}); }catch{} setUser(null); paintNav(); paintAccountSection(); alert('Sesión cerrada'); };
       statusEl.textContent = isSubActive(S.user) ? prettyPlan(S.user) : 'Sin plan activo';
       const next = computeNextRenewal30(S.user); renewsEl.textContent = next ? `Renovación / fin de periodo: ${fmtDate(next)}.` : '';
       const qty = Number(S.user.nfc_qty || 0); nfcEl.textContent = `NFC comprados: ${qty}`;
@@ -519,15 +532,58 @@
       for(let i=0;i<retries;i++){
         try{
           const data=await api('GET','/api/session');
-          if(data?.user){ S.user=data.user; saveUser(S.user); paintNav(); paintAccountSection(); if(S.user.subscription || typeof S.user.nfc_qty==='number') break; }
+          if(data?.user){
+            setUser(data.user);
+            paintNav(); paintAccountSection();
+            if(S.user.subscription || typeof S.user.nfc_qty==='number') break;
+          }
         }catch{}
         await new Promise(r=>setTimeout(r,delay));
       }
     }
 
+    // ====== NUEVO: mapeo errores Google + manejo del hash ======
+    function mapGoogleError(code){
+      switch(String(code||'').toLowerCase()){
+        case 'email_in_use_password': return 'Ese correo ya tiene una cuenta con contraseña. Inicia sesión con tu contraseña.';
+        case 'email_in_use_google':   return 'Ese correo ya está registrado con Google. Inicia sesión con Google.';
+        case 'email_in_use':          return 'Ese correo ya está en uso.';
+        case 'use_password_login':    return 'Esa cuenta no está vinculada a Google. Usa correo y contraseña.';
+        case 'not_registered':        return 'No existe ninguna cuenta registrada con ese Google. Regístrate primero.';
+        case 'email_not_verified':    return 'Tu correo de Google no está verificado.';
+        case 'state_error':           return 'Error de seguridad (state). Inténtalo de nuevo.';
+        case 'cfg_error':             return 'Configuración de Google incompleta.';
+        default:                      return 'No se pudo completar con Google. Inténtalo otra vez.';
+      }
+    }
+    async function handleGoogleHash(){
+      const raw = (location.hash || '').replace(/^#/, '');
+      if(!raw) return;
+      const params = new URLSearchParams(raw.replace(/;/g,'&'));
+      const g = params.get('google');      // ok | err
+      const from = (params.get('from') || 'login').toLowerCase();
+      const code = params.get('code');
+
+      if (g === 'ok') {
+        await forceSessionRefresh();
+        history.replaceState(null,'',location.pathname + location.search);
+        return;
+      }
+      if (g === 'err') {
+        openModal(from === 'register' ? 'register' : 'login');
+        const target = (from === 'register') ? errs.register : errs.login;
+        if (target){
+          target.textContent = mapGoogleError(code);
+          target.style.display = 'block';
+        }
+        history.replaceState(null,'',location.pathname + location.search);
+      }
+    }
+    // ====== FIN bloque nuevo ======
+
     async function getSession(){
-      const cached=readUser(); if(cached){ S.user=cached; paintNav(); paintAccountSection(); }
-      try{ const data=await api('GET','/api/session'); S.user=data?.user||null; saveUser(S.user); }catch{ S.user=cached||null; }
+      const cached=readUser(); if(cached){ setUser(cached); paintNav(); paintAccountSection(); }
+      try{ const data=await api('GET','/api/session'); setUser(data?.user||null); }catch{ setUser(cached||null); }
       paintNav(); paintAccountSection();
 
       // gating de botones de pago
@@ -535,13 +591,16 @@
         const g=e.target.closest('.acct-guard'); if(g && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); }
       }, true);
 
-      // si venimos del callback con hash ?#google=ok (o similar)
-      if(location.hash.includes('google=ok')){ await forceSessionRefresh(); history.replaceState(null,'',location.pathname+location.search); }
+      // Maneja éxito/errores de Google (hash)
+      await handleGoogleHash();
     }
 
     // Sync entre pestañas
     window.addEventListener('storage', e=>{
-      if(e.key==='acct_user'){ try{ S.user = e.newValue ? JSON.parse(e.newValue) : null; }catch{ S.user=null; } paintNav(); paintAccountSection(); }
+      if(e.key==='acct_user'){
+        try{ setUser(e.newValue ? JSON.parse(e.newValue) : null); }catch{ setUser(null); }
+        paintNav(); paintAccountSection();
+      }
     });
 
     // Arranque
@@ -552,10 +611,14 @@
   $$('.btn.plan').forEach(btn => btn.addEventListener('click', async () => {
     const tier = btn.dataset.tier;
     const frequency = (document.querySelector('#btn-year')?.classList.contains('active')) ? 'annual' : 'monthly';
+
+    // Si ya hay sesión + sub activa, avisar
     if (window.taplyAuth?.user && (window.taplyAuth.user.subscription || window.taplyAuth.user.isSubscribed)) {
-      const u = window.taplyAuth.user; const planName = (u.subscription && (u.subscription.plan?.nickname||u.subscription.price?.nickname)) || 'actual';
+      const u = window.taplyAuth.user;
+      const planName = (u.subscription && (u.subscription.plan?.nickname||u.subscription.price?.nickname)) || 'actual';
       if (confirm(`Ya tienes un plan ${planName} activo.\n\n¿Quieres ir a “Gestionar suscripción” para cambiarlo?`)) { location.href = 'gestionar.html'; return; }
     }
+
     try {
       const res = await fetch('/api/create-checkout-session', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ tier, frequency }) });
       const data = await res.json();
