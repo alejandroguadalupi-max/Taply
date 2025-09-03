@@ -260,8 +260,8 @@
 
         <div class="acct-actions">
           <button type="submit" class="btn">Iniciar sesión</button>
-          <!-- Abrir Google (OAuth) en pestaña nueva -->
-          <a id="btn-google-login" href="/api/google?from=login" target="_blank" rel="noopener" class="btn btn-google">Continuar con Google</a>
+          <!-- Los listeners JS gestionan la apertura (misma pestaña en móvil/in-app, popup en desktop) -->
+          <a id="btn-google-login" href="/api/google?from=login" rel="noopener" class="btn btn-google">Continuar con Google</a>
           <p id="acct-error-login" class="acct-err" style="display:none"></p>
         </div>
       </form>
@@ -289,8 +289,7 @@
         <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
         <div class="acct-actions">
           <button type="submit" class="btn">Crear cuenta</button>
-          <!-- Registrarse con Google en pestaña nueva -->
-          <a id="btn-google-register" href="/api/google?from=register" target="_blank" rel="noopener" class="btn btn-google">Registrarme con Google</a>
+          <a id="btn-google-register" href="/api/google?from=register" rel="noopener" class="btn btn-google">Registrarme con Google</a>
           <p id="acct-error-register" class="acct-err" style="display:none"></p>
         </div>
       </form>
@@ -418,7 +417,7 @@
     // Centraliza set de usuario (S + localStorage + window.taplyAuth)
     function setUser(u){
       S.user = u || null;
-      saveUser(S.user);
+      try { localStorage.setItem(KEY, u ? JSON.stringify(u) : ""); } catch {}
       window.taplyAuth = window.taplyAuth || {};
       window.taplyAuth.user = S.user;
     }
@@ -464,7 +463,12 @@
       }
     });
 
-    // -------- Google: abrir en pestaña nueva + polling de sesión --------
+    // -------- Google: abrir (misma pestaña en móvil/in-app) + polling --------
+    function shouldOpenSameTab(){
+      const ua = navigator.userAgent || "";
+      return /FBAN|FBAV|Instagram|Line|MicroMessenger|Twitter|TikTok|Snapchat|Pinterest/i.test(ua)
+          || /iPhone|iPad|iPod/i.test(ua);
+    }
     function startGooglePolling(){
       if(S.polling) clearInterval(S.polling);
       let tries=0;
@@ -482,13 +486,21 @@
         if(tries>30){ clearInterval(S.polling); S.polling=null; } // ~60s
       },2000);
     }
-    document.getElementById('btn-google-login')?.addEventListener('click', startGooglePolling);
-    document.getElementById('btn-google-register')?.addEventListener('click', startGooglePolling);
+    function openGoogle(from){
+      try{ startGooglePolling(); }catch{}
+      const url = `/api/google?from=${encodeURIComponent(from)}`;
+      if (shouldOpenSameTab()){
+        location.href = url; // móvil / in-app → misma pestaña
+      } else {
+        const w = window.open(url, "taply_google", "noopener,noreferrer,width=480,height=640");
+        if(!w) location.href = url; // si bloquea popup
+      }
+    }
+    document.getElementById('btn-google-login')?.addEventListener('click', (e)=>{ e.preventDefault(); openGoogle('login'); });
+    document.getElementById('btn-google-register')?.addEventListener('click', (e)=>{ e.preventDefault(); openGoogle('register'); });
 
-    // También escuchar postMessage desde la pestaña de callback (si se abrió como popup)
-    window.addEventListener('message', (e)=>{
-      if(e?.data?.type==='taply_auth_success'){ forceSessionRefresh(); }
-    });
+    // También escuchar postMessage si algún día mandas mensajes desde el callback
+    window.addEventListener('message', (e)=>{ if(e?.data?.type==='taply_auth_success'){ forceSessionRefresh(); }});
 
     // -------- Menú / sesión / gating --------
     function paintNav(){
@@ -542,17 +554,18 @@
       }
     }
 
-    // ====== NUEVO: mapeo errores Google + manejo del hash ======
+    // ====== Mapeo errores Google + manejo del hash ======
     function mapGoogleError(code){
       switch(String(code||'').toLowerCase()){
         case 'email_in_use_password': return 'Ese correo ya tiene una cuenta con contraseña. Inicia sesión con tu contraseña.';
         case 'email_in_use_google':   return 'Ese correo ya está registrado con Google. Inicia sesión con Google.';
         case 'email_in_use':          return 'Ese correo ya está en uso.';
-        case 'use_password_login':    return 'Esa cuenta no está vinculada a Google. Usa correo y contraseña.';
+        case 'use_password_login':    return 'Esa cuenta no está vinculada a Google. Usa correo y contraseña (o “¿Olvidaste la contraseña?”).';
         case 'not_registered':        return 'No existe ninguna cuenta registrada con ese Google. Regístrate primero.';
         case 'email_not_verified':    return 'Tu correo de Google no está verificado.';
         case 'state_error':           return 'Error de seguridad (state). Inténtalo de nuevo.';
-        case 'cfg_error':             return 'Configuración de Google incompleta.';
+        case 'google_auth_failed':    return 'No se pudo completar con Google. Inténtalo otra vez.';
+        case 'server_error':          return 'Error del servidor. Intenta de nuevo.';
         default:                      return 'No se pudo completar con Google. Inténtalo otra vez.';
       }
     }
@@ -579,7 +592,6 @@
         history.replaceState(null,'',location.pathname + location.search);
       }
     }
-    // ====== FIN bloque nuevo ======
 
     async function getSession(){
       const cached=readUser(); if(cached){ setUser(cached); paintNav(); paintAccountSection(); }

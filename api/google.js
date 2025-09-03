@@ -40,20 +40,24 @@ function readCookies(req) {
 function normalizeEmail(s = "") {
   return String(s).trim().toLowerCase();
 }
-
-export default async function handler(req, res) {
+function baseFromReq(req) {
   const envBase = process.env.APP_BASE_URL?.replace(/\/$/, "");
   const proto   = String(req.headers["x-forwarded-proto"] || "https").split(",")[0];
   const host    = String(req.headers["x-forwarded-host"]  || req.headers.host || "").split(",")[0];
-  const base    = envBase || (host ? `${proto}://${host}` : "");
+  return envBase || (host ? `${proto}://${host}` : "");
+}
+
+export default async function handler(req, res) {
+  const base        = baseFromReq(req);
   const redirectUri = `${base}/api/google`;
-  const isHttps = base.startsWith("https://");
+  const isHttps     = base.startsWith("https://");
 
   const clientId     = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
   const stripeSecret = process.env.STRIPE_SECRET_KEY;
   const appSecret    = process.env.APP_SECRET;
 
+  // Debug opcional
   const url = new URL(req.url, base || "http://x");
   if (url.searchParams.get("debug") === "1") {
     return res.status(200).json({
@@ -66,7 +70,7 @@ export default async function handler(req, res) {
   }
 
   // Validaciones
-  if (!base)        return res.status(500).json({ error: "missing_base_url" });
+  if (!base)         return res.status(500).json({ error: "missing_base_url" });
   if (!clientId || !clientId.endsWith(".apps.googleusercontent.com"))
     return res.status(500).json({ error: "misconfigured_google_client_id" });
   if (!clientSecret) return res.status(500).json({ error: "missing_GOOGLE_CLIENT_SECRET" });
@@ -75,7 +79,7 @@ export default async function handler(req, res) {
 
   const code   = url.searchParams.get("code");
   const stateQ = url.searchParams.get("state");
-  const fromQ  = url.searchParams.get("from") || "login";
+  const fromQ  = (url.searchParams.get("from") || "login").toLowerCase();
 
   const stripe = new Stripe(stripeSecret, { apiVersion: "2024-06-20" });
 
@@ -91,7 +95,7 @@ export default async function handler(req, res) {
     auth.searchParams.set("scope", "openid email profile");
     auth.searchParams.set("access_type", "offline");
     auth.searchParams.set("prompt", "select_account");
-    auth.searchParams.set("state", `${st}|${fromQ}`); // guardo de dónde venía (login/register)
+    auth.searchParams.set("state", `${st}|${fromQ}`); // guardo login/register
 
     res.writeHead(302, { Location: auth.toString() });
     return res.end();
@@ -99,14 +103,16 @@ export default async function handler(req, res) {
 
   // 2) Callback
   try {
-    const cookies = readCookies(req);
-    const expected = cookies[COOKIE_STATE];
-    if (!expected || !stateQ || !stateQ.startsWith(expected)) {
+    const cookies  = readCookies(req);
+    const expected = cookies[COOKIE_STATE] || "";
+    const [stateVal, fromState] = String(stateQ || "").split("|");
+    const from = (fromState || fromQ || "login").toLowerCase();
+
+    if (!expected || !stateVal || stateVal !== expected) {
       clearStateCookie(res, isHttps);
-      res.writeHead(302, { Location: `/suscripciones.html#google=err&code=state_error&from=${fromQ}` });
+      res.writeHead(302, { Location: `/suscripciones.html#google=err&code=state_error&from=${from}` });
       return res.end();
     }
-    const from = stateQ.split("|")[1] || fromQ;
 
     // Intercambio
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -118,17 +124,24 @@ export default async function handler(req, res) {
       }),
     });
     const token = await tokenRes.json();
-    if (!tokenRes.ok || !token.id_token) {
+    if (!tokenRes.ok || !token?.id_token) {
       clearStateCookie(res, isHttps);
       res.writeHead(302, { Location: `/suscripciones.html#google=err&code=google_auth_failed&from=${from}` });
       return res.end();
     }
 
     // Decodificar id_token
-    const payload = JSON.parse(Buffer.from(token.id_token.split(".")[1], "base64").toString("utf8"));
-    const email = normalizeEmail(payload.email || "");
-    const name  = payload.name || payload.given_name || email;
-    const emailVerified = !!payload.email_verified;
+    let payload;
+    try {
+      payload = JSON.parse(Buffer.from(token.id_token.split(".")[1], "base64").toString("utf8"));
+    } catch {
+      clearStateCookie(res, isHttps);
+      res.writeHead(302, { Location: `/suscripciones.html#google=err&code=google_auth_failed&from=${from}` });
+      return res.end();
+    }
+    const email = normalizeEmail(payload?.email || "");
+    const name  = payload?.name || payload?.given_name || email;
+    const emailVerified = !!payload?.email_verified;
     if (!email || !emailVerified) {
       clearStateCookie(res, isHttps);
       res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_not_verified&from=${from}` });
@@ -136,27 +149,37 @@ export default async function handler(req, res) {
     }
 
     // Buscar/validar en Stripe
-    const found = await stripe.customers.search({ query: `email:'${email.replace(/'/g, "\\'")}'`, limit: 1 });
+    const safeEmail = email.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const found = await stripe.customers.search({ query: `email:'${safeEmail}'`, limit: 1 });
     const exists    = found.data.length ? found.data[0] : null;
-    const hasPass   = !!(exists?.metadata?.taply_pass_hash);
-    const hasGoogle = (exists?.metadata?.taply_google === "1" || exists?.metadata?.taply_google === "true");
+    const meta      = exists?.metadata || {};
+    const hasPass   = !!meta.taply_pass_hash;
+    const hasGoogle = (meta.taply_google === "1" || meta.taply_google === "true");
 
     if (from === "login") {
-      // Solo permitimos login con Google si ya está registrado con Google
-      if (!exists || !hasGoogle) {
+      // Si NO existe → no registrado
+      if (!exists) {
         clearStateCookie(res, isHttps);
         res.writeHead(302, { Location: `/suscripciones.html#google=err&code=not_registered&from=login` });
         return res.end();
       }
+      // Si existe con contraseña pero NO vinculado a Google → mensaje de "ya está registrado" (con password)
       if (hasPass && !hasGoogle) {
         clearStateCookie(res, isHttps);
-        res.writeHead(302, { Location: `/suscripciones.html#google=err&code=use_password_login&from=login` });
+        res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use_password&from=login` });
         return res.end();
       }
+      // Si existe, sin pass y sin google (huérfano por checkout, etc.)
+      if (!hasPass && !hasGoogle) {
+        clearStateCookie(res, isHttps);
+        res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use&from=login` });
+        return res.end();
+      }
+      // Tiene Google → login OK
       try {
         await stripe.customers.update(exists.id, {
           name: exists.name || name || undefined,
-          metadata: { ...(exists.metadata || {}), app: "taply", taply_google: "1", taply_nfc_qty: exists?.metadata?.taply_nfc_qty || "0" },
+          metadata: { ...meta, app: "taply", taply_google: "1", taply_nfc_qty: meta.taply_nfc_qty || "0" },
         });
       } catch {}
       setSession(res, { email, name: exists.name || name || null, customerId: exists.id }, isHttps);
@@ -167,17 +190,17 @@ export default async function handler(req, res) {
 
     // from === 'register'
     if (exists) {
-      if (hasGoogle) { // ya está registrado con Google
+      if (hasGoogle) {
         clearStateCookie(res, isHttps);
         res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use_google&from=register` });
         return res.end();
       }
-      if (hasPass) {   // ya está registrado con password
+      if (hasPass) {
         clearStateCookie(res, isHttps);
         res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use_password&from=register` });
         return res.end();
       }
-      // existe “huérfano” → lo consideramos en uso
+      // existe “huérfano” → en uso
       clearStateCookie(res, isHttps);
       res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use&from=register` });
       return res.end();
@@ -193,9 +216,11 @@ export default async function handler(req, res) {
     return res.end();
   } catch (e) {
     console.error("google oauth error:", e);
+    const isHttps = (process.env.APP_BASE_URL || "").startsWith("https://");
     clearStateCookie(res, isHttps);
     res.writeHead(302, { Location: `/suscripciones.html#google=err&code=server_error&from=login` });
     return res.end();
   }
 }
+
 
