@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="theme-color" content="#0b0f1a" />
+  <meta name="google-signin-client_id" content="124694801200-ibn7tfgtle183n6gqkqk29egeu0j1t4c.apps.googleusercontent.com">
   <title>Taply — NFC + Suscripción</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
@@ -65,17 +66,15 @@
     .panel{display:none;margin-bottom:40px}
     .panel.show{display:block}
 
-    /* ===== PANEL/ MODAL DE ACCESO (nuevo look) ===== */
+    /* ===== PANEL/ MODAL DE ACCESO ===== */
     #acct-modal.acct-hidden{display:none!important}
     #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.65);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
     .acct-dialog{
-      width:min(560px,92%); background:var(--bg-2); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow);
-      padding:0; overflow:hidden; color:var(--txt)
+      width:min(560px,92%); max-height:90vh; overflow:auto;
+      background:var(--bg-2); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow);
+      padding:0; color:var(--txt)
     }
-    .acct-cover{
-      background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
-      height:6px; width:100%;
-    }
+    .acct-cover{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));height:6px;width:100%}
     .acct-body{padding:22px}
     .acct-head{display:flex;justify-content:center;align-items:center;margin:10px 0 18px}
     .acct-logo{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-weight:900}
@@ -107,9 +106,17 @@
     .meter > i{display:block;height:100%;width:0%;background:#ef4444;transition:width .25s, background .25s}
 
     /* ===== Chips y datos cuenta ===== */
-    .acct-badge{display:inline-block;border:1px solid var(--border);background:rgba(255,255,255,.06);padding:6px 10px;border-radius:999px;font-weight:800}
+    .plan-badge{
+      display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;
+      background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-weight:800
+    }
+    .nfc-chip{
+      display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:10px 14px;border-radius:14px;
+      background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);font-weight:800
+    }
     .acct-small{color:var(--muted);font-size:.92rem;margin-top:6px}
   </style>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <header>
@@ -206,24 +213,19 @@
 <!-- === RESUMEN DE CUENTA === -->
 <section id="cuenta" class="container" style="padding:40px 0">
   <article class="card">
-    <h3 style="margin:0 0 6px">Mi suscripción</h3>
-    <p class="desc">Gestiona tu suscripción y tus datos de acceso.</p>
-
-    <div class="acct-row" style="margin:12px 0 6px">
+    <h3 style="margin:0 0 10px">Mi suscripción</h3>
+    <div class="acct-row" style="margin:8px 0 2px">
       <div>
-        <div id="acct-status" class="acct-badge">Sesión no iniciada</div>
-        <div id="acct-email" class="acct-small">—</div>
-        <div id="acct-plan" class="acct-small"></div>
-        <div id="acct-nfc" class="acct-small"></div>
+        <div id="acct-status" class="plan-badge">Sesión no iniciada</div>
+        <div id="acct-nfc" class="nfc-chip">NFC comprados: 0</div>
       </div>
       <div class="actions">
         <a href="gestionar.html" id="acct-manage" class="btn acct-guard">Gestionar suscripción</a>
         <button id="acct-logout" class="btn ghost">Cerrar sesión</button>
       </div>
     </div>
-
-    <p id="acct-renews" class="acct-small"></p>
-    <p class="acct-small">¿No tienes cuenta? <a id="acct-open-from-section" class="acct-badge" style="cursor:pointer">Inicia sesión o regístrate</a>.</p>
+    <p id="acct-renews" class="acct-small" style="margin-top:10px"></p>
+    <p class="acct-small" style="margin-top:8px">¿No tienes cuenta? <a id="acct-open-from-section" class="badge" style="cursor:pointer">Inicia sesión o regístrate</a></p>
   </article>
 </section>
 
@@ -238,16 +240,13 @@
   <div class="acct-dialog">
     <div class="acct-cover"></div>
     <div class="acct-body">
-      <div class="acct-head">
-        <div class="acct-logo">⌁</div>
-      </div>
+      <div class="acct-head"><div class="acct-logo">⌁</div></div>
       <h3 id="acct-title" class="acct-title">Inicia sesión en tu cuenta</h3>
       <p id="acct-sub" class="acct-sub">Introduce tus datos de acceso o crea una cuenta nueva.</p>
 
       <div class="acct-tabs" role="tablist">
         <button class="acct-tab acct-tab-active" data-tab="login" role="tab" aria-selected="true">Iniciar sesión</button>
         <button class="acct-tab" data-tab="register" role="tab" aria-selected="false">Registrarse</button>
-        <button class="acct-tab" data-tab="recover" role="tab" aria-selected="false">Recuperar</button>
       </div>
 
       <!-- LOGIN -->
@@ -266,12 +265,26 @@
 
         <div class="acct-row">
           <label class="remember"><input type="checkbox" checked> Mantener sesión activa</label>
-          <span class="acct-tab acct-link" data-tab-go="recover" style="background:transparent;border:0;cursor:pointer">¿Olvidaste la contraseña?</span>
+          <span id="link-forgot" class="acct-tab" style="background:transparent;border:1px dashed var(--border);cursor:pointer">¿Olvidaste la contraseña?</span>
+        </div>
+
+        <!-- RECOVER INLINE (no pestaña) -->
+        <div id="recover-inline" class="acct-form" style="display:none;margin-top:4px">
+          <label class="acct-label">Correo para recuperar
+            <span class="acct-input">
+              <input id="acct-recover-email" type="email" autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
+            </span>
+          </label>
+          <div class="acct-actions">
+            <button type="button" id="btn-send-recover" class="btn line">Enviar enlace</button>
+            <p id="acct-info-recover" class="acct-ok" style="display:none"></p>
+            <p id="acct-error-recover" class="acct-err" style="display:none"></p>
+          </div>
         </div>
 
         <div class="acct-actions">
           <button type="submit" class="btn">Iniciar sesión</button>
-          <button type="button" class="btn btn-google" id="btn-google-login" title="No configurado">Iniciar sesión con Google</button>
+          <button type="button" class="btn btn-google" id="btn-google">Iniciar sesión con Google</button>
           <p id="acct-error-login" class="acct-err" style="display:none"></p>
         </div>
       </form>
@@ -279,10 +292,10 @@
       <!-- REGISTER -->
       <form id="acct-form-register" class="acct-form" style="display:none" autocomplete="on" novalidate>
         <label class="acct-label">Nombre
-          <input id="acct-reg-name" type="text" required autocomplete="name" placeholder="Nombre y apellidos">
+          <span class="acct-input"><input id="acct-reg-name" type="text" required autocomplete="name" placeholder="Nombre y apellidos"></span>
         </label>
         <label class="acct-label">Correo
-          <input id="acct-reg-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
+          <span class="acct-input"><input id="acct-reg-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></span>
         </label>
         <label class="acct-label">Contraseña
           <span class="acct-input">
@@ -302,24 +315,11 @@
           <p id="acct-error-register" class="acct-err" style="display:none"></p>
         </div>
       </form>
-
-      <!-- RECOVER -->
-      <form id="acct-form-recover" class="acct-form" style="display:none" autocomplete="on" novalidate>
-        <p class="acct-small">Te enviaremos un enlace para restablecer tu contraseña.</p>
-        <label class="acct-label">Correo
-          <input id="acct-recover-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
-        </label>
-        <div class="acct-actions">
-          <button type="submit" class="btn">Enviar enlace</button>
-          <p id="acct-info-recover" class="acct-ok" style="display:none"></p>
-          <p id="acct-error-recover" class="acct-err" style="display:none"></p>
-        </div>
-      </form>
     </div>
   </div>
 </div>
 
-<!-- === LÓGICA DE PÁGINA (NFC + precios + Stripe) === -->
+<!-- === LÓGICA NFC/PLANES === -->
 <script>
   const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
   const fmt=v=>new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(v);
@@ -328,26 +328,10 @@
   const PRICE={nfcUnit:5,monthly:{basic:25,medio:35,pro:45},annualDiscount:.20};
   let qty=1,yearly=false;
 
-  // Mostrar paneles
-  $('#showNfc').addEventListener('click',e=>{
-    e.preventDefault();
-    $('#panel-nfc').classList.add('show');
-    $('#panel-sub').classList.remove('show');
-    $('#panel-nfc').scrollIntoView({behavior:'smooth'});
-  });
-  $('#showSub').addEventListener('click',e=>{
-    e.preventDefault();
-    $('#panel-sub').classList.add('show');
-    $('#panel-nfc').classList.remove('show');
-    $('#panel-sub').scrollIntoView({behavior:'smooth'});
-  });
+  $('#showNfc').addEventListener('click',e=>{e.preventDefault();$('#panel-nfc').classList.add('show');$('#panel-sub').classList.remove('show');$('#panel-nfc').scrollIntoView({behavior:'smooth'});});
+  $('#showSub').addEventListener('click',e=>{e.preventDefault();$('#panel-sub').classList.add('show');$('#panel-nfc').classList.remove('show');$('#panel-sub').scrollIntoView({behavior:'smooth'});});
 
-  // NFC UX
-  function paintNfc(){
-    $('#qty').textContent=qty;
-    $('#totalNfc').textContent=fmt(qty*PRICE.nfcUnit)+' (pago único)';
-    $('#unitPrice').textContent=fmt(PRICE.nfcUnit)+' por dispositivo';
-  }
+  function paintNfc(){ $('#qty').textContent=qty; $('#totalNfc').textContent=fmt(qty*PRICE.nfcUnit)+' (pago único)'; $('#unitPrice').textContent=fmt(PRICE.nfcUnit)+' por dispositivo'; }
   function clamp(n,min,max){ return Math.max(min, Math.min(max,n)); }
   function changeQty(delta){ qty = clamp(qty + delta, 1, 999); paintNfc(); }
   function attachStepper(btn, delta){
@@ -358,11 +342,8 @@
     ['pointerup','pointercancel','pointerleave','blur'].forEach(ev=>btn.addEventListener(ev, stop));
     btn.addEventListener('click', e=>{ if(pressed){ e.preventDefault(); e.stopPropagation(); } }, true);
   }
-  attachStepper($('#minus'), -1);
-  attachStepper($('#plus'), +1);
-  paintNfc();
+  attachStepper($('#minus'), -1); attachStepper($('#plus'), +1); paintNfc();
 
-  // Toggle mensual/anual
   function planAmount(tier){const m=PRICE.monthly[tier];return yearly?Math.round(m*12*(1-PRICE.annualDiscount)):m}
   function paintPrices(){
     $('#p-basic').textContent=yearly?fmt(planAmount('basic')):PRICE.monthly.basic+'€';
@@ -370,59 +351,33 @@
     $('#p-pro').textContent=yearly?fmt(planAmount('pro')):PRICE.monthly.pro+'€';
     $$('.per').forEach(el=>el.textContent=yearly?'/año':'/mes');
   }
-  $('#btn-month').addEventListener('click',()=>{
-    yearly=false;$('#btn-month').classList.add('active');$('#btn-year').classList.remove('active');
-    $('#btn-month').setAttribute('aria-selected','true'); $('#btn-year').setAttribute('aria-selected','false');
-    paintPrices()
-  });
-  $('#btn-year').addEventListener('click',()=>{
-    yearly=true;$('#btn-year').classList.add('active');$('#btn-month').classList.remove('active');
-    $('#btn-year').setAttribute('aria-selected','true'); $('#btn-month').setAttribute('aria-selected','false');
-    paintPrices()
-  });
+  $('#btn-month').addEventListener('click',()=>{yearly=false;$('#btn-month').classList.add('active');$('#btn-year').classList.remove('active');$('#btn-month').setAttribute('aria-selected','true'); $('#btn-year').setAttribute('aria-selected','false');paintPrices()});
+  $('#btn-year').addEventListener('click',()=>{yearly=true;$('#btn-year').classList.add('active');$('#btn-month').classList.remove('active');$('#btn-year').setAttribute('aria-selected','true'); $('#btn-month').setAttribute('aria-selected','false');paintPrices()});
   paintPrices();
 
-  // Pago NFC (con credenciales)
+  // Pago NFC
   $('#buyNfcBtn').addEventListener('click', async () => {
     try {
-      const res = await fetch('/api/buy-nfc', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ quantity: qty })
-      });
+      const res = await fetch('/api/buy-nfc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ quantity: qty }) });
       const data = await res.json();
       if (!res.ok) { alert(data?.error || 'Error iniciando el pago de NFC'); return; }
       if (data?.url) location.href = data.url; else alert('No se generó la URL de Stripe (no_session_url)');
     } catch { alert('Error de red al iniciar el pago de NFC'); }
   });
 
-  // Pago suscripciones (con credenciales)
+  // Pago suscripciones
   $$('.btn.plan').forEach(btn => btn.addEventListener('click', async () => {
     const tier = btn.dataset.tier;
     const frequency = yearly ? 'annual' : 'monthly';
-
     if (window.taplyAuth?.user && isSubActive(window.taplyAuth.user)) {
-      const u = window.taplyAuth.user;
-      const planName = prettyPlan(u) || 'actual';
-      const info = `Ya tienes un plan ${planName} activo.\n\n¿Quieres ir a “Gestionar suscripción” para cambiarlo?`;
-      const goManage = confirm(info);
-      if (goManage) { location.href = 'gestionar.html'; return; }
+      const u = window.taplyAuth.user; const planName = prettyPlan(u) || 'actual';
+      if (confirm(`Ya tienes un plan ${planName} activo.\n\n¿Quieres ir a “Gestionar suscripción” para cambiarlo?`)) { location.href = 'gestionar.html'; return; }
     }
-
     try {
-      const res = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tier, frequency })
-      });
+      const res = await fetch('/api/create-checkout-session', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ tier, frequency }) });
       const data = await res.json();
       if (!res.ok) {
-        if (data?.error === 'already_subscribed') {
-          if (confirm('Ya tienes una suscripción activa. ¿Abrir la página de gestión?')) location.href='gestionar.html';
-          return;
-        }
+        if (data?.error === 'already_subscribed') { if (confirm('Ya tienes una suscripción activa. ¿Abrir la página de gestión?')) location.href='gestionar.html'; return; }
         alert(data?.error || 'Error iniciando la suscripción'); return;
       }
       if (data?.url) location.href = data.url; else alert('No se generó la URL de Stripe (no_session_url)');
@@ -446,104 +401,90 @@
 
   /* === Helpers fecha === */
   function addDays(date, days){ const x = new Date(date); x.setDate(x.getDate()+days); return x; }
-  function getInterval(u){
-    return (u?.subscription?.price?.interval ||
-            u?.subscription?.plan?.interval ||
-            u?.subscription_interval || 'month').toLowerCase();
-  }
+  function getInterval(u){ return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase(); }
   function computeNextRenewal30(u){
     const start = u?.subscription?.current_period_start || u?.subscription_start || u?.subscription_created;
     if(!start) return null;
     const startDate = typeof start==='number' ? new Date(start*1000) : new Date(start);
-    const interval = getInterval(u);
-    return interval==='year' ? addDays(startDate, 365) : addDays(startDate, 30);
+    return getInterval(u)==='year' ? addDays(startDate,365) : addDays(startDate,30);
   }
-
   function prettyPlan(u){
     const nick = (u?.subscription?.plan?.nickname || u?.subscription?.price?.nickname || u?.plan || '').toLowerCase();
-    let base = 'Básico';
-    if(/pro/.test(nick)) base = 'Pro';
-    else if(/medio|standard|estándar/.test(nick)) base = 'Medio';
-    else if(/basic|básico|basico/.test(nick)) base = 'Básico';
-    const freq = getInterval(u)==='year' ? 'anual' : 'mensual';
-    return `${base} ${freq}`;
+    let base = 'Básico'; if(/pro/.test(nick)) base = 'Pro'; else if(/medio|standard|estándar/.test(nick)) base = 'Medio'; else if(/basic|básico|basico/.test(nick)) base = 'Básico';
+    const freq = getInterval(u)==='year' ? 'anual' : 'mensual'; return `${base} ${freq}`;
   }
   function isSubActive(u){
     const s = (u?.subscription?.status || u?.subscription_status || '').toLowerCase();
     return s === 'active' || s === 'trialing' || s === 'past_due' || u?.isSubscribed === true;
   }
 
-  // ===== Panel de acceso =====
-  const modal = $('#acct-modal');
-  const title = $('#acct-title');
-  const sub = $('#acct-sub');
+  // ===== Panel acceso =====
+  const modal = $('#acct-modal'), title = $('#acct-title'), sub = $('#acct-sub');
   const tabBtns = $$('#acct-modal .acct-tab');
-  const forms = {
-    login:   $('#acct-form-login'),
-    register:$('#acct-form-register'),
-    recover: $('#acct-form-recover'),
-  };
-  const errs = {
-    login:   $('#acct-error-login'),
-    register:$('#acct-error-register'),
-    recover: $('#acct-error-recover'),
-  };
+  const forms = { login:$('#acct-form-login'), register:$('#acct-form-register') };
+  const errs = { login:$('#acct-error-login'), register:$('#acct-error-register'), recover:$('#acct-error-recover') };
   const okRecover = $('#acct-info-recover');
 
   function setTab(name){
     Object.entries(forms).forEach(([k,f])=> f.style.display = (k===name?'grid':'none'));
-    tabBtns.forEach(b=>{
-      const on = b.dataset.tab===name; b.classList.toggle('acct-tab-active',on); b.setAttribute('aria-selected', String(on));
-    });
+    tabBtns.forEach(b=>{ const on = b.dataset.tab===name; b.classList.toggle('acct-tab-active',on); b.setAttribute('aria-selected', String(on)); });
     if(name==='login'){ title.textContent='Inicia sesión en tu cuenta'; sub.textContent='Introduce tus datos de acceso o crea una cuenta nueva.'; }
     if(name==='register'){ title.textContent='Crea tu cuenta ahora mismo'; sub.textContent='Completa tus datos para registrarte en Taply.'; }
-    if(name==='recover'){ title.textContent='Recupera tu acceso'; sub.textContent='Te enviaremos un enlace para restablecer tu contraseña.'; }
   }
   function openModal(tab='login'){ modal.classList.remove('acct-hidden'); setTab(tab); setTimeout(()=>$('#acct-login-email')?.focus(),40); }
-  function closeModal(){
-    modal.classList.add('acct-hidden');
-    Object.values(errs).forEach(e=> e && (e.style.display='none'));
-    okRecover.style.display='none';
-  }
+  function closeModal(){ modal.classList.add('acct-hidden'); Object.values(errs).forEach(e=> e && (e.style.display='none')); okRecover.style.display='none'; }
   document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeModal(); });
   modal?.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
   tabBtns.forEach(b => b.addEventListener('click', ()=> setTab(b.dataset.tab)));
-  document.querySelectorAll('[data-tab-go]').forEach(el=> el.addEventListener('click', ()=> setTab(el.getAttribute('data-tab-go')) ));
+  $('#acct-open-from-section')?.addEventListener('click', ()=> openModal('login'));
 
-  $$('.toggle-eye').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const sel = btn.getAttribute('data-toggle'); const input = document.querySelector(sel);
-      if(!input) return; input.type = input.type === 'password' ? 'text' : 'password';
-    });
-  });
+  // Toggle contraseña
+  $$('.toggle-eye').forEach(btn=>btn.addEventListener('click', ()=>{ const sel = btn.getAttribute('data-toggle'); const input = document.querySelector(sel); if(!input) return; input.type = input.type==='password'?'text':'password'; }));
+
+  // Medidor registro
   const meter = $('#pw-meter');
-  $('#acct-reg-pass')?.addEventListener('input', (e)=>{
-    const v = e.target.value || ''; let score = 0;
-    if(v.length >= 6) score += 33;
-    if(/[A-Z]/.test(v) && /[a-z]/.test(v)) score += 33;
-    if(/\d/.test(v) || /[^A-Za-z0-9]/.test(v)) score += 34;
-    if(meter){ meter.style.width = Math.min(100, score) + '%'; meter.style.background = score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; }
-  });
+  $('#acct-reg-pass')?.addEventListener('input', (e)=>{ const v=e.target.value||''; let score=0; if(v.length>=6) score+=33; if(/[A-Z]/.test(v)&&/[a-z]/.test(v)) score+=33; if(/\d/.test(v)||/[^A-Za-z0-9]/.test(v)) score+=34; if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; } });
 
+  // API helper
   async function api(method, url, body){
-    const res = await fetch(url, {
-      method,
-      headers:{'Content-Type':'application/json'},
-      credentials:'include',
-      cache:'no-store',
-      body: body?JSON.stringify(body):undefined
-    });
-    let data=null; try{ data = await res.json(); }catch{}
-    if(!res.ok) throw (data?.error || `HTTP ${res.status}`);
-    return data;
+    const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, credentials:'include', cache:'no-store', body: body?JSON.stringify(body):undefined });
+    let data=null; try{ data=await res.json(); }catch{}
+    if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
   }
 
-  // Botón Google (placeholder)
-  $('#btn-google-login')?.addEventListener('click', ()=>{
-    alert('Inicio con Google no está configurado todavía.');
+  // ===== Google Identity Services =====
+  let googleReady=false; let googleInitialized=false;
+  function getGoogleClientId(){ const m=document.querySelector('meta[name="google-signin-client_id"]'); return (m&&m.content)||window.GOOGLE_CLIENT_ID||''; }
+  function initGoogle(){
+    if(googleInitialized) return; const cid=getGoogleClientId();
+    if(!cid || !window.google || !google.accounts?.id) return;
+    google.accounts.id.initialize({
+      client_id: cid,
+      callback: async ({credential})=>{
+        if(!credential) return alert('No se recibió la credencial de Google.');
+        try{
+          const data = await api('POST','/api/google-login',{ credential });
+          S.user = data?.user || null; saveUser(S.user);
+          await forceSessionRefresh(); // refresco inmediato (plan/NFC)
+          closeModal();
+        }catch(err){
+          alert('No se pudo iniciar sesión con Google: '+err);
+        }
+      },
+      auto_select:false, cancel_on_tap_outside:true
+    });
+    googleReady=true; googleInitialized=true;
+  }
+  window.addEventListener('load', ()=>{ initGoogle(); });
+
+  $('#btn-google')?.addEventListener('click', ()=>{
+    initGoogle();
+    if(!googleReady){ alert('Configura GOOGLE_OAUTH_CLIENT_ID y origenes autorizados en Google Cloud.'); return; }
+    // Mostramos One Tap cuando pulsa:
+    google.accounts.id.prompt();
   });
 
-  // ===== Menú superior =====
+  // ===== Nav superior =====
   function paintNav(){
     const slot = document.querySelector('#acct-nav-slot');
     const htmlAnon = `<a class="btn ghost" id="acct-open-nav">Iniciar sesión</a>`;
@@ -562,53 +503,46 @@
     `;
     slot.style.position='relative';
     slot.innerHTML = S.user ? htmlLogged : htmlAnon;
-
     slot.querySelector('#acct-open-nav')?.addEventListener('click', ()=> openModal('login'));
-
-    const userBtn = slot.querySelector('#acct-user-menu');
-    const pop = slot.querySelector('#acct-menu-pop');
+    const userBtn = slot.querySelector('#acct-user-menu'); const pop = slot.querySelector('#acct-menu-pop');
     const toggle = ()=>{ if(pop) pop.style.display = pop.style.display==='block'?'none':'block'; };
     userBtn?.addEventListener('click', toggle);
     document.addEventListener('click', (e)=>{ if(!slot.contains(e.target)){ if(pop) pop.style.display='none'; } });
-
-    slot.querySelector('#acct-logout-nav')?.addEventListener('click', async (e)=>{
-      e.preventDefault();
-      try{ await api('POST','/api/logout',{});}catch{}
-      S.user = null; saveUser(null); paintNav(); paintAccountSection();
-    });
+    slot.querySelector('#acct-logout-nav')?.addEventListener('click', async (e)=>{ e.preventDefault(); try{ await api('POST','/api/logout',{});}catch{} S.user = null; saveUser(null); paintNav(); paintAccountSection(); });
   }
 
   // ===== Sesión + gating =====
   async function getSession(){
-    const cached = readUser();
-    if(cached){ S.user = cached; paintNav(); paintAccountSection(); }
-
-    try{
-      const data = await api('GET','/api/session');
-      S.user = data?.user || null;
-      saveUser(S.user);
-    }catch{ S.user = cached || null; }
+    const cached = readUser(); if(cached){ S.user = cached; paintNav(); paintAccountSection(); }
+    try{ const data = await api('GET','/api/session'); S.user = data?.user || null; saveUser(S.user); }catch{ S.user = cached || null; }
     paintNav(); paintAccountSection();
-
-    document.body.addEventListener('click',(e)=>{
-      const guarded = e.target.closest('.acct-guard');
-      if(guarded && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); }
-    }, true);
+    document.body.addEventListener('click',(e)=>{ const g=e.target.closest('.acct-guard'); if(g && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); } }, true);
   }
 
   // ===== Formularios =====
+  // Mostrar/ocultar recuperacion inline
+  $('#link-forgot')?.addEventListener('click', ()=>{ const box=$('#recover-inline'); if(box) box.style.display = (box.style.display==='none' || !box.style.display)?'grid':'none'; });
+
+  // Enviar recover
+  $('#btn-send-recover')?.addEventListener('click', async ()=>{
+    const email = $('#acct-recover-email').value.trim();
+    const ok = $('#acct-info-recover'); const err = $('#acct-error-recover'); ok.style.display='none'; err.style.display='none';
+    try{ await api('POST','/api/request-password-reset',{ email }); ok.textContent='Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora).'; ok.style.display='block'; }
+    catch(e){ err.textContent=String(e); err.style.display='block'; }
+  });
+
   forms.login?.addEventListener('submit', async (e)=>{
     e.preventDefault(); errs.login.style.display='none';
-    const email = $('#acct-login-email').value.trim();
-    const password = $('#acct-login-pass').value;
+    const email = $('#acct-login-email').value.trim(); const password = $('#acct-login-pass').value;
     try{
       const data = await api('POST','/api/login',{ email, password });
       S.user = data?.user || null; saveUser(S.user);
-      paintNav(); paintAccountSection(); closeModal();
+      await forceSessionRefresh();
+      closeModal();
     }catch(err){
       errs.login.textContent = (err==='account_not_found') ? 'No existe una cuenta con ese email.' :
                                (err==='invalid_credentials') ? 'Contraseña incorrecta.' :
-                               (err==='password_not_set') ? 'Esta cuenta no tiene contraseña. Usa “Recuperar”.' :
+                               (err==='password_not_set') ? 'Esta cuenta no tiene contraseña. Usa el enlace de recuperación.' :
                                String(err);
       errs.login.style.display='block';
     }
@@ -616,19 +550,18 @@
 
   forms.register?.addEventListener('submit', async (e)=>{
     e.preventDefault(); errs.register.style.display='none';
-    const name = $('#acct-reg-name').value.trim();
-    const email = $('#acct-reg-email').value.trim();
-    const p1 = $('#acct-reg-pass').value;
-    const p2 = $('#acct-reg-pass2').value;
+    const name = $('#acct-reg-name').value.trim(); const email = $('#acct-reg-email').value.trim();
+    const p1 = $('#acct-reg-pass').value; const p2 = $('#acct-reg-pass2').value;
     if(p1 !== p2){ errs.register.textContent='Las contraseñas no coinciden.'; errs.register.style.display='block'; return; }
     if(p1.length < 6){ errs.register.textContent='La contraseña debe tener al menos 6 caracteres.'; errs.register.style.display='block'; return; }
     if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
     try{
       const data = await api('POST','/api/register',{ name, email, password: p1 });
       S.user = data?.user || null; saveUser(S.user);
-      paintNav(); paintAccountSection(); closeModal();
+      await forceSessionRefresh();
+      closeModal();
     }catch(err){
-      errs.register.textContent = (err==='email_in_use') ? 'Ese correo ya tiene una cuenta. Inicia sesión.' :
+      errs.register.textContent = (err==='email_in_use') ? 'Ese correo ya tiene una cuenta. Inicia sesión o usa “¿Olvidaste la contraseña?”.' :
                                   (err==='weak_password') ? 'La contraseña debe tener al menos 6 caracteres.' :
                                   (err==='name_email_password_required') ? 'Nombre, email y contraseña son obligatorios.' :
                                   String(err);
@@ -636,47 +569,17 @@
     }
   });
 
-  forms.recover?.addEventListener('submit', async (e)=>{
-    e.preventDefault(); errs.recover.style.display='none'; okRecover.style.display='none';
-    const email = $('#acct-recover-email').value.trim();
-    try{
-      await api('POST','/api/request-password-reset',{ email });
-      okRecover.textContent = 'Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora). Revisa tu bandeja y spam.';
-      okRecover.style.display='block';
-    }catch(err){
-      errs.recover.textContent = String(err); errs.recover.style.display='block';
-    }
-  });
-
-  // Sección “Mi suscripción”
+  // ===== “Mi suscripción” =====
   function paintAccountSection(){
-    const emailEl = $('#acct-email');
-    const statusEl = $('#acct-status');
-    const renewsEl = $('#acct-renews');
-    const planEl = $('#acct-plan');
-    const nfcEl = $('#acct-nfc');
-    const logoutBtn = $('#acct-logout');
-
+    const statusEl = $('#acct-status'), renewsEl = $('#acct-renews'), nfcEl = $('#acct-nfc'), logoutBtn = $('#acct-logout');
     if(!S.user){
-      emailEl.textContent = '—';
-      statusEl.textContent = 'Sesión no iniciada';
-      renewsEl.textContent = ''; planEl.textContent = ''; nfcEl.textContent = '';
-      logoutBtn?.setAttribute('disabled','disabled');
-      return;
+      statusEl.textContent='Sesión no iniciada'; nfcEl.textContent='NFC comprados: 0'; renewsEl.textContent=''; logoutBtn?.setAttribute('disabled','disabled'); return;
     }
-    logoutBtn?.removeAttribute('disabled');
-    logoutBtn.onclick = async ()=> {
-      try{ await api('POST','/api/logout',{}); }catch{}
-      S.user = null; saveUser(null); paintNav(); paintAccountSection();
-      alert('Sesión cerrada');
-    };
+    logoutBtn?.removeAttribute('disabled'); logoutBtn.onclick = async ()=>{ try{ await api('POST','/api/logout',{}); }catch{} S.user = null; saveUser(null); paintNav(); paintAccountSection(); alert('Sesión cerrada'); };
 
-    emailEl.textContent = S.user.email || '—';
-    const st = (S.user.subscription?.status || S.user.subscription_status || 'none').toLowerCase();
-    const prettyStatus = isSubActive(S.user) ? 'Suscripción activa' : (st==='canceled'?'Suscripción cancelada':'Sin suscripción');
-    statusEl.textContent = prettyStatus;
-
-    planEl.textContent = S.user.subscription ? `Plan: ${prettyPlan(S.user)}` : '';
+    // Texto principal: plan o sin plan
+    if(isSubActive(S.user)) statusEl.textContent = prettyPlan(S.user);
+    else statusEl.textContent = 'Sin plan activo';
 
     const next = computeNextRenewal30(S.user);
     renewsEl.textContent = next ? `Renovación / fin de periodo: ${fmtDate(next)}.` : '';
@@ -685,17 +588,27 @@
     nfcEl.textContent = `NFC comprados: ${qty}`;
   }
 
-  document.getElementById('acct-open-from-section')?.addEventListener('click', ()=> openModal('login'));
+  // Refresco “rápido” tras login/registro/google para no depender de recarga
+  async function forceSessionRefresh(retries=4, delay=600){
+    for(let i=0;i<retries;i++){
+      try{
+        const data = await api('GET','/api/session');
+        if(data?.user){
+          S.user = data.user; saveUser(S.user); paintNav(); paintAccountSection();
+          // Si ya tenemos sub o NFC pintados, salimos
+          if(S.user.subscription || typeof S.user.nfc_qty === 'number') break;
+        }
+      }catch{}
+      await new Promise(r=>setTimeout(r,delay));
+    }
+  }
 
   // Sync entre pestañas
-  window.addEventListener('storage', (e)=>{
-    if(e.key==='acct_user'){ try{ S.user = e.newValue ? JSON.parse(e.newValue) : null; }catch{ S.user=null; } paintNav(); paintAccountSection(); }
-  });
+  window.addEventListener('storage', (e)=>{ if(e.key==='acct_user'){ try{ S.user = e.newValue ? JSON.parse(e.newValue) : null; }catch{ S.user=null; } paintNav(); paintAccountSection(); } });
 
   // Exponer helpers
   window.taplyAuth = { open: openModal, close: closeModal, get user(){ return S.user; } };
-  window.isSubActive = isSubActive;
-  window.prettyPlan = prettyPlan;
+  window.isSubActive = isSubActive; window.prettyPlan = prettyPlan;
 
   // Arranque
   getSession();

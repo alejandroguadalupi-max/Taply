@@ -22,12 +22,6 @@ const PRICES = {
 };
 const PRICE_ID_NFC = process.env.PRICE_ID_NFC;
 
-// 👇 NUEVO: si pones esto en .env, usaremos el login del portal directamente
-// Ej.: STRIPE_PORTAL_LOGIN_URL="https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00"
-const PORTAL_LOGIN_URL =
-  process.env.STRIPE_PORTAL_LOGIN_URL ||
-  process.env.PORTAL_LOGIN_URL || null;
-
 /* ============ Utils base ============ */
 function assertEnv() {
   if (!process.env.APP_SECRET) throw Object.assign(new Error('missing APP_SECRET'), { statusCode: 500 });
@@ -82,6 +76,7 @@ function getStripe(){
   }
   return stripeSingleton;
 }
+// Evita inyección en customers.search
 function escapeStripeQueryValue(v=''){
   return String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
@@ -127,7 +122,7 @@ async function hasValidSubscription(stripe, customerId){
   return subs.data.some(s => ['active','trialing','past_due'].includes(s.status));
 }
 
-/* ===== util fechas: mensual = 30 días exactos ===== */
+/* ===== util fechas: mensual = 30 días exactos (tu requerimiento) ===== */
 function addDays(d, days){ return new Date(d.getTime() + days*24*60*60*1000); }
 
 /* ========= Envíos opcionales ========= */
@@ -149,7 +144,7 @@ async function sendEmail({to, subject, text, html}){
 
 /* ================== Handlers ================== */
 
-// POST /api/register
+// POST /api/register  (bloquea email duplicado)
 async function register(req, res){
   const rawEmail = getBody(req).email;
   const email = normalizeEmail(rawEmail);
@@ -162,21 +157,14 @@ async function register(req, res){
   const found = await stripe.customers.search({ query: q, limit: 1 });
 
   if(found.data.length){
-    const customer = found.data[0];
-    const already = customer.metadata?.taply_pass_hash;
-    if(already){
-      return res.status(409).json({ error:'email_in_use' });
-    } else {
-      const hash = await bcrypt.hash(password, 10);
-      const meta = Object.assign({}, customer.metadata||{}, { taply_pass_hash: hash, app:'taply', taply_nfc_qty: customer.metadata?.taply_nfc_qty || '0' });
-      const updated = await stripe.customers.update(customer.id, { name, metadata: meta });
-      setSession(res, { email, name: updated.name || name, customerId: customer.id });
-      return res.status(200).json({ user:{ email, name: updated.name || name, customerId: customer.id }});
-    }
+    return res.status(409).json({ error:'email_in_use' });
   }
 
   const hash = await bcrypt.hash(password, 10);
-  const customer = await stripe.customers.create({ email, name, metadata:{ app:'taply', taply_pass_hash: hash, taply_nfc_qty: '0' }});
+  const customer = await stripe.customers.create({
+    email, name,
+    metadata:{ app:'taply', taply_pass_hash: hash, taply_nfc_qty: '0' }
+  });
   setSession(res, { email, name, customerId: customer.id });
   return res.status(200).json({ user:{ email, name, customerId: customer.id }});
 }
@@ -223,7 +211,7 @@ async function session(req, res){
   const best = await getBestSubscription(stripe, sess.customerId);
   const sub = normalizeSub(best);
 
-  // Próxima “renovación” aparente: year = +1 año; month = +30 días
+  // Próxima “renovación” aparente
   let nextGuess = null;
   if (sub?.current_period_start) {
     const start = new Date(sub.current_period_start * 1000);
@@ -271,7 +259,7 @@ async function requestPasswordReset(req, res){
   await sendEmail({
     to: email,
     subject: 'Recupera tu contraseña — Taply',
-    html: `<p>Para restablecer tu contraseña haz clic en el botón:</p>
+    html: `<p>Para restablecer tu contraseña, haz clic:</p>
            <p><a href="${link}" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#7c3aed;color:#fff;text-decoration:none">Establecer nueva contraseña</a></p>
            <p>Este enlace caduca en 1 hora.</p>`
   });
@@ -306,12 +294,6 @@ async function resetPassword(req, res){
 /* ======== Portal de facturación ======== */
 // POST /api/create-portal-session (+ alias /api/portal y /api/create-billing-portal)
 async function createPortalSession(req, res){
-  // Si tienes un login del portal configurado, úsalo y listo (email OTP de Stripe)
-  if (PORTAL_LOGIN_URL) {
-    return res.status(200).json({ url: PORTAL_LOGIN_URL });
-  }
-
-  // Si no hay login URL, creamos sesión de portal normal (cliente ya logueado en tu web)
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error:'auth_required' });
   const stripe = getStripe();
@@ -331,6 +313,7 @@ async function createPortalSession(req, res){
 }
 
 /* ======== Suscripciones: cancelar / reanudar / cambiar plan ======== */
+// POST /api/subscription/cancel  { at_period_end?: boolean }
 async function subscriptionCancel(req, res){
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error:'auth_required' });
@@ -339,10 +322,12 @@ async function subscriptionCancel(req, res){
   const sub = await getBestSubscription(stripe, sess.customerId);
   if(!sub) return res.status(400).json({ error:'no_active_subscription' });
 
-  const atPeriodEnd = (getBody(req).at_period_end !== false);
+  const atPeriodEnd = (getBody(req).at_period_end !== false); // por defecto: true
   const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: !!atPeriodEnd });
   return res.status(200).json({ subscription: normalizeSub(updated) });
 }
+
+// POST /api/subscription/resume
 async function subscriptionResume(req, res){
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error:'auth_required' });
@@ -354,6 +339,8 @@ async function subscriptionResume(req, res){
   const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: false });
   return res.status(200).json({ subscription: normalizeSub(updated) });
 }
+
+// POST /api/subscription/swap { priceId }
 async function subscriptionSwap(req, res){
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error:'auth_required' });
@@ -375,6 +362,7 @@ async function subscriptionSwap(req, res){
 }
 
 /* ======== Checkout ======== */
+// POST /api/create-checkout-session  (suscripciones)
 async function createCheckoutSession(req, res){
   const { tier, frequency } = getBody(req);
   if (!tier || !frequency) return res.status(400).json({ error: 'missing_params' });
@@ -414,7 +402,7 @@ async function createCheckoutSession(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-/* Pago único NFC */
+// POST /api/buy-nfc  (pago único)
 async function buyNfc(req, res){
   if (!PRICE_ID_NFC) return res.status(500).json({ error: 'missing_nfc_price_id' });
 
@@ -446,7 +434,7 @@ async function buyNfc(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-/* ========= POST /api/post-pago ========= */
+/* ========= POST /api/post-pago (fallback por si el webhook no corre) ========= */
 async function postPago(req, res){
   const stripe = getStripe();
   const url = new URL(req.url, 'http://x');
@@ -466,6 +454,7 @@ async function postPago(req, res){
       lineSummary = li.map(i => `${i.quantity} × ${i.description || i.price?.nickname || i.price?.id}`).join(', ');
       amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '';
 
+      // Fallback: sumar NFC aquí también
       if (cs.mode === 'payment' && PRICE_ID_NFC && customerId) {
         const addQty = li.reduce((acc, it) => acc + ((it.price?.id === PRICE_ID_NFC) ? (it.quantity || 0) : 0), 0);
         if(addQty > 0){
@@ -475,7 +464,7 @@ async function postPago(req, res){
         }
       }
     }catch(e){
-      console.error('post-pago retrieve error', e);
+      console.error('post-pago retrieve error', e?.message || e);
     }
   }
 
@@ -510,7 +499,7 @@ async function postPago(req, res){
   return res.status(200).json({ ok:true });
 }
 
-/* ======== POST /api/store-customer-from-session ======== */
+/* ======== POST /api/store-customer-from-session ========= */
 async function storeCustomerFromSession(req, res){
   const { session_id } = getBody(req);
   if(!session_id) return res.status(400).json({ error:'missing_params' });
@@ -533,10 +522,53 @@ async function storeCustomerFromSession(req, res){
     }
 
     setSession(res, { email, name: name || null, customerId });
+
     return res.status(200).json({ user: { email, name: name || null, customerId }});
   }catch(e){
     console.error('storeCustomerFromSession error', e?.message || e);
     return res.status(500).json({ error:'server_error' });
+  }
+}
+
+/* ======== Google Login (token one-tap) ======== */
+async function googleLogin(req, res){
+  const { credential } = getBody(req) || {};
+  if(!credential) return res.status(400).json({ error:'missing_params' });
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  if(!clientId) return res.status(500).json({ error:'missing_google_client_id' });
+
+  try{
+    const { OAuth2Client } = await import('google-auth-library');
+    const client = new OAuth2Client(clientId);
+    const ticket = await client.verifyIdToken({ idToken: credential, audience: clientId });
+    const payload = ticket.getPayload();
+    const email = normalizeEmail(payload?.email || '');
+    const name = payload?.name || payload?.given_name || null;
+    if(!email) return res.status(400).json({ error:'google_email_required' });
+
+    const stripe = getStripe();
+    const q = `email:'${escapeStripeQueryValue(email)}'`;
+    const found = await stripe.customers.search({ query: q, limit: 1 });
+
+    let customerId;
+    if(found.data.length){
+      customerId = found.data[0].id;
+      if(name && !found.data[0].name){
+        try{ await stripe.customers.update(customerId, { name }); }catch{}
+      }
+    }else{
+      const created = await stripe.customers.create({
+        email, name: name || undefined,
+        metadata: { app:'taply', provider:'google', taply_nfc_qty: '0' }
+      });
+      customerId = created.id;
+    }
+
+    setSession(res, { email, name: name || null, customerId });
+    return res.status(200).json({ user: { email, name: name || null, customerId } });
+  }catch(e){
+    console.error('googleLogin error', e?.message || e);
+    return res.status(401).json({ error:'google_auth_failed' });
   }
 }
 
@@ -546,6 +578,7 @@ export default async function handler(req, res){
     assertEnv();
     const route = routeOf(req);
 
+    // Preflight muy básico
     if (req.method === 'OPTIONS') {
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -560,8 +593,9 @@ export default async function handler(req, res){
       if (route === 'logout') return logout(req,res);
       if (route === 'request-password-reset') return requestPasswordReset(req,res);
       if (route === 'reset-password') return resetPassword(req,res);
+      if (route === 'google-login') return googleLogin(req,res); // <-- Google
 
-      // Portal
+      // Portal (alias válidos)
       if (route === 'create-portal-session' || route === 'portal' || route === 'create-billing-portal')
         return createPortalSession(req,res);
 
@@ -574,7 +608,7 @@ export default async function handler(req, res){
       if (route === 'create-checkout-session') return createCheckoutSession(req,res);
       if (route === 'buy-nfc') return buyNfc(req,res);
 
-      // Post-pago + compat
+      // Post-pago (fallback) + compat
       if (route === 'post-pago') return postPago(req,res);
       if (route === 'store-customer-from-session') return storeCustomerFromSession(req,res);
     }
