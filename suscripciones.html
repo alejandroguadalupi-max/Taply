@@ -1,10 +1,10 @@
-<!doctype html>
+<!doctype html> 
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="theme-color" content="#0b0f1a" />
-  <!-- TU CLIENT ID DE GOOGLE -->
+  <!-- CLIENT ID DE GOOGLE (para referencia del proyecto) -->
   <meta name="google-signin-client_id" content="124694801200-ibn7tfgtle183n6gqkqk29egeu0j1t4c.apps.googleusercontent.com">
   <title>Taply — NFC + Suscripción</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -115,8 +115,6 @@
     }
     .acct-small{color:var(--muted);font-size:.92rem;margin-top:6px}
   </style>
-  <!-- Google Identity Services (botón oficial con selector de cuentas) -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <header>
@@ -270,8 +268,8 @@
 
         <div class="acct-actions">
           <button type="submit" class="btn">Iniciar sesión</button>
-          <!-- Botón oficial de Google (renderizado por GIS) -->
-          <div id="googleBtnLogin"></div>
+          <!-- Google en nueva pestaña -->
+          <a href="/api/google-oauth-begin" target="_blank" rel="noopener" class="btn btn-google">Continuar con Google</a>
           <p id="acct-error-login" class="acct-err" style="display:none"></p>
         </div>
       </form>
@@ -299,8 +297,8 @@
         <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
         <div class="acct-actions">
           <button type="submit" class="btn">Crear cuenta</button>
-          <!-- Botón Google también en registro -->
-          <div id="googleBtnRegister"></div>
+          <!-- Google en nueva pestaña -->
+          <a href="/api/google-oauth-begin" target="_blank" rel="noopener" class="btn btn-google">Registrarse con Google</a>
           <p id="acct-error-register" class="acct-err" style="display:none"></p>
         </div>
       </form>
@@ -458,39 +456,6 @@
     if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
   }
 
-  // ===== Google Identity Services: botón con chooser =====
-  function getGoogleClientId(){ const m=document.querySelector('meta[name="google-signin-client_id"]'); return (m&&m.content)||window.GOOGLE_CLIENT_ID||''; }
-  function onGoogleCredential(resp){
-    if(!resp?.credential) return alert('No se recibió la credencial de Google.');
-    (async ()=>{
-      try{
-        const data = await api('POST','/api/google-login',{ credential: resp.credential });
-        S.user = data?.user || null; saveUser(S.user);
-        await forceSessionRefresh(); closeModal();
-      }catch(err){
-        alert('No se pudo iniciar sesión con Google: '+err);
-      }
-    })();
-  }
-  function renderGoogleButtons(){
-    try{
-      const cid = getGoogleClientId();
-      if(!cid || !window.google || !google.accounts?.id) return;
-      google.accounts.id.initialize({
-        client_id: cid,
-        callback: onGoogleCredential,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        itp_support: true,
-        context: 'signin'
-      });
-      const opts = { theme: 'filled_blue', size:'large', text:'continue_with', shape:'rectangular', logo_alignment:'left', locale:'es' };
-      const c1 = document.getElementById('googleBtnLogin'); if(c1) { c1.innerHTML=''; google.accounts.id.renderButton(c1, opts); }
-      const c2 = document.getElementById('googleBtnRegister'); if(c2) { c2.innerHTML=''; google.accounts.id.renderButton(c2, opts); }
-    }catch{}
-  }
-  window.addEventListener('load', renderGoogleButtons);
-
   // ===== Enlaces recuperacion =====
   $('#link-forgot')?.addEventListener('click', ()=> setTab('recover'));
   $('#recover-back')?.addEventListener('click', ()=> setTab('login'));
@@ -591,7 +556,7 @@
     nfcEl.textContent = `NFC comprados: ${qty}`;
   }
 
-  // Refresco “rápido” tras login/Google/registro
+  // Refresco rápido tras login/registro/Google (se activa también por evento storage del callback)
   async function forceSessionRefresh(retries=4, delay=600){
     for(let i=0;i<retries;i++){
       try{
@@ -605,7 +570,7 @@
     }
   }
 
-  // Sync entre pestañas
+  // Sync entre pestañas (el callback de Google escribe acct_user)
   window.addEventListener('storage', (e)=>{ if(e.key==='acct_user'){ try{ S.user = e.newValue ? JSON.parse(e.newValue) : null; }catch{ S.user=null; } paintNav(); paintAccountSection(); } });
 
   // Exponer helpers
@@ -618,4 +583,3 @@
 </script>
 </body>
 </html>
-
