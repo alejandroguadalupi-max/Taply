@@ -2,7 +2,6 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <!-- Evita zoom molesto en iOS al enfocar inputs -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="theme-color" content="#0b0f1a" />
   <title>Taply — Sube la valoración de tu negocio sin esfuerzo</title>
@@ -10,7 +9,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
   <style>
     :root{
       --bg:#0b0f1a; --bg-2:#0e1424; --txt:#e9eefc; --muted:#94a3b8;
@@ -21,7 +19,6 @@
     *{box-sizing:border-box}
     html{-webkit-text-size-adjust:100%}
     html,body{margin:0;height:100%;scroll-behavior:smooth}
-
     body{
       font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
       background:var(--bg); color:var(--txt);
@@ -31,13 +28,8 @@
     body.is-loaded{opacity:1;transform:none}
     a{color:inherit;text-decoration:none}
     .container{width:min(1200px,92%);margin-inline:auto}
-    body::before{
-      content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
-      background-image: radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.6px);
-      background-size:26px 26px;opacity:.12
-    }
+    body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.6px);background-size:26px 26px;opacity:.12}
 
-    /* Header */
     header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px)}
     .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0; position:relative}
     .brand{display:flex;gap:10px;align-items:center;font-weight:800;letter-spacing:.3px}
@@ -56,13 +48,11 @@
     .acct-menu a:hover,.acct-menu button:hover{background:rgba(255,255,255,.06)}
     .acct-dd.open .acct-menu{display:block}
 
-    /* Menú móvil */
     .mobile-menu{position:absolute; left:0; right:0; top:100%; display:none; padding:14px; background:#0b0f1a; border-top:1px solid rgba(255,255,255,.08); box-shadow:0 16px 40px rgba(0,0,0,.45)}
     .mobile-links{display:flex;flex-direction:column;gap:10px}
     .mobile-links .ghost{background:rgba(255,255,255,.02); border-color:rgba(255,255,255,.18)}
     .mobile-links .btn{width:100%; justify-content:center}
 
-    /* Botón */
     .btn{
       --p:14px 18px; background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
       color:#061017;font-weight:700;border:0;border-radius:999px;cursor:pointer;touch-action:manipulation;
@@ -76,7 +66,6 @@
     .btn:active{ transform:translateY(0); filter:saturate(1.1) }
     .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.12);color:var(--txt);box-shadow:none}
 
-    /* Tipografía y hero */
     .hero{padding:64px 0 40px; text-align:center}
     .hero-grid{display:grid;grid-template-columns:1fr;gap:18px;justify-items:center}
     h1,h2,h3,p{ text-align:center }
@@ -86,14 +75,12 @@
     .pills{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px}
     .pill{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);padding:10px 14px;border-radius:999px}
 
-    /* Secciones */
     section{padding:56px 0}
     .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
     .card{background:var(--bg-2);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);text-align:center}
     .card h3{margin:.2rem 0 .6rem}
     .card p{color:var(--muted);margin:0}
 
-    /* Opiniones con flechas azules */
     .reviews{position:relative;margin:36px 0}
     .reviews h2{margin:0 0 14px}
     .reviews-window{position:relative;overflow:hidden}
@@ -107,7 +94,7 @@
       background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
       border:1px solid rgba(255,255,255,.1);
       border-radius:16px;padding:20px;scroll-snap-align:center;scroll-snap-stop:normal;
-      text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.35);transition:transform .2s ease, border-color .2s ease;
+      text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.35);
     }
     .review-header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
     .review-avatar{width:54px;height:54px;border-radius:999px;overflow:hidden;flex:0 0 54px;border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 22px rgba(124,58,237,.25)}
@@ -115,7 +102,6 @@
     .review-stars{color:#fbbf24;font-size:18px;letter-spacing:2px}
     .review-text{color:#c9d3e6;margin:6px 0 12px}
 
-    /* FAQ */
     .faq{max-width:900px;margin-inline:auto}
     .acc{border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.02);box-shadow:var(--shadow)}
     .acc-item + .acc-item{border-top:1px solid rgba(255,255,255,.08)}
@@ -125,18 +111,13 @@
     .acc-panel{max-height:0;overflow:hidden;transition:max-height .3s ease}
     .acc-panel > div{padding:0 20px 18px;color:var(--muted);text-align:center}
 
-    /* Cookie bar */
     .cookiebar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#0a0f16;color:#dbeafe;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:14px;justify-content:space-between;padding:12px 16px}
     .cookiebar p{margin:0;font-size:.95rem;text-align:left}
     .cookiebar .btn-accept{background:#6366f1;border:0;color:#fff;border-radius:8px;padding:8px 16px;cursor:pointer}
 
-    /* Inputs 16px para evitar zoom iOS */
     input,select,textarea,button{font-size:16px}
-
-    /* Accesibilidad foco */
     :focus-visible{outline:2px solid #7c3aed; outline-offset:2px; border-radius:8px}
 
-    /* Móvil */
     @media (max-width: 768px){
       :root{ --arrowSize:48px; --edgePad:72px; }
       section{padding:48px 0}
@@ -144,35 +125,29 @@
       .grid-3{grid-template-columns:1fr}
       .nav-links{display:none}
       .menu{
-        display:block;
-        background:#0f172a; color:#e9eefc;
-        border:1px solid rgba(255,255,255,.28);
-        box-shadow:0 8px 24px rgba(0,0,0,.45);
-        padding:10px 14px; border-radius:999px; touch-action:manipulation;
+        display:block;background:#0f172a;color:#e9eefc;border:1px solid rgba(255,255,255,.28);
+        box-shadow:0 8px 24px rgba(0,0,0,.45);padding:10px 14px;border-radius:999px;touch-action:manipulation;
       }
       .menu:hover{filter:brightness(1.08)}
       .menu:active{transform:translateY(1px)}
       .cookiebar{flex-direction:column;align-items:flex-start;gap:10px}
     }
+    @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
-    @media (prefers-reduced-motion: reduce){
-      *{animation:none !important; transition:none !important}
-    }
-
-    /* === MODAL CUENTA === */
+    /* MODAL CUENTA (pro) */
     #acct-modal.acct-hidden{display:none!important}
     #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.6);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
-    .acct-dialog{width:min(520px,92%);background:var(--bg-2,#0e1424);color:var(--txt,#e9eefc);
-      border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:var(--shadow);padding:20px}
+    .acct-dialog{width:min(520px,92%);background:var(--bg-2);color:var(--txt);border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:var(--shadow);padding:20px}
     .acct-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
     .acct-x{background:transparent;border:0;color:inherit;font-size:22px;cursor:pointer}
     .acct-tabs{display:flex;gap:8px;margin:10px 0 12px}
-    .acct-tab{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);
-      border-radius:999px;padding:8px 12px;cursor:pointer;color:inherit;font-weight:700}
+    .acct-tab{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);border-radius:999px;padding:8px 12px;cursor:pointer;font-weight:700}
     .acct-tab.acct-tab-active{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017}
     .acct-form{display:grid;gap:10px}
     .acct-form label{display:grid;gap:6px;font-weight:600}
-    .acct-form input{background:#0a0f16;border:1px solid rgba(255,255,255,.12);color:inherit;border-radius:12px;padding:12px}
+    .acct-input{position:relative}
+    .acct-input input{background:#0a0f16;border:1px solid rgba(255,255,255,.12);color:inherit;border-radius:12px;padding:12px;width:100%}
+    .toggle-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
     .acct-msg{color:#cfe3ff;margin:0 0 8px;font-size:.95rem}
     .acct-err{color:#fca5a5}
     .acct-small{color:var(--muted);font-size:.92rem;margin-top:6px}
@@ -181,9 +156,7 @@
     .pw-meter > span{display:block;height:100%;width:0;background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e)}
   </style>
 </head>
-
 <body>
-  <!-- HEADER -->
   <header>
     <div class="container nav">
       <a class="brand" href="index.html" aria-label="Inicio">
@@ -193,22 +166,18 @@
         <span>taply</span>
       </a>
 
-      <!-- MENÚ PRINCIPAL -->
       <nav class="nav-links">
         <a class="ghost" href="#beneficios">Beneficios</a>
         <a class="ghost" href="#como-funciona">Cómo funciona</a>
         <a class="ghost" href="#reviews">Opiniones</a>
         <a class="ghost" href="suscripciones.html">Suscripciones</a>
         <a class="btn" href="suscripciones.html">¡Comenzar ahora!</a>
-
-        <!-- Slot dinámico: login / nombre + dropdown -->
         <span id="acct-nav-slot" class="acct-dd"></span>
       </nav>
 
       <button class="menu ghost" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Menú</button>
     </div>
 
-    <!-- MENÚ MÓVIL -->
     <div class="container mobile-menu" id="mobileMenu" role="menu" aria-label="Menú móvil">
       <div class="mobile-links">
         <a class="ghost" href="#beneficios" role="menuitem">Beneficios</a>
@@ -222,7 +191,6 @@
   </header>
 
   <main>
-    <!-- HERO -->
     <section class="hero">
       <div class="container hero-grid">
         <div>
@@ -234,7 +202,6 @@
       </div>
     </section>
 
-    <!-- BENEFICIOS -->
     <section id="beneficios">
       <div class="container">
         <h2>¿Qué podrás conseguir gracias a nuestro sistema?</h2>
@@ -248,116 +215,48 @@
       </div>
     </section>
 
-    <!-- OPINIONES -->
     <section class="reviews" id="reviews">
       <div class="container">
         <h2>Valorado 4,8/5 por más de 30 negocios</h2>
-
         <div class="reviews-window">
           <div class="reviews-track" id="reviewsTrack" tabindex="0" aria-label="Opiniones de clientes">
-            <article class="review-card">
-              <div class="review-header">
-                <div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=26" alt="Sara Cordero" width="54" height="54"></div>
-                <div><div class="review-name">Sara Cordero</div><div class="review-stars">★★★★★</div></div>
-              </div>
-              <p class="review-text">Instalación en 5 minutos. Los avisos de reseñas negativas nos han permitido corregir fallos en días.</p>
-            </article>
-
-            <article class="review-card">
-              <div class="review-header">
-                <div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=33" alt="Marlon Melara" width="54" height="54"></div>
-                <div><div class="review-name">Marlon Melara</div><div class="review-stars">★★★★★</div></div>
-              </div>
-              <p class="review-text">Ahorra tiempo en reputación online. Muy fácil para el cliente.</p>
-            </article>
-
-            <article class="review-card">
-              <div class="review-header">
-                <div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=12" alt="Joan Blanch" width="54" height="54"></div>
-                <div><div class="review-name">Joan Blanch</div><div class="review-stars">★★★★★</div></div>
-              </div>
-              <p class="review-text">Subimos reseñas sin pedirlo. El panel de negativas nos ha ayudado a mejorar procesos.</p>
-            </article>
-
-            <article class="review-card">
-              <div class="review-header">
-                <div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=5" alt="Eco Abraham" width="54" height="54"></div>
-                <div><div class="review-name">Eco Abraham</div><div class="review-stars">★★★★★</div></div>
-              </div>
-              <p class="review-text">Nunca había conseguido tantas reseñas reales tan rápido. El flujo NFC es comodísimo.</p>
-            </article>
+            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=26" alt="Sara Cordero" width="54" height="54"></div><div><div class="review-name">Sara Cordero</div><div class="review-stars">★★★★★</div></div></div><p class="review-text">Instalación en 5 minutos. Los avisos de reseñas negativas nos han permitido corregir fallos en días.</p></article>
+            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=33" alt="Marlon Melara" width="54" height="54"></div><div><div class="review-name">Marlon Melara</div><div class="review-stars">★★★★★</div></div></div><p class="review-text">Ahorra tiempo en reputación online. Muy fácil para el cliente.</p></article>
+            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=12" alt="Joan Blanch" width="54" height="54"></div><div><div class="review-name">Joan Blanch</div><div class="review-stars">★★★★★</div></div></div><p class="review-text">Subimos reseñas sin pedirlo. El panel de negativas nos ha ayudado a mejorar procesos.</p></article>
+            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=5" alt="Eco Abraham" width="54" height="54"></div><div><div class="review-name">Eco Abraham</div><div class="review-stars">★★★★★</div></div></div><p class="review-text">Nunca había conseguido tantas reseñas reales tan rápido. El flujo NFC es comodísimo.</p></article>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- COMO FUNCIONA -->
     <section id="como-funciona">
       <div class="container"><h2>¿Cómo funciona Taply?</h2></div>
       <div class="container grid-3">
-        <div class="card">
-          <h3>1) Acerca el móvil</h3>
-          <p>Coloca los dispositivos <strong>Taply</strong> en tus mesas. Al acercar el smartphone aparece la pantalla de valoración.</p>
-        </div>
-
-        <div class="card">
-          <h3>2) Enrutado inteligente</h3>
-          <p>Si la experiencia es positiva, va a Google a dejar reseña. Si es negativa, se abre un formulario privado.</p>
-        </div>
-
-        <div class="card">
-          <h3>3) Formulario privado</h3>
-          <p>Adaptado a tu negocio (tiempos, atención, calidad…). Lo conectamos a una hoja privada donde se guardan todas las respuestas.</p>
-        </div>
-
-        <div class="card">
-          <h3>4) Aprende y mejora</h3>
-          <p>Consulta la hoja cuando quieras: gráficos, filtros por fecha y patrones para mejorar sin afectar tu puntuación pública.</p>
-        </div>
-
-        <div class="card">
-          <h3>5) Todo suma</h3>
-          <p>Mejores valoraciones elevan tu visibilidad en el buscador, aumentan la confianza y traen más clientes.</p>
-        </div>
+        <div class="card"><h3>1) Acerca el móvil</h3><p>Coloca los dispositivos <strong>Taply</strong> en tus mesas. Al acercar el smartphone aparece la pantalla de valoración.</p></div>
+        <div class="card"><h3>2) Enrutado inteligente</h3><p>Si la experiencia es positiva, va a Google a dejar reseña. Si es negativa, se abre un formulario privado.</p></div>
+        <div class="card"><h3>3) Formulario privado</h3><p>Adaptado a tu negocio (tiempos, atención, calidad…). Lo conectamos a una hoja privada donde se guardan todas las respuestas.</p></div>
+        <div class="card"><h3>4) Aprende y mejora</h3><p>Consulta la hoja cuando quieras: gráficos, filtros por fecha y patrones para mejorar sin afectar tu puntuación pública.</p></div>
+        <div class="card"><h3>5) Todo suma</h3><p>Mejores valoraciones elevan tu visibilidad en el buscador, aumentan la confianza y traen más clientes.</p></div>
       </div>
     </section>
 
-    <!-- FAQ -->
     <section id="faq">
       <div class="container faq">
         <h2>Preguntas frecuentes</h2>
         <div class="acc" role="tablist">
-          <div class="acc-item">
-            <button class="acc-btn" aria-expanded="false">¿En qué me ayuda Taply? <span>+</span></button>
-            <div class="acc-panel"><div>
-              Consigue <strong>mejores reseñas</strong> con un flujo sin fricción y <strong>escucha</strong> al cliente: las positivas se publican; las negativas se quedan en privado para actuar.
-            </div></div>
-          </div>
-          <div class="acc-item">
-            <button class="acc-btn" aria-expanded="false">¿Necesito algo especial? <span>+</span></button>
-            <div class="acc-panel"><div>
-              Solo nuestro dispositivo NFC. Funciona con la mayoría de smartphones. También te mandamos un QR.
-            </div></div>
-          </div>
-          <div class="acc-item">
-            <button class="acc-btn" aria-expanded="false">¿Puedo ver y filtrar negativas? <span>+</span></button>
-            <div class="acc-panel"><div>
-              Sí: en tu panel podrás ver todas, filtrarlas y detectar <strong>puntos de mejora</strong>.
-            </div></div>
-          </div>
+          <div class="acc-item"><button class="acc-btn" aria-expanded="false">¿En qué me ayuda Taply? <span>+</span></button><div class="acc-panel"><div>Consigue <strong>mejores reseñas</strong> con un flujo sin fricción y <strong>escucha</strong> al cliente: las positivas se publican; las negativas se quedan en privado para actuar.</div></div></div>
+          <div class="acc-item"><button class="acc-btn" aria-expanded="false">¿Necesito algo especial? <span>+</span></button><div class="acc-panel"><div>Solo nuestro dispositivo NFC. Funciona con la mayoría de smartphones. También te mandamos un QR.</div></div></div>
+          <div class="acc-item"><button class="acc-btn" aria-expanded="false">¿Puedo ver y filtrar negativas? <span>+</span></button><div class="acc-panel"><div>Sí: en tu panel podrás ver todas, filtrarlas y detectar <strong>puntos de mejora</strong>.</div></div></div>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- FOOTER -->
   <footer>
     <div class="container" style="padding:40px 0;color:#b7c3d2;border-top:1px solid rgba(255,255,255,.06)">
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:20px">
         <div>
-          <div class="brand" style="margin-bottom:10px">
-            <span class="brand-logo" aria-hidden="true"></span><span>taply</span>
-          </div>
+          <div class="brand" style="margin-bottom:10px"><span class="brand-logo" aria-hidden="true"></span><span>taply</span></div>
           <p style="color:#9fb0c8;max-width:560px">Tecnología NFC para convertir feedback en crecimiento real.</p>
         </div>
         <div>
@@ -373,24 +272,18 @@
     </div>
   </footer>
 
-  <!-- Cookie bar -->
   <div class="cookiebar" id="cookiebar" role="dialog" aria-live="polite" aria-label="Aviso de cookies">
-    <p>
-      Usamos cookies para ver cómo interactúas con la web.
-      Al aceptarlas, estás de acuerdo con nuestro uso de cookies.
-      <a href="#" style="color:#b3e1ff;text-decoration:underline">Política de privacidad</a>
-    </p>
+    <p>Usamos cookies para ver cómo interactúas con la web. Al aceptarlas, estás de acuerdo con nuestro uso de cookies. <a href="#" style="color:#b3e1ff;text-decoration:underline">Política de privacidad</a></p>
     <button class="btn-accept" id="cookieAccept">Aceptar</button>
   </div>
 
-  <!-- MODAL CUENTA -->
+  <!-- MODAL CUENTA (mismo diseño que en suscripciones) -->
   <div id="acct-modal" class="acct-hidden" role="dialog" aria-modal="true" aria-labelledby="acct-title">
     <div class="acct-dialog">
       <div class="acct-head">
         <h3 id="acct-title" style="margin:0">Accede a tu cuenta</h3>
         <button id="acct-close" class="acct-x" aria-label="Cerrar">×</button>
       </div>
-
       <p id="acct-msg" class="acct-msg"></p>
 
       <div class="acct-tabs">
@@ -401,9 +294,16 @@
 
       <!-- LOGIN -->
       <form id="acct-form-login" class="acct-form" autocomplete="on">
-        <label>Email <input id="acct-login-email" type="email" required autocomplete="email" inputmode="email"></label>
+        <label>Email
+          <span class="acct-input">
+            <input id="acct-login-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
+          </span>
+        </label>
         <label>Contraseña
-          <input id="acct-login-pass" type="password" required autocomplete="current-password">
+          <span class="acct-input">
+            <input id="acct-login-pass" type="password" required autocomplete="current-password" placeholder="••••••••">
+            <button type="button" class="toggle-eye" data-toggle="#acct-login-pass">👁</button>
+          </span>
         </label>
         <button type="submit" class="btn">Entrar</button>
         <p class="acct-small">¿Has olvidado la contraseña? Abre la pestaña <strong>Recuperar</strong>.</p>
@@ -412,14 +312,20 @@
 
       <!-- REGISTER -->
       <form id="acct-form-register" class="acct-form acct-hidden" autocomplete="on" novalidate>
-        <label>Nombre <input id="acct-reg-name" type="text" required autocomplete="name" minlength="2" maxlength="60"></label>
-        <label>Email <input id="acct-reg-email" type="email" required autocomplete="email" inputmode="email"></label>
+        <label>Nombre <input id="acct-reg-name" type="text" required autocomplete="name" minlength="2" maxlength="60" placeholder="Nombre y apellidos"></label>
+        <label>Email <input id="acct-reg-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></label>
         <label>Contraseña (mín. 6)
-          <input id="acct-reg-pass" type="password" required minlength="6" autocomplete="new-password">
+          <span class="acct-input">
+            <input id="acct-reg-pass" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass">👁</button>
+          </span>
         </label>
         <div class="pw-meter" aria-hidden="true"><span id="pwBar"></span></div>
         <label>Confirmar contraseña
-          <input id="acct-reg-pass2" type="password" required minlength="6" autocomplete="new-password">
+          <span class="acct-input">
+            <input id="acct-reg-pass2" type="password" required minlength="6" autocomplete="new-password" placeholder="Repite la contraseña">
+            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass2">👁</button>
+          </span>
         </label>
         <button type="submit" class="btn">Crear cuenta</button>
         <p id="acct-error-register" class="acct-err" style="display:none"></p>
@@ -427,7 +333,7 @@
 
       <!-- FORGOT -->
       <form id="acct-form-forgot" class="acct-form acct-hidden" autocomplete="on">
-        <label>Email <input id="acct-forgot-email" type="email" required autocomplete="email" inputmode="email"></label>
+        <label>Email <input id="acct-forgot-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></label>
         <button type="submit" class="btn">Enviar instrucciones</button>
         <p class="acct-small">Si el correo existe, recibirás un email para restablecer la contraseña.</p>
         <p id="acct-error-forgot" class="acct-err" style="display:none"></p>
@@ -436,7 +342,6 @@
   </div>
 
   <script>
-    // Carga suave
     window.addEventListener('load', () => document.body.classList.add('is-loaded'));
 
     // Menú móvil
@@ -447,10 +352,7 @@
       mobileMenu.style.display = open ? 'none' : 'block';
       menuBtn.setAttribute('aria-expanded', String(!open));
     });
-    mobileMenu?.addEventListener('click', (e)=>{
-      const a = e.target.closest('a');
-      if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); }
-    });
+    mobileMenu?.addEventListener('click', (e)=>{ const a = e.target.closest('a'); if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); } });
     window.addEventListener('resize', ()=>{ if(window.innerWidth > 768){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); } });
 
     // FAQ acordeón
@@ -459,10 +361,7 @@
       const panel=btn.nextElementSibling; if(panel) panel.style.maxHeight='0px';
       btn.addEventListener('click',()=>{
         const open=btn.getAttribute('aria-expanded')==='true';
-        document.querySelectorAll('.acc-btn').forEach(b=>{
-          b.setAttribute('aria-expanded','false');
-          const p=b.nextElementSibling; if(p) p.style.maxHeight='0px';
-        });
+        document.querySelectorAll('.acc-btn').forEach(b=>{ b.setAttribute('aria-expanded','false'); const p=b.nextElementSibling; if(p) p.style.maxHeight='0px'; });
         if(!open){btn.setAttribute('aria-expanded','true'); if(panel) panel.style.maxHeight=panel.scrollHeight+'px';}
       });
     });
@@ -476,7 +375,7 @@
       btn.addEventListener('click',()=>{ localStorage.setItem(KEY,'1'); bar.style.display='none'; });
     })();
 
-    /* ======= CUENTA: sesión, modal, validaciones, dropdown ======= */
+    /* ======= Cuenta: sesión + modal ======= */
     (function(){
       const S = { user:null };
       const $ = s => document.querySelector(s);
@@ -486,11 +385,9 @@
       const formLogin   = $('#acct-form-login');
       const formReg     = $('#acct-form-register');
       const formForgot  = $('#acct-form-forgot');
-
       const errLogin   = $('#acct-error-login');
       const errReg     = $('#acct-error-register');
       const errForgot  = $('#acct-error-forgot');
-
       const regName = $('#acct-reg-name');
       const regEmail= $('#acct-reg-email');
       const regPass = $('#acct-reg-pass');
@@ -499,14 +396,9 @@
 
       function showModal(message){
         $('#acct-msg').textContent = message || 'Inicia sesión para continuar';
-        modal.classList.remove('acct-hidden');
-        setTab('login');
-        setTimeout(()=>$('#acct-login-email')?.focus(),50);
+        modal.classList.remove('acct-hidden'); setTab('login'); setTimeout(()=>$('#acct-login-email')?.focus(),50);
       }
-      function hideModal(){
-        modal.classList.add('acct-hidden');
-        [errLogin,errReg,errForgot].forEach(e=>e&&(e.style.display='none'));
-      }
+      function hideModal(){ modal.classList.add('acct-hidden'); [errLogin,errReg,errForgot].forEach(e=>e&&(e.style.display='none')); }
       function setTab(name){
         formLogin.classList.toggle('acct-hidden', name!=='login');
         formReg.classList.toggle('acct-hidden',   name!=='register');
@@ -520,23 +412,13 @@
       async function api(method, url, body){
         const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):undefined });
         let data=null; try{ data = await res.json(); }catch{}
-        if(!res.ok) throw (data?.error || `HTTP ${res.status}`);
-        return data;
+        if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
       }
-      async function getSession(){
-        try{ const data = await api('GET','/api/session'); setUser(data?.user || null); }
-        catch{ setUser(null); }
-      }
-      function setUser(u){
-        S.user = u;
-        try{ localStorage.setItem('acct_user', u ? JSON.stringify(u) : ''); }catch{}
-        paintAccountNav();
-      }
-      function initials(str){
-        const n=(str||'').trim().split(/\s+/).slice(0,2).map(s=>s[0]?.toUpperCase()||'').join('');
-        return n||'T';
-      }
+      async function getSession(){ try{ const d=await api('GET','/api/session'); setUser(d?.user||null); }catch{ setUser(null); } }
+      function setUser(u){ S.user=u; try{ localStorage.setItem('acct_user', u ? JSON.stringify(u) : ''); }catch{} paintAccountNav(); }
+      function initials(str){ const n=(str||'').trim().split(/\s+/).slice(0,2).map(s=>s[0]?.toUpperCase()||'').join(''); return n||'T'; }
       function displayName(u){ return (u?.name || u?.email || 'Mi cuenta').split('@')[0]; }
+
       function paintAccountNav(){
         const slots = ['#acct-nav-slot','#acct-nav-slot-mobile'].map(s=>document.querySelector(s)).filter(Boolean);
         slots.forEach(slot=>{
@@ -554,108 +436,52 @@
             <div class="acct-menu" role="menu">
               <a href="gestionar.html" role="menuitem" class="acct-guard">Gestionar suscripción</a>
               <button id="acct-logout-btn" role="menuitem">Cerrar sesión</button>
-            </div>
-          `;
-          const dd=slot;
-          const chip=dd.querySelector('#acct-chip');
-          chip?.addEventListener('click', ()=>{
-            dd.classList.toggle('open');
-            chip.setAttribute('aria-expanded', dd.classList.contains('open')?'true':'false');
-          });
+            </div>`;
+          const dd=slot, chip=dd.querySelector('#acct-chip');
+          chip?.addEventListener('click', ()=>{ dd.classList.toggle('open'); chip.setAttribute('aria-expanded', dd.classList.contains('open')?'true':'false'); });
           document.addEventListener('click', (e)=>{ if(!dd.contains(e.target)) dd.classList.remove('open'); });
-
-          dd.querySelector('#acct-logout-btn')?.addEventListener('click', async ()=>{
-            try{ await api('POST','/api/logout',{}); }catch{}
-            setUser(null);
-            alert('Sesión cerrada');
-          });
+          dd.querySelector('#acct-logout-btn')?.addEventListener('click', async ()=>{ try{ await api('POST','/api/logout',{});}catch{} setUser(null); alert('Sesión cerrada'); });
         });
       }
 
-      // Validación registro + medidor
-      function passwordScore(p){
-        let s=0; if(!p) return 0;
-        if(p.length>=6) s+=25;
-        if(/[A-Z]/.test(p)) s+=20;
-        if(/[a-z]/.test(p)) s+=20;
-        if(/\d/.test(p))   s+=20;
-        if(/[^\w\s]/.test(p)) s+=15;
-        return Math.min(100,s);
-      }
-      regPass?.addEventListener('input', ()=>{
-        const v=passwordScore(regPass.value);
-        pwBar.style.width=v+'%';
-      });
+      function passwordScore(p){ let s=0; if(!p) return 0; if(p.length>=6) s+=25; if(/[A-Z]/.test(p)) s+=20; if(/[a-z]/.test(p)) s+=20; if(/\d/.test(p)) s+=20; if(/[^\w\s]/.test(p)) s+=15; return Math.min(100,s); }
+      regPass?.addEventListener('input', ()=>{ const v=passwordScore(regPass.value); pwBar.style.width=v+'%'; });
 
       formReg?.addEventListener('submit', async (e)=>{
-        e.preventDefault();
-        errReg.style.display='none';
-        if(!regName.value.trim() || regName.value.trim().length<2){
-          errReg.textContent='El nombre es obligatorio (mín. 2 caracteres).';
-          return void(errReg.style.display='block');
-        }
-        if(regPass.value.length<6){
-          errReg.textContent='La contraseña debe tener al menos 6 caracteres.';
-          return void(errReg.style.display='block');
-        }
-        if(regPass.value !== regPass2.value){
-          errReg.textContent='Las contraseñas no coinciden.';
-          return void(errReg.style.display='block');
-        }
-        try{
-          const data = await api('POST','/api/register',{ name: regName.value.trim(), email: regEmail.value.trim(), password: regPass.value });
-          setUser(data?.user || null);
-          hideModal();
-        }catch(err){
-          errReg.textContent = (err==='email_in_use') ? 'Ese correo ya tiene cuenta. Inicia sesión.' : String(err);
-          errReg.style.display='block';
-        }
+        e.preventDefault(); errReg.style.display='none';
+        if(!regName.value.trim() || regName.value.trim().length<2){ errReg.textContent='El nombre es obligatorio (mín. 2 caracteres).'; return void(errReg.style.display='block'); }
+        if(regPass.value.length<6){ errReg.textContent='La contraseña debe tener al menos 6 caracteres.'; return void(errReg.style.display='block'); }
+        if(regPass.value !== regPass2.value){ errReg.textContent='Las contraseñas no coinciden.'; return void(errReg.style.display='block'); }
+        try{ const data = await api('POST','/api/register',{ name: regName.value.trim(), email: regEmail.value.trim(), password: regPass.value }); setUser(data?.user||null); hideModal(); }
+        catch(err){ errReg.textContent = (err==='email_in_use') ? 'Ese correo ya tiene cuenta. Inicia sesión.' : String(err); errReg.style.display='block'; }
       });
 
-      // Login
       formLogin?.addEventListener('submit', async (e)=>{
         e.preventDefault(); errLogin.style.display='none';
-        const email = document.getElementById('acct-login-email').value.trim();
-        const password = document.getElementById('acct-login-pass').value;
-        try{
-          const data = await api('POST','/api/login',{ email, password });
-          setUser(data?.user || null);
-          hideModal();
-        }catch(err){
+        const email = $('#acct-login-email').value.trim(); const password = $('#acct-login-pass').value;
+        try{ const data = await api('POST','/api/login',{ email, password }); setUser(data?.user||null); hideModal(); }
+        catch(err){
           errLogin.textContent = (err==='account_not_found') ? 'No existe una cuenta con ese email.' :
                                  (err==='invalid_credentials') ? 'Contraseña incorrecta.' :
-                                 (err==='password_not_set') ? 'Esta cuenta no tiene contraseña. Usa “Recuperar”.' :
-                                 String(err);
+                                 (err==='password_not_set') ? 'Esta cuenta no tiene contraseña. Usa “Recuperar”.' : String(err);
           errLogin.style.display='block';
         }
       });
 
-      // Forgot
       formForgot?.addEventListener('submit', async (e)=>{
         e.preventDefault(); errForgot.style.display='none';
-        const email = document.getElementById('acct-forgot-email').value.trim();
-        try{
-          await api('POST','/api/request-password-reset',{ email });
-          hideModal();
-          alert('Si el correo existe, te hemos enviado un email con instrucciones.');
-        }catch(_){
-          hideModal();
-          alert('Si el correo existe, te hemos enviado un email con instrucciones.');
-        }
+        const email = $('#acct-forgot-email').value.trim();
+        try{ await api('POST','/api/request-password-reset',{ email }); hideModal(); alert('Si el correo existe, te hemos enviado un email con instrucciones.'); }
+        catch(_){ hideModal(); alert('Si el correo existe, te hemos enviado un email con instrucciones.'); }
       });
 
-      // Bloquear enlaces "gestionar" si no hay sesión (abre modal)
-      document.body.addEventListener('click',(e)=>{
-        const a = e.target.closest('a.acct-guard');
-        if(a && !S.user){ e.preventDefault(); showModal('Inicia sesión para gestionar tu suscripción.'); }
-      });
+      // Gating “gestionar” sin sesión
+      document.body.addEventListener('click',(e)=>{ const a=e.target.closest('a.acct-guard'); if(a && !S.user){ e.preventDefault(); showModal('Inicia sesión para gestionar tu suscripción.'); } });
 
-      // Sesión inicial
       getSession();
-
-      // Exponer abridor si lo quieres usar desde otras páginas
       window.TaplyOpenLogin = showModal;
     })();
   </script>
 </body>
 </html>
+

@@ -76,6 +76,15 @@ function routeOf(req){
   return p.startsWith('api/') ? p.slice(4) : p;
 }
 
+/* ============ Admin guard ============ */
+function assertAdmin(req){
+  const k = req.headers['x-admin-key'] || req.headers['X-Admin-Key'] || req.headers['x-admin-key'.toLowerCase()];
+  if(!process.env.ADMIN_KEY || k !== process.env.ADMIN_KEY){
+    const e = new Error('unauthorized_admin');
+    e.statusCode = 401; throw e;
+  }
+}
+
 /* ============ Stripe helpers ============ */
 let stripeSingleton = null;
 function getStripe(){
@@ -102,7 +111,6 @@ async function ensureCustomerId(stripe, sess){
   const found = await stripe.customers.search({ query: q, limit: 1 });
   if(found.data.length) {
     const id = found.data[0].id;
-    // completa name si falta
     if (sess.name && !found.data[0].name) {
       try { await stripe.customers.update(id, { name: sess.name }); } catch {}
     }
@@ -125,11 +133,7 @@ function normalizeSub(sub){
   };
 }
 async function getBestSubscription(stripe, customerId){
-  const subs = await stripe.subscriptions.list({
-    customer: customerId,
-    status: 'all',
-    expand: ['data.items.data.price']
-  });
+  const subs = await stripe.subscriptions.list({ customer: customerId, status:'all', expand:['data.items.data.price'] });
   const order = { active:3, trialing:2, past_due:1 };
   const best = subs.data.sort((a,b)=> (order[b.status]||0)-(order[a.status]||0) || (b.current_period_end||0)-(a.current_period_end||0))[0];
   return best || null;
@@ -246,13 +250,13 @@ async function session(req, res){
     customer = await stripe.customers.retrieve(sess.customerId);
     nfcQty = parseInt(customer?.metadata?.taply_nfc_qty || '0', 10) || 0;
   } catch {
-    // cliente inexistente/borrado: devolvemos sesión mínima
     return res.status(200).json({ user: { email: sess.email, name: sess.name || null, customerId: null, subscription: null, subscription_status: null, nfc_qty: 0 }});
   }
 
   const best = await getBestSubscription(stripe, sess.customerId);
   const sub = normalizeSub(best);
 
+  // Próxima renovación (aparente) desde el inicio del periodo
   let nextGuess = null;
   if (sub?.current_period_start) {
     const start = new Date((sub.current_period_start * 1000));
@@ -388,9 +392,7 @@ async function createCheckoutSession(req, res){
     cancel_url:  `${appBase(req)}/cancelado.html`,
     phone_number_collection: { enabled: true },
     customer: customerId,
-    subscription_data: {
-      metadata: { type: 'subscription', tier, frequency, app:'taply' }
-    },
+    subscription_data: { metadata: { type: 'subscription', tier, frequency, app:'taply' } },
     metadata: { type: 'subscription', tier, frequency, app:'taply' }
   });
 
@@ -401,7 +403,6 @@ async function createCheckoutSession(req, res){
 // POST /api/buy-nfc  (pago único)
 async function buyNfc(req, res){
   if (!PRICE_ID_NFC) return res.status(500).json({ error: 'missing_nfc_price_id' });
-
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error: 'auth_required' });
 
@@ -491,6 +492,77 @@ async function postPago(req, res){
   return res.status(200).json({ ok:true });
 }
 
+/* ================== Admin endpoints ================== */
+/** POST /api/admin/find  { email? , customerId? } */
+async function adminFind(req,res){
+  assertAdmin(req);
+  const { email:rawEmail, customerId } = getBody(req);
+  const stripe = getStripe();
+
+  let customer = null;
+  if(customerId){
+    try{ customer = await stripe.customers.retrieve(customerId); }catch{}
+  }else if(rawEmail){
+    const email = normalizeEmail(rawEmail);
+    const q = `email:'${escapeStripeQueryValue(email)}'`;
+    const found = await stripe.customers.search({ query:q, limit:1 });
+    customer = found.data[0] || null;
+  }
+  if(!customer) return res.status(404).json({ error:'not_found' });
+
+  const sub = await getBestSubscription(stripe, customer.id);
+  const norm = normalizeSub(sub);
+
+  return res.status(200).json({
+    customer: {
+      id: customer.id,
+      email: customer.email,
+      name: customer.name || null,
+      phone: customer.phone || null,
+      metadata: customer.metadata || {}
+    },
+    subscription: norm
+  });
+}
+
+/** POST /api/admin/set-nfc { customerId, qty } */
+async function adminSetNfc(req,res){
+  assertAdmin(req);
+  const { customerId, qty } = getBody(req);
+  if(!customerId || qty==null) return res.status(400).json({ error:'missing_params' });
+  const stripe = getStripe();
+  const cust = await stripe.customers.retrieve(customerId);
+  const meta = Object.assign({}, cust.metadata||{}, { taply_nfc_qty: String(Math.max(0, parseInt(qty,10)||0)) });
+  await stripe.customers.update(customerId, { metadata: meta });
+  return res.status(200).json({ ok:true, nfc_qty: parseInt(meta.taply_nfc_qty,10)||0 });
+}
+
+/** POST /api/admin/add-nfc { customerId, delta } */
+async function adminAddNfc(req,res){
+  assertAdmin(req);
+  const { customerId, delta } = getBody(req);
+  if(!customerId || delta==null) return res.status(400).json({ error:'missing_params' });
+  const stripe = getStripe();
+  const cust = await stripe.customers.retrieve(customerId);
+  const prev = parseInt(cust?.metadata?.taply_nfc_qty || '0',10) || 0;
+  const next = Math.max(0, prev + (parseInt(delta,10)||0));
+  await stripe.customers.update(customerId, { metadata: { ...(cust.metadata||{}), taply_nfc_qty: String(next) }});
+  return res.status(200).json({ ok:true, nfc_qty: next });
+}
+
+/** POST /api/admin/create-portal { customerId } */
+async function adminCreatePortal(req,res){
+  assertAdmin(req);
+  const { customerId } = getBody(req);
+  if(!customerId) return res.status(400).json({ error:'missing_params' });
+  const stripe = getStripe();
+  const portal = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: appBase(req) + '/admin.html'
+  });
+  return res.status(200).json({ url: portal.url });
+}
+
 /* ================== Router ================== */
 export default async function handler(req, res){
   try{
@@ -500,15 +572,22 @@ export default async function handler(req, res){
     if (req.method === 'GET' && route === 'session') return session(req,res);
 
     if (req.method === 'POST') {
+      // auth
       if (route === 'register') return register(req,res);
       if (route === 'login') return login(req,res);
       if (route === 'logout') return logout(req,res);
       if (route === 'request-password-reset') return requestPasswordReset(req,res);
       if (route === 'reset-password') return resetPassword(req,res);
+      // billing
       if (route === 'create-portal-session') return createPortalSession(req,res);
       if (route === 'create-checkout-session') return createCheckoutSession(req,res);
       if (route === 'buy-nfc') return buyNfc(req,res);
       if (route === 'post-pago') return postPago(req,res);
+      // admin
+      if (route === 'admin/find') return adminFind(req,res);
+      if (route === 'admin/set-nfc') return adminSetNfc(req,res);
+      if (route === 'admin/add-nfc') return adminAddNfc(req,res);
+      if (route === 'admin/create-portal') return adminCreatePortal(req,res);
     }
 
     return res.status(404).json({ error:'not_found', route, method:req.method });

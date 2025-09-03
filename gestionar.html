@@ -19,6 +19,7 @@
     .muted{color:var(--muted)}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
     @media (max-width:780px){ .grid2{grid-template-columns:1fr} }
+    input{font-size:16px}
   </style>
 </head>
 <body>
@@ -69,7 +70,6 @@
 
   <script>
     const $=s=>document.querySelector(s);
-    const fmtDate = ts => { try{ const d = typeof ts==='number' && ts < 2e10 ? new Date(ts*1000) : new Date(ts); return new Intl.DateTimeFormat('es-ES',{dateStyle:'medium'}).format(d);}catch{return '';} };
 
     async function api(method, url, body){
       const res = await fetch(url,{method,headers:{'Content-Type':'application/json'},body: body?JSON.stringify(body):undefined});
@@ -78,66 +78,92 @@
       return data;
     }
 
-    function prettySub(u){
+    // Helpers de plan + fechas
+    function getInterval(u){
+      return (u?.subscription?.price?.interval ||
+              u?.subscription?.plan?.interval ||
+              u?.subscription_interval || 'month').toLowerCase();
+    }
+    function prettyPlan(u){
+      const nick=(u?.subscription?.plan?.nickname || u?.subscription?.price?.nickname || '').toLowerCase();
+      let base='Básico';
+      if(/pro/.test(nick)) base='Pro';
+      else if(/medio|standard|estándar/.test(nick)) base='Medio';
+      else if(/basic|básico|basico/.test(nick)) base='Básico';
+      const freq = getInterval(u)==='year' ? 'anual' : 'mensual';
+      return `${base} ${freq}`;
+    }
+    function addDays(date, days){ const x=new Date(date); x.setDate(x.getDate()+days); return x; }
+    function computeNextRenewal30(u){
+      const start = u?.subscription?.current_period_start || u?.subscription_start || u?.subscription_created;
+      if(!start) return null;
+      const startDate = typeof start==='number' ? new Date(start*1000) : new Date(start);
+      return getInterval(u)==='year' ? addDays(startDate,365) : addDays(startDate,30);
+    }
+    const fmtDate = (d)=> new Intl.DateTimeFormat('es-ES',{dateStyle:'medium'}).format(d);
+
+    function prettySubLine(u){
       const st=(u?.subscription?.status||'').toLowerCase();
-      const nick=u?.subscription?.plan?.nickname || u?.subscription?.price?.nickname || '—';
-      const interval=u?.subscription?.price?.interval || 'month';
       if(!st) return 'Sin suscripción';
-      const niceInt = interval==='year'?'Anual':'Mensual';
-      return `${nick} · ${niceInt} · estado: ${st}`;
+      return `${prettyPlan(u)} · estado: ${st}`;
     }
 
     async function load(){
-      const d = await api('GET','/api/session');
-      const u = d?.user;
-      if(!u){ location.href='acceso.html'; return; }
-      $('#email').textContent=u.email||'—';
-      $('#subLine').textContent = prettySub(u);
-      $('#nfcQty').textContent = u.nfc_qty ?? 0;
-      const end = u.current_period_end || u.subscription?.current_period_end;
-      if(end) $('#renewLine').textContent='Renovación / fin de periodo: '+fmtDate(end);
+      try{
+        const d = await api('GET','/api/session');
+        const u = d?.user;
+        if(!u){ alert('Inicia sesión para gestionar tu suscripción.'); location.href='suscripciones.html#cuenta'; return; }
 
-      const st=(u?.subscription?.status||'').toLowerCase();
-      if(st==='active' || st==='trialing' || st==='past_due'){
-        $('#btnCancel').style.display='inline-flex';
-        $('#btnResume').style.display='none';
-      }else if(st==='canceled'){
-        $('#btnCancel').style.display='none';
-        $('#btnResume').style.display='inline-flex';
+        $('#email').textContent=u.email||'—';
+        $('#subLine').textContent = prettySubLine(u);
+        $('#nfcQty').textContent = Number(u.nfc_qty||0);
+
+        const next = computeNextRenewal30(u);
+        $('#renewLine').textContent = next ? ('Renovación / fin de periodo: '+fmtDate(next)) : '';
+
+        const st=(u?.subscription?.status||'').toLowerCase();
+        if(st==='active' || st==='trialing' || st==='past_due'){
+          $('#btnCancel').style.display='inline-flex';
+          $('#btnResume').style.display='none';
+        }else if(st==='canceled'){
+          $('#btnCancel').style.display='none';
+          $('#btnResume').style.display='inline-flex';
+        }
+      }catch(e){
+        alert('No se pudo cargar tu cuenta.'); location.href='suscripciones.html#cuenta';
       }
     }
 
-    // Portal
-    async function openPortal(){ try{ const r=await api('POST','/api/create-portal-session',{}); if(r?.url) location.href=r.url; }catch{ alert('No se pudo abrir el portal'); } }
+    // Portal (todas las acciones van al portal — estable y seguro con tu API actual)
+    async function openPortal(){
+      try{
+        const r=await api('POST','/api/create-portal-session',{});
+        if(r?.url) location.href=r.url; else alert('No se pudo abrir el portal.');
+      }catch{ alert('No se pudo abrir el portal'); }
+    }
 
-    // Cancelar / Reanudar
-    $('#btnCancel').addEventListener('click', async ()=>{
-      if(!confirm('Cancelar al final del periodo actual?')) return;
-      try{ await api('POST','/api/subscription/cancel',{ at_period_end:true }); alert('Cancelación programada.'); location.reload(); }
-      catch(e){ alert('No se pudo cancelar: '+e); }
-    });
-    $('#btnResume').addEventListener('click', async ()=>{
-      try{ await api('POST','/api/subscription/resume',{}); alert('Suscripción reanudada.'); location.reload(); }
-      catch(e){ alert('No se pudo reanudar: '+e); }
-    });
-
-    // Acciones portal
     $('#btnPortal').addEventListener('click', openPortal);
     $('#changePlan').addEventListener('click', openPortal);
     $('#updateCard').addEventListener('click', openPortal);
     $('#invoices').addEventListener('click', openPortal);
+    // Para que "Cancelar" y "Reanudar" SIEMPRE funcionen sin nuevos endpoints, los enviamos al portal:
+    $('#btnCancel').addEventListener('click', openPortal);
+    $('#btnResume').addEventListener('click', openPortal);
 
     // NFC
     $('#buyNfc').addEventListener('click', async ()=>{
       const q = Math.max(1, Math.min(999, parseInt($('#nfcCount').value||'1',10)||1));
       try{
         const r = await api('POST','/api/buy-nfc',{quantity:q});
-        if(r?.url) location.href=r.url;
-      }catch(e){ alert('No se pudo iniciar la compra: '+e); }
+        if(r?.url) location.href=r.url; else alert('No se pudo iniciar la compra.');
+      }catch(e){ alert('No se pudo iniciar la compra.'); }
     });
 
     // Logout
-    $('#logout').addEventListener('click', async ()=>{ try{ await api('POST','/api/logout',{});}catch{} location.href='acceso.html'; });
+    $('#logout').addEventListener('click', async ()=>{
+      try{ await api('POST','/api/logout',{});}catch{}
+      location.href='suscripciones.html#cuenta';
+    });
 
     load();
   </script>
