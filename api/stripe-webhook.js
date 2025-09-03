@@ -1,150 +1,110 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-  <title>Admin — Taply</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-  <style>
-    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12);
-           --brand1:#00d4ff; --brand2:#7c3aed; }
-    *{box-sizing:border-box} html,body{height:100%} html{-webkit-text-size-adjust:100%}
-    body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui}
-    .wrap{width:min(900px,94%);margin:28px auto}
-    .card{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:18px;margin-bottom:16px}
-    h1{margin:0 0 10px}
-    label{display:grid;gap:6px;margin:8px 0}
-    input{background:#0a0f16;border:1px solid var(--b);color:inherit;border-radius:12px;padding:10px;font-size:16px}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    .btn{padding:10px 14px;border:0;border-radius:999px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017}
-    .ghost{padding:10px 14px;border:1px solid var(--b);border-radius:999px;background:transparent;color:inherit}
-    .muted{color:var(--muted)}
-    .kv{display:grid;grid-template-columns:160px 1fr;gap:8px;align-items:center}
-    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
-  </style>
-</head>
-<body>
-  <main class="wrap">
-    <h1>Panel de administración</h1>
+// api/stripe-webhooks.js
+import Stripe from 'stripe';
+import getRawBody from 'raw-body';
 
-    <section class="card">
-      <h3>Clave de admin</h3>
-      <div class="row">
-        <input id="admKey" type="password" placeholder="ADMIN_KEY" style="min-width:280px">
-        <button class="ghost" id="saveKey">Guardar</button>
-        <span class="muted">Se guarda en localStorage para tus peticiones.</span>
-      </div>
-    </section>
+export const config = { api: { bodyParser: false } };
 
-    <section class="card">
-      <h3>Buscar cliente</h3>
-      <div class="row">
-        <input id="email" type="email" placeholder="email@cliente.com" style="min-width:280px">
-        <input id="custId" type="text" placeholder="cus_XXXX (opcional)" style="min-width:280px">
-        <button id="find" class="btn">Buscar</button>
-      </div>
-      <p id="findErr" class="muted" style="display:none;color:#fca5a5"></p>
-    </section>
+async function sendEmail({to, subject, html}) {
+  if(!process.env.SENDGRID_API_KEY || !process.env.EMAIL_FROM) return;
+  const { default: sgMail } = await import('@sendgrid/mail');
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  await sgMail.send({
+    to,
+    from: process.env.EMAIL_FROM,
+    replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM,
+    subject,
+    text: html.replace(/<[^>]+>/g,' '),
+    html
+  });
+}
+function parseIntSafe(v, def=0){ const n = parseInt(v,10); return Number.isFinite(n) ? n : def; }
 
-    <section id="result" class="card" style="display:none">
-      <h3 id="userTitle" style="margin:0 0 8px">Cliente</h3>
-      <div class="kv"><div>Email</div><div id="rEmail" class="mono">—</div></div>
-      <div class="kv"><div>Nombre</div><div id="rName">—</div></div>
-      <div class="kv"><div>Customer ID</div><div id="rId" class="mono">—</div></div>
-      <div class="kv"><div>Teléfono</div><div id="rPhone" class="mono">—</div></div>
+let stripeSingleton = null;
+function stripeClient(){
+  if(!process.env.STRIPE_SECRET_KEY) throw new Error('Missing STRIPE_SECRET_KEY');
+  if(!stripeSingleton){
+    stripeSingleton = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
+  }
+  return stripeSingleton;
+}
 
-      <h4 style="margin:14px 0 6px">Suscripción</h4>
-      <div class="kv"><div>Estado</div><div id="rSubState">—</div></div>
-      <div class="kv"><div>Plan</div><div id="rPlan">—</div></div>
-      <div class="kv"><div>Intervalo</div><div id="rInterval">—</div></div>
-      <div class="kv"><div>Inicio periodo</div><div id="rStart">—</div></div>
-      <div class="kv"><div>Fin periodo</div><div id="rEnd">—</div></div>
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).send('Method not allowed');
 
-      <h4 style="margin:14px 0 6px">NFC</h4>
-      <div class="kv"><div>Comprados</div><div id="rNfc" class="mono">0</div></div>
+  try {
+    if(!process.env.STRIPE_SECRET_KEY) return res.status(500).send('Missing STRIPE_SECRET_KEY');
+    if(!process.env.STRIPE_WEBHOOK_SECRET) return res.status(500).send('Missing STRIPE_WEBHOOK_SECRET');
 
-      <div class="row" style="margin-top:12px">
-        <button id="openPortal" class="btn">Abrir portal (cliente)</button>
-        <input id="delta" type="number" step="1" value="1" min="0" style="width:120px">
-        <button id="btnAddNfc" class="ghost">Sumar NFC</button>
-        <input id="abs" type="number" step="1" value="0" min="0" style="width:120px">
-        <button id="btnSetNfc" class="ghost">Establecer NFC</button>
-        <button id="sendReset" class="ghost">Enviar reset password</button>
-      </div>
-    </section>
-  </main>
+    const stripe = stripeClient();
+    const sig = req.headers['stripe-signature'];
+    const raw = await getRawBody(req);
+    const event = stripe.webhooks.constructEvent(raw, sig, process.env.STRIPE_WEBHOOK_SECRET);
 
-  <script>
-    const $=s=>document.querySelector(s);
-    const fmtDate = ts => { try{ const d = typeof ts==='number' && ts < 2e10 ? new Date(ts*1000) : new Date(ts); return new Intl.DateTimeFormat('es-ES',{dateStyle:'medium'}).format(d);}catch{return '—';} };
-    const KEYLS='taply_admin_key';
-
-    function getKey(){ return localStorage.getItem(KEYLS)||''; }
-    function setKey(v){ localStorage.setItem(KEYLS, v||''); }
-
-    $('#admKey').value = getKey();
-    $('#saveKey').addEventListener('click', ()=>{ setKey($('#admKey').value.trim()); alert('Clave guardada'); });
-
-    async function apiAdmin(path, body){
-      const res = await fetch('/api/'+path, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'X-Admin-Key': getKey() },
-        body: JSON.stringify(body||{})
-      });
-      let data=null; try{ data=await res.json(); }catch{}
-      if(!res.ok) throw (data?.error || ('HTTP '+res.status));
-      return data;
+    async function upsertCustomerMeta(customerId, patch){
+      const cust = await stripe.customers.retrieve(customerId);
+      const meta = Object.assign({}, cust.metadata || {});
+      await stripe.customers.update(customerId, { metadata: { ...meta, ...patch }});
     }
 
-    function paint(result){
-      const c = result.customer, s = result.subscription || {};
-      $('#result').style.display='block';
-      $('#userTitle').textContent = c.name || c.email || c.id;
-      $('#rEmail').textContent = c.email || '—';
-      $('#rName').textContent = c.name || '—';
-      $('#rId').textContent = c.id || '—';
-      $('#rPhone').textContent = c.phone || '—';
-
-      $('#rSubState').textContent = s?.status || '—';
-      $('#rPlan').textContent = s?.plan?.nickname || '—';
-      $('#rInterval').textContent = s?.price?.interval || '—';
-      $('#rStart').textContent = s?.current_period_start ? fmtDate(s.current_period_start) : '—';
-      $('#rEnd').textContent = s?.current_period_end ? fmtDate(s.current_period_end) : '—';
-
-      $('#rNfc').textContent = Number(c?.metadata?.taply_nfc_qty || 0);
-
-      // actions
-      $('#openPortal').onclick = async ()=>{
-        try{ const r=await apiAdmin('admin/create-portal',{ customerId:c.id }); if(r?.url) location.href=r.url; }catch(e){ alert('No se pudo abrir el portal: '+e); }
-      };
-      $('#btnAddNfc').onclick = async ()=>{
-        const delta = parseInt($('#delta').value||'0',10)||0;
-        try{ const r=await apiAdmin('admin/add-nfc',{ customerId:c.id, delta }); $('#rNfc').textContent = r.nfc_qty; alert('Actualizado'); }catch(e){ alert('Error al sumar: '+e); }
-      };
-      $('#btnSetNfc').onclick = async ()=>{
-        const qty = Math.max(0, parseInt($('#abs').value||'0',10)||0);
-        try{ const r=await apiAdmin('admin/set-nfc',{ customerId:c.id, qty }); $('#rNfc').textContent = r.nfc_qty; alert('Guardado'); }catch(e){ alert('Error al establecer: '+e); }
-      };
-      $('#sendReset').onclick = async ()=>{
-        try{ await fetch('/api/request-password-reset',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: c.email }) }); alert('Enviado (si existe)'); }catch{ alert('Intento de envío realizado'); }
-      };
+    async function sumNfcFromSession(cs){
+      if (!process.env.PRICE_ID_NFC) return 0;
+      const full = await stripe.checkout.sessions.retrieve(cs.id, { expand: ['line_items'] });
+      const items = full.line_items?.data || [];
+      return items.reduce((acc, it) => acc + ((it.price?.id === process.env.PRICE_ID_NFC) ? (it.quantity || 0) : 0), 0);
     }
 
-    $('#find').addEventListener('click', async ()=>{
-      $('#findErr').style.display='none';
+    if (event.type === 'checkout.session.completed') {
+      const cs = event.data.object;
+      const email = cs.customer_details?.email || null;
+      const title = cs.mode === 'subscription' ? 'Suscripción activada' : 'Pago recibido';
+
+      // Actualiza datos básicos del customer
       try{
-        const email = $('#email').value.trim();
-        const customerId = $('#custId').value.trim();
-        const r = await apiAdmin('admin/find', email ? { email } : { customerId });
-        paint(r);
-      }catch(e){
-        $('#result').style.display='none';
-        const err = (''+e) || 'error';
-        $('#findErr').textContent = err;
-        $('#findErr').style.display='block';
-      }
-    });
-  </script>
-</body>
-</html>
+        if (cs.customer) {
+          const patch = {};
+          if (cs.customer_details?.phone) patch.phone = cs.customer_details.phone;
+          if (cs.customer_details?.name)  patch.name  = cs.customer_details.name;
+          if (Object.keys(patch).length) await stripe.customers.update(cs.customer, patch);
+        }
+      }catch(e){ console.error('customer update err', e?.message || e); }
 
+      // Sumar NFC comprados en ese checkout de pago único
+      if (cs.mode === 'payment' && cs.customer) {
+        try{
+          const addQty = await sumNfcFromSession(cs);
+          if (addQty > 0) {
+            const cust = await stripe.customers.retrieve(cs.customer);
+            const prev = parseIntSafe(cust?.metadata?.taply_nfc_qty, 0);
+            await upsertCustomerMeta(cs.customer, { taply_nfc_qty: String(prev + addQty) });
+          }
+        }catch(e){ console.error('sum NFC error', e?.message || e); }
+      }
+
+      // Emails básicos
+      const amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '-';
+      const html = `<h2>${title}</h2><p>Gracias por tu compra en Taply.</p><p>Importe: ${amountText}</p>`;
+      if(email) await sendEmail({ to: email, subject: `Taply — ${title}`, html });
+      if(process.env.EMAIL_FROM) await sendEmail({ to: process.env.EMAIL_FROM, subject: `Taply — ${title}`, html: `<p>${title}</p><p>Cliente: ${email || '—'}</p>` });
+    }
+
+    // Persistir estado de suscripción en metadata (sirve de “BD” ligera)
+    if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+      const sub = event.data.object;
+      const price = sub.items?.data?.[0]?.price || null;
+      const patch = {
+        taply_sub_status: sub.status || '',
+        taply_sub_price: price?.id || '',
+        taply_sub_price_nickname: price?.nickname || '',
+        taply_sub_interval: price?.recurring?.interval || '',
+        taply_sub_current_period_start: String(sub.current_period_start || ''),
+        taply_sub_current_period_end: String(sub.current_period_end || '')
+      };
+      if(sub.customer) await upsertCustomerMeta(sub.customer, patch);
+    }
+
+    return res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('stripe webhook error:', err?.message || err);
+    return res.status(400).send(`Webhook Error: ${err?.message || 'unknown'}`);
+  }
+}
