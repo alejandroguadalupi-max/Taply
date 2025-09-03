@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="theme-color" content="#0b0f1a" />
+  <!-- TU CLIENT ID DE GOOGLE -->
   <meta name="google-signin-client_id" content="124694801200-ibn7tfgtle183n6gqkqk29egeu0j1t4c.apps.googleusercontent.com">
   <title>Taply — NFC + Suscripción</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -99,8 +100,6 @@
     .acct-ok{color:var(--ok);margin-top:2px}
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .acct-actions{display:grid;gap:10px}
-    .btn-google{background:#dd4b39;color:#fff;border:0}
-    .btn-google:hover{filter:brightness(.95)}
     .remember{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.95rem}
     .meter{height:8px;border-radius:8px;background:#101826;border:1px solid rgba(255,255,255,.08);overflow:hidden}
     .meter > i{display:block;height:100%;width:0%;background:#ef4444;transition:width .25s, background .25s}
@@ -116,6 +115,7 @@
     }
     .acct-small{color:var(--muted);font-size:.92rem;margin-top:6px}
   </style>
+  <!-- Google Identity Services (botón oficial con selector de cuentas) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -235,7 +235,7 @@
   </div>
 </footer>
 
-<!-- === PANEL DE ACCESO === -->
+<!-- === MODAL ACCESO === -->
 <div id="acct-modal" class="acct-hidden" role="dialog" aria-modal="true" aria-labelledby="acct-title">
   <div class="acct-dialog">
     <div class="acct-cover"></div>
@@ -268,23 +268,10 @@
           <span id="link-forgot" class="acct-tab" style="background:transparent;border:1px dashed var(--border);cursor:pointer">¿Olvidaste la contraseña?</span>
         </div>
 
-        <!-- RECOVER INLINE (no pestaña) -->
-        <div id="recover-inline" class="acct-form" style="display:none;margin-top:4px">
-          <label class="acct-label">Correo para recuperar
-            <span class="acct-input">
-              <input id="acct-recover-email" type="email" autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
-            </span>
-          </label>
-          <div class="acct-actions">
-            <button type="button" id="btn-send-recover" class="btn line">Enviar enlace</button>
-            <p id="acct-info-recover" class="acct-ok" style="display:none"></p>
-            <p id="acct-error-recover" class="acct-err" style="display:none"></p>
-          </div>
-        </div>
-
         <div class="acct-actions">
           <button type="submit" class="btn">Iniciar sesión</button>
-          <button type="button" class="btn btn-google" id="btn-google">Iniciar sesión con Google</button>
+          <!-- Botón oficial de Google (renderizado por GIS) -->
+          <div id="googleBtnLogin"></div>
           <p id="acct-error-login" class="acct-err" style="display:none"></p>
         </div>
       </form>
@@ -312,7 +299,23 @@
         <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
         <div class="acct-actions">
           <button type="submit" class="btn">Crear cuenta</button>
+          <!-- Botón Google también en registro -->
+          <div id="googleBtnRegister"></div>
           <p id="acct-error-register" class="acct-err" style="display:none"></p>
+        </div>
+      </form>
+
+      <!-- RECOVER (tarjeta separada) -->
+      <form id="acct-form-recover" class="acct-form" style="display:none" autocomplete="on" novalidate>
+        <p class="acct-small">Te enviaremos un enlace para restablecer tu contraseña.</p>
+        <label class="acct-label">Correo
+          <span class="acct-input"><input id="acct-recover-email" type="email" autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></span>
+        </label>
+        <div class="acct-actions">
+          <button type="submit" class="btn">Enviar enlace</button>
+          <button type="button" class="btn ghost" id="recover-back">Volver</button>
+          <p id="acct-info-recover" class="acct-ok" style="display:none"></p>
+          <p id="acct-error-recover" class="acct-err" style="display:none"></p>
         </div>
       </form>
     </div>
@@ -421,15 +424,18 @@
   // ===== Panel acceso =====
   const modal = $('#acct-modal'), title = $('#acct-title'), sub = $('#acct-sub');
   const tabBtns = $$('#acct-modal .acct-tab');
-  const forms = { login:$('#acct-form-login'), register:$('#acct-form-register') };
+  const forms = { login:$('#acct-form-login'), register:$('#acct-form-register'), recover:$('#acct-form-recover') };
   const errs = { login:$('#acct-error-login'), register:$('#acct-error-register'), recover:$('#acct-error-recover') };
   const okRecover = $('#acct-info-recover');
 
   function setTab(name){
-    Object.entries(forms).forEach(([k,f])=> f.style.display = (k===name?'grid':'none'));
+    forms.login.style.display = (name==='login'?'grid':'none');
+    forms.register.style.display = (name==='register'?'grid':'none');
+    forms.recover.style.display = (name==='recover'?'grid':'none');
     tabBtns.forEach(b=>{ const on = b.dataset.tab===name; b.classList.toggle('acct-tab-active',on); b.setAttribute('aria-selected', String(on)); });
     if(name==='login'){ title.textContent='Inicia sesión en tu cuenta'; sub.textContent='Introduce tus datos de acceso o crea una cuenta nueva.'; }
     if(name==='register'){ title.textContent='Crea tu cuenta ahora mismo'; sub.textContent='Completa tus datos para registrarte en Taply.'; }
+    if(name==='recover'){ title.textContent='Recuperar contraseña'; sub.textContent='Te enviaremos un enlace a tu correo para restablecerla.'; }
   }
   function openModal(tab='login'){ modal.classList.remove('acct-hidden'); setTab(tab); setTimeout(()=>$('#acct-login-email')?.focus(),40); }
   function closeModal(){ modal.classList.add('acct-hidden'); Object.values(errs).forEach(e=> e && (e.style.display='none')); okRecover.style.display='none'; }
@@ -443,7 +449,7 @@
 
   // Medidor registro
   const meter = $('#pw-meter');
-  $('#acct-reg-pass')?.addEventListener('input', (e)=>{ const v=e.target.value||''; let score=0; if(v.length>=6) score+=33; if(/[A-Z]/.test(v)&&/[a-z]/.test(v)) score+=33; if(/\d/.test(v)||/[^A-Za-z0-9]/.test(v)) score+=34; if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; } });
+  $('#acct-reg-pass')?.addEventListener('input', (e)=>{ const v=e.target.value||''; let score=0; if(v.length>=6) score+=33; if(/[A-Z]/.test(v)&&/[a-z]/.test(v)) score+=33; if(/\d/.test(v) || /[^A-Za-z0-9]/.test(v)) score+=34; if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; } });
 
   // API helper
   async function api(method, url, body){
@@ -452,39 +458,50 @@
     if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
   }
 
-  // ===== Google Identity Services =====
-  let googleReady=false; let googleInitialized=false;
+  // ===== Google Identity Services: botón con chooser =====
   function getGoogleClientId(){ const m=document.querySelector('meta[name="google-signin-client_id"]'); return (m&&m.content)||window.GOOGLE_CLIENT_ID||''; }
-  function initGoogle(){
-    if(googleInitialized) return; const cid=getGoogleClientId();
-    if(!cid || !window.google || !google.accounts?.id) return;
-    google.accounts.id.initialize({
-      client_id: cid,
-      callback: async ({credential})=>{
-        if(!credential) return alert('No se recibió la credencial de Google.');
-        try{
-          const data = await api('POST','/api/google-login',{ credential });
-          S.user = data?.user || null; saveUser(S.user);
-          await forceSessionRefresh(); // refresco inmediato (plan/NFC)
-          closeModal();
-        }catch(err){
-          alert('No se pudo iniciar sesión con Google: '+err);
-        }
-      },
-      auto_select:false, cancel_on_tap_outside:true
-    });
-    googleReady=true; googleInitialized=true;
+  function onGoogleCredential(resp){
+    if(!resp?.credential) return alert('No se recibió la credencial de Google.');
+    (async ()=>{
+      try{
+        const data = await api('POST','/api/google-login',{ credential: resp.credential });
+        S.user = data?.user || null; saveUser(S.user);
+        await forceSessionRefresh(); closeModal();
+      }catch(err){
+        alert('No se pudo iniciar sesión con Google: '+err);
+      }
+    })();
   }
-  window.addEventListener('load', ()=>{ initGoogle(); });
+  function renderGoogleButtons(){
+    try{
+      const cid = getGoogleClientId();
+      if(!cid || !window.google || !google.accounts?.id) return;
+      google.accounts.id.initialize({
+        client_id: cid,
+        callback: onGoogleCredential,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        itp_support: true,
+        context: 'signin'
+      });
+      const opts = { theme: 'filled_blue', size:'large', text:'continue_with', shape:'rectangular', logo_alignment:'left', locale:'es' };
+      const c1 = document.getElementById('googleBtnLogin'); if(c1) { c1.innerHTML=''; google.accounts.id.renderButton(c1, opts); }
+      const c2 = document.getElementById('googleBtnRegister'); if(c2) { c2.innerHTML=''; google.accounts.id.renderButton(c2, opts); }
+    }catch{}
+  }
+  window.addEventListener('load', renderGoogleButtons);
 
-  $('#btn-google')?.addEventListener('click', ()=>{
-    initGoogle();
-    if(!googleReady){ alert('Configura GOOGLE_OAUTH_CLIENT_ID y origenes autorizados en Google Cloud.'); return; }
-    // Mostramos One Tap cuando pulsa:
-    google.accounts.id.prompt();
+  // ===== Enlaces recuperacion =====
+  $('#link-forgot')?.addEventListener('click', ()=> setTab('recover'));
+  $('#recover-back')?.addEventListener('click', ()=> setTab('login'));
+  forms.recover?.addEventListener('submit', async (e)=>{
+    e.preventDefault(); errs.recover.style.display='none'; okRecover.style.display='none';
+    const email = $('#acct-recover-email').value.trim();
+    try{ await api('POST','/api/request-password-reset',{ email }); okRecover.textContent='Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora).'; okRecover.style.display='block'; }
+    catch(err){ errs.recover.textContent=String(err); errs.recover.style.display='block'; }
   });
 
-  // ===== Nav superior =====
+  // ===== Menú superior =====
   function paintNav(){
     const slot = document.querySelector('#acct-nav-slot');
     const htmlAnon = `<a class="btn ghost" id="acct-open-nav">Iniciar sesión</a>`;
@@ -520,25 +537,13 @@
   }
 
   // ===== Formularios =====
-  // Mostrar/ocultar recuperacion inline
-  $('#link-forgot')?.addEventListener('click', ()=>{ const box=$('#recover-inline'); if(box) box.style.display = (box.style.display==='none' || !box.style.display)?'grid':'none'; });
-
-  // Enviar recover
-  $('#btn-send-recover')?.addEventListener('click', async ()=>{
-    const email = $('#acct-recover-email').value.trim();
-    const ok = $('#acct-info-recover'); const err = $('#acct-error-recover'); ok.style.display='none'; err.style.display='none';
-    try{ await api('POST','/api/request-password-reset',{ email }); ok.textContent='Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora).'; ok.style.display='block'; }
-    catch(e){ err.textContent=String(e); err.style.display='block'; }
-  });
-
   forms.login?.addEventListener('submit', async (e)=>{
     e.preventDefault(); errs.login.style.display='none';
     const email = $('#acct-login-email').value.trim(); const password = $('#acct-login-pass').value;
     try{
       const data = await api('POST','/api/login',{ email, password });
       S.user = data?.user || null; saveUser(S.user);
-      await forceSessionRefresh();
-      closeModal();
+      await forceSessionRefresh(); closeModal();
     }catch(err){
       errs.login.textContent = (err==='account_not_found') ? 'No existe una cuenta con ese email.' :
                                (err==='invalid_credentials') ? 'Contraseña incorrecta.' :
@@ -558,10 +563,10 @@
     try{
       const data = await api('POST','/api/register',{ name, email, password: p1 });
       S.user = data?.user || null; saveUser(S.user);
-      await forceSessionRefresh();
-      closeModal();
+      await forceSessionRefresh(); closeModal();
     }catch(err){
-      errs.register.textContent = (err==='email_in_use') ? 'Ese correo ya tiene una cuenta. Inicia sesión o usa “¿Olvidaste la contraseña?”.' :
+      errs.register.textContent = (err==='email_in_use_google') ? 'Ese correo ya existe como cuenta Google. Inicia sesión con Google.' :
+                                  (err==='email_in_use') ? 'Ese correo ya tiene una cuenta. Inicia sesión.' :
                                   (err==='weak_password') ? 'La contraseña debe tener al menos 6 caracteres.' :
                                   (err==='name_email_password_required') ? 'Nombre, email y contraseña son obligatorios.' :
                                   String(err);
@@ -577,9 +582,7 @@
     }
     logoutBtn?.removeAttribute('disabled'); logoutBtn.onclick = async ()=>{ try{ await api('POST','/api/logout',{}); }catch{} S.user = null; saveUser(null); paintNav(); paintAccountSection(); alert('Sesión cerrada'); };
 
-    // Texto principal: plan o sin plan
-    if(isSubActive(S.user)) statusEl.textContent = prettyPlan(S.user);
-    else statusEl.textContent = 'Sin plan activo';
+    if(isSubActive(S.user)) statusEl.textContent = prettyPlan(S.user); else statusEl.textContent = 'Sin plan activo';
 
     const next = computeNextRenewal30(S.user);
     renewsEl.textContent = next ? `Renovación / fin de periodo: ${fmtDate(next)}.` : '';
@@ -588,14 +591,13 @@
     nfcEl.textContent = `NFC comprados: ${qty}`;
   }
 
-  // Refresco “rápido” tras login/registro/google para no depender de recarga
+  // Refresco “rápido” tras login/Google/registro
   async function forceSessionRefresh(retries=4, delay=600){
     for(let i=0;i<retries;i++){
       try{
         const data = await api('GET','/api/session');
         if(data?.user){
           S.user = data.user; saveUser(S.user); paintNav(); paintAccountSection();
-          // Si ya tenemos sub o NFC pintados, salimos
           if(S.user.subscription || typeof S.user.nfc_qty === 'number') break;
         }
       }catch{}
@@ -616,3 +618,4 @@
 </script>
 </body>
 </html>
+
