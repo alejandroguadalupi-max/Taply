@@ -64,7 +64,7 @@
     .panel{display:none;margin-bottom:40px}
     .panel.show{display:block}
 
-    /* === MODAL / CUENTA (mejorado) === */
+    /* === MODAL / CUENTA === */
     #acct-modal.acct-hidden{display:none!important}
     #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.6);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
     .acct-dialog{width:min(560px,92%);background:var(--bg-2,#0e1424);color:var(--txt,#e9eefc);
@@ -94,7 +94,6 @@
     .row-between{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .ok{color:#86efac}
 
-    /* Mi cuenta */
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
     .acct-badge{display:inline-block;border:1px solid var(--border,rgba(255,255,255,.12));background:rgba(255,255,255,.04);padding:6px 10px;border-radius:999px;font-weight:800}
   </style>
@@ -191,7 +190,7 @@
   </div>
 </section>
 
-<!-- === RESUMEN DE CUENTA (ligero) === -->
+<!-- === RESUMEN DE CUENTA === -->
 <section id="cuenta" class="container" style="padding:40px 0">
   <article class="card">
     <h3 style="margin:0 0 6px">Mi suscripción</h3>
@@ -316,7 +315,7 @@
     $('#panel-sub').scrollIntoView({behavior:'smooth'});
   });
 
-  // NFC UX (stepper con autorepeat y sin ghost click)
+  // NFC UX
   function paintNfc(){
     $('#qty').textContent=qty;
     $('#totalNfc').textContent=fmt(qty*PRICE.nfcUnit)+' (pago único)';
@@ -356,12 +355,13 @@
   });
   paintPrices();
 
-  // Pago NFC (si no hay sesión, el gating lo corta abajo)
+  // Pago NFC (con credenciales)
   $('#buyNfcBtn').addEventListener('click', async () => {
     try {
       const res = await fetch('/api/buy-nfc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ quantity: qty })
       });
       const data = await res.json();
@@ -370,7 +370,7 @@
     } catch { alert('Error de red al iniciar el pago de NFC'); }
   });
 
-  // Pago suscripciones
+  // Pago suscripciones (con credenciales)
   $$('.btn.plan').forEach(btn => btn.addEventListener('click', async () => {
     const tier = btn.dataset.tier;
     const frequency = yearly ? 'annual' : 'monthly';
@@ -387,6 +387,7 @@
       const res = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ tier, frequency })
       });
       const data = await res.json();
@@ -402,7 +403,7 @@
   }));
 </script>
 
-<!-- === AUTH + MENÚ + GATING (login requerido) === -->
+<!-- === AUTH + MENÚ + GATING === -->
 <script>
 (function(){
   const S = { user:null };
@@ -411,14 +412,18 @@
   const $$ = s => Array.from(document.querySelectorAll(s));
   const fmtDate = (d)=> new Intl.DateTimeFormat('es-ES',{dateStyle:'medium'}).format(d);
 
-  /* === Helpers de fecha === */
+  // Persistencia ligera
+  const KEY='acct_user';
+  function saveUser(u){ try{ localStorage.setItem(KEY, u ? JSON.stringify(u) : ''); }catch{} }
+  function readUser(){ try{ const v=localStorage.getItem(KEY)||''; return v?JSON.parse(v):null; }catch{ return null; } }
+
+  /* === Helpers fecha === */
   function addDays(date, days){ const x = new Date(date); x.setDate(x.getDate()+days); return x; }
   function getInterval(u){
     return (u?.subscription?.price?.interval ||
             u?.subscription?.plan?.interval ||
             u?.subscription_interval || 'month').toLowerCase();
   }
-  // Renovación a 30 días (o 365 días si anual)
   function computeNextRenewal30(u){
     const start = u?.subscription?.current_period_start || u?.subscription_start || u?.subscription_created;
     if(!start) return null;
@@ -427,7 +432,6 @@
     return interval==='year' ? addDays(startDate, 365) : addDays(startDate, 30);
   }
 
-  /* === Plan pretty === */
   function prettyPlan(u){
     const nick = (u?.subscription?.plan?.nickname || u?.subscription?.price?.nickname || u?.plan || '').toLowerCase();
     let base = 'Básico';
@@ -442,7 +446,7 @@
     return s === 'active' || s === 'trialing' || s === 'past_due' || u?.isSubscribed === true;
   }
 
-  /* === Modal === */
+  // Modal
   const modal = $('#acct-modal');
   const msg = $('#acct-msg');
   const tabBtns = $$('#acct-modal .acct-tab');
@@ -484,7 +488,6 @@
     setTab('recover'); const input = $('#acct-recover-email'); if(input&&email) input.value = email;
   });
 
-  // Ver/ocultar pass + medidor
   $$('.toggle-eye').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const sel = btn.getAttribute('data-toggle'); const input = document.querySelector(sel);
@@ -501,13 +504,19 @@
   });
 
   async function api(method, url, body){
-    const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):undefined });
+    const res = await fetch(url, {
+      method,
+      headers:{'Content-Type':'application/json'},
+      credentials:'include',
+      cache:'no-store',
+      body: body?JSON.stringify(body):undefined
+    });
     let data=null; try{ data = await res.json(); }catch{}
     if(!res.ok) throw (data?.error || `HTTP ${res.status}`);
     return data;
   }
 
-  /* === Top-right account nav === */
+  // Pintar nav
   function paintNav(){
     const slots = ['#acct-nav-slot'].map(s=>document.querySelector(s)).filter(Boolean);
     const htmlAnon = `<a class="btn ghost" id="acct-open-nav">Iniciar sesión</a>`;
@@ -539,18 +548,25 @@
       slot.querySelector('#acct-logout-nav')?.addEventListener('click', async (e)=>{
         e.preventDefault();
         try{ await api('POST','/api/logout',{});}catch{}
-        S.user = null; paintNav(); paintAccountSection();
+        S.user = null; saveUser(null); paintNav(); paintAccountSection();
       });
     });
   }
 
-  /* === Sesión + gating (sin auto-checkout tras login) === */
+  // Sesión + gating
   async function getSession(){
-    try{ const data = await api('GET','/api/session'); S.user = data?.user || null; }
-    catch{ S.user = null; }
+    // pinta rápido con cache local
+    const cached = readUser();
+    if(cached){ S.user = cached; paintNav(); paintAccountSection(); }
+
+    try{
+      const data = await api('GET','/api/session');
+      S.user = data?.user || null;
+      saveUser(S.user);
+    }catch{ S.user = cached || null; }
     paintNav(); paintAccountSection();
 
-    // Gating de compras: si no hay sesión -> abrir modal y NO relanzar acción
+    // Gating: abrir modal y NO relanzar acción
     const requireLogin = (ev) => {
       if(!S.user){
         ev.stopImmediatePropagation(); ev.preventDefault();
@@ -559,7 +575,6 @@
       } return false;
     };
 
-    // Proteger todos los botones de compra/planes/gestión
     document.body.addEventListener('click',(e)=>{
       const guarded = e.target.closest('.acct-guard');
       if(guarded) requireLogin(e);
@@ -573,8 +588,8 @@
     const password = $('#acct-login-pass').value;
     try{
       const data = await api('POST','/api/login',{ email, password });
-      S.user = data?.user || null; paintNav(); paintAccountSection(); closeModal();
-      // No relanzamos la acción que abrió el modal: te quedas en esta página.
+      S.user = data?.user || null; saveUser(S.user);
+      paintNav(); paintAccountSection(); closeModal();
     }catch(err){
       errs.login.textContent = (err==='account_not_found') ? 'No existe una cuenta con ese email.' :
                                (err==='invalid_credentials') ? 'Contraseña incorrecta.' :
@@ -595,7 +610,8 @@
     if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
     try{
       const data = await api('POST','/api/register',{ name, email, password: p1 });
-      S.user = data?.user || null; paintNav(); paintAccountSection(); closeModal();
+      S.user = data?.user || null; saveUser(S.user);
+      paintNav(); paintAccountSection(); closeModal();
     }catch(err){
       errs.register.textContent = (err==='email_in_use') ? 'Ese correo ya tiene una cuenta. Inicia sesión.' :
                                   (err==='weak_password') ? 'La contraseña debe tener al menos 6 caracteres.' :
@@ -617,7 +633,7 @@
     }
   });
 
-  /* === Bloque “Mi suscripción” === */
+  // Sección “Mi suscripción”
   function paintAccountSection(){
     const emailEl = $('#acct-email');
     const statusEl = $('#acct-status');
@@ -640,7 +656,7 @@
     logoutBtn?.removeAttribute('disabled');
     logoutBtn.onclick = async ()=> {
       try{ await api('POST','/api/logout',{}); }catch{}
-      S.user = null; paintNav(); paintAccountSection();
+      S.user = null; saveUser(null); paintNav(); paintAccountSection();
       alert('Sesión cerrada');
     };
 
@@ -649,21 +665,23 @@
     const prettyStatus = isSubActive(S.user) ? 'Suscripción activa' : (st==='canceled'?'Suscripción cancelada':'Sin suscripción');
     statusEl.textContent = prettyStatus;
 
-    // Plan exacto (“Básico mensual/anual”)
     planEl.textContent = S.user.subscription ? `Plan: ${prettyPlan(S.user)}` : '';
 
-    // Renovación a 30 días desde inicio de periodo
     const next = computeNextRenewal30(S.user);
     renewsEl.textContent = next ? `Renovación / fin de periodo: ${fmtDate(next)}.` : '';
 
-    // NFC comprados (desde metadata)
     const qty = Number(S.user.nfc_qty || 0);
     nfcEl.textContent = `NFC comprados: ${qty}`;
   }
 
   document.getElementById('acct-open-from-section')?.addEventListener('click', ()=> openModal());
 
-  // Exposición mínima
+  // Sync entre pestañas
+  window.addEventListener('storage', (e)=>{
+    if(e.key==='acct_user'){ try{ S.user = e.newValue ? JSON.parse(e.newValue) : null; }catch{ S.user=null; } paintNav(); paintAccountSection(); }
+  });
+
+  // Exponer helpers
   window.taplyAuth = { open: openModal, close: closeModal, get user(){ return S.user; } };
   window.isSubActive = isSubActive;
   window.prettyPlan = prettyPlan;
@@ -674,5 +692,3 @@
 </script>
 </body>
 </html>
-
-

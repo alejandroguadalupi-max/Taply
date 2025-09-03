@@ -82,9 +82,20 @@
     const $=s=>document.querySelector(s);
     document.querySelectorAll('.eye').forEach(b=>b.addEventListener('click',()=>{const i=document.querySelector(b.dataset.t); if(i) i.type=i.type==='password'?'text':'password';}));
 
-    // API helper
+    // Persistencia ligera
+    const KEY='acct_user';
+    function saveUser(u){ try{ localStorage.setItem(KEY, u ? JSON.stringify(u) : ''); }catch{} }
+    function readUser(){ try{ const v=localStorage.getItem(KEY)||''; return v?JSON.parse(v):null; }catch{ return null; } }
+
+    // API helper con credenciales
     async function api(method, url, body){
-      const res = await fetch(url,{method,headers:{'Content-Type':'application/json'},body: body?JSON.stringify(body):undefined});
+      const res = await fetch(url,{
+        method,
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        cache:'no-store',
+        body: body?JSON.stringify(body):undefined
+      });
       let data=null; try{ data=await res.json(); }catch{}
       if(!res.ok) throw (data?.error||'error');
       return data;
@@ -94,17 +105,24 @@
     const qs = new URLSearchParams(location.search);
     const NEXT = (qs.get('next') && decodeURIComponent(qs.get('next'))) || 'gestionar.html';
 
-    // Si ya está logueado, redirige
+    // Si el cache dice que ya hay usuario, intentamos redirigir rápido
+    const cached = readUser();
+    if(cached){ location.replace(NEXT); }
+
+    // Verificación con servidor
     (async ()=>{
-      try{ const s=await api('GET','/api/session'); if(s?.user){ location.replace(NEXT); } }catch{}
+      try{ const s=await api('GET','/api/session'); if(s?.user){ saveUser(s.user); location.replace(NEXT); } }catch{}
     })();
 
     // LOGIN
     $('#form-login').addEventListener('submit', async (e)=>{
       e.preventDefault(); $('#err-login').style.display='none';
       const email=$('#login-email').value.trim(); const password=$('#login-pass').value;
-      try{ await api('POST','/api/login',{email,password}); location.href=NEXT; }
-      catch(err){
+      try{
+        const data = await api('POST','/api/login',{email,password});
+        saveUser(data?.user || null);
+        location.href=NEXT;
+      }catch(err){
         const s=String(err);
         $('#err-login').textContent = s==='account_not_found'?'No existe esa cuenta.':
                                        s==='invalid_credentials'?'Contraseña incorrecta.':
@@ -130,8 +148,15 @@
       if(!name || name.length<2){ err.textContent='El nombre es obligatorio.'; return void(err.style.display='block'); }
       if(p1.length<6){ err.textContent='La contraseña debe tener al menos 6 caracteres.'; return void(err.style.display='block'); }
       if(p1!==p2){ err.textContent='Las contraseñas no coinciden.'; return void(err.style.display='block'); }
-      try{ await api('POST','/api/register',{name,email,password:p1}); location.href=NEXT; }
-      catch(ex){ const s=String(ex); err.textContent = s==='email_in_use'?'Ese correo ya tiene cuenta. Inicia sesión.': s; err.style.display='block'; }
+      try{
+        const data = await api('POST','/api/register',{name,email,password:p1});
+        saveUser(data?.user || null);
+        location.href=NEXT;
+      }catch(ex){
+        const s=String(ex);
+        err.textContent = s==='email_in_use'?'Ese correo ya tiene cuenta. Inicia sesión.': s;
+        err.style.display='block';
+      }
     });
   </script>
 </body>

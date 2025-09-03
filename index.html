@@ -6,9 +6,21 @@
   <meta name="theme-color" content="#0b0f1a" />
   <title>Taply — Sube la valoración de tu negocio sin esfuerzo</title>
   <meta name="description" content="Sé un imán de clientes con Taply: más y mejores reseñas online con tecnología NFC. Convierte opiniones positivas en reseñas de Google y aprende de las negativas." />
+
+  <!-- SEO / OG -->
+  <link rel="canonical" href="https://tu-dominio.com/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Taply — Sube la valoración de tu negocio sin esfuerzo">
+  <meta property="og:description" content="Más reseñas, mejor reputación y más ingresos con NFC.">
+  <meta property="og:image" content="https://tu-dominio.com/og.jpg">
+  <meta property="og:url" content="https://tu-dominio.com/">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Fuentes -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
   <style>
     :root{
       --bg:#0b0f1a; --bg-2:#0e1424; --txt:#e9eefc; --muted:#94a3b8;
@@ -81,6 +93,7 @@
     .card h3{margin:.2rem 0 .6rem}
     .card p{color:var(--muted);margin:0}
 
+    /* Reviews / carrusel */
     .reviews{position:relative;margin:36px 0}
     .reviews h2{margin:0 0 14px}
     .reviews-window{position:relative;overflow:hidden}
@@ -101,6 +114,15 @@
     .review-name{font-weight:700}
     .review-stars{color:#fbbf24;font-size:18px;letter-spacing:2px}
     .review-text{color:#c9d3e6;margin:6px 0 12px}
+
+    .carousel-btn{
+      position:absolute;top:50%;transform:translateY(-50%);
+      width:44px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,.16);
+      background:rgba(10,15,22,.7);backdrop-filter:blur(6px);color:#e9eefc;cursor:pointer;
+      display:grid;place-items:center;box-shadow:var(--shadow)
+    }
+    .carousel-btn.left{left:12px}
+    .carousel-btn.right{right:12px}
 
     .faq{max-width:900px;margin-inline:auto}
     .acc{border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.02);box-shadow:var(--shadow)}
@@ -134,7 +156,7 @@
     }
     @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
-    /* MODAL CUENTA (pro) */
+    /* MODAL CUENTA */
     #acct-modal.acct-hidden{display:none!important}
     #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.6);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
     .acct-dialog{width:min(520px,92%);background:var(--bg-2);color:var(--txt);border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:var(--shadow);padding:20px}
@@ -191,13 +213,16 @@
   </header>
 
   <main>
-    <section class="hero">
+    <section class="hero" aria-labelledby="hero-title">
       <div class="container hero-grid">
         <div>
-          <h1>¿Imaginas subir la valoración de tu negocio <em>SIN HACER NADA</em>?</h1>
+          <h1 id="hero-title">¿Imaginas subir la valoración de tu negocio <em>SIN HACER NADA</em>?</h1>
           <p class="lead">Aumenta tus reseñas, protege tu reputación y convierte opiniones en más clientes y más ingresos, sin mover un solo dedo.</p>
           <div class="pills"><div class="pill">Mejores reseñas</div><div class="pill">Más clientes</div><div class="pill">Más dinero</div></div>
-          <div class="cta-row"><a class="btn" href="suscripciones.html">Ver suscripciones</a></div>
+          <div class="cta-row">
+            <a class="btn" href="suscripciones.html">Ver suscripciones</a>
+            <a class="ghost acct-guard" href="gestionar.html">Gestionar suscripción</a>
+          </div>
         </div>
       </div>
     </section>
@@ -215,15 +240,19 @@
       </div>
     </section>
 
-    <section class="reviews" id="reviews">
+    <section class="reviews" id="reviews" aria-labelledby="reviews-title">
       <div class="container">
-        <h2>Valorado 4,8/5 por más de 30 negocios</h2>
+        <h2 id="reviews-title">Valorado 4,8/5 por más de 30 negocios</h2>
+
+        <button class="carousel-btn left" id="revPrev" aria-label="Opinión anterior">‹</button>
+        <button class="carousel-btn right" id="revNext" aria-label="Opinión siguiente">›</button>
+
         <div class="reviews-window">
           <div class="reviews-track" id="reviewsTrack" tabindex="0" aria-label="Opiniones de clientes">
-            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=26" alt="Sara Cordero" width="54" height="54"></div><div><div class="review-name">Sara Cordero</div><div class="review-stars">★★★★★</div></div></div><p class="review-text">Instalación en 5 minutos. Los avisos de reseñas negativas nos han permitido corregir fallos en días.</p></article>
-            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=33" alt="Marlon Melara" width="54" height="54"></div><div><div class="review-name">Marlon Melara</div><div class="review-stars">★★★★★</div></div></div><p class="review-text">Ahorra tiempo en reputación online. Muy fácil para el cliente.</p></article>
-            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=12" alt="Joan Blanch" width="54" height="54"></div><div><div class="review-name">Joan Blanch</div><div class="review-stars">★★★★★</div></div></div><p class="review-text">Subimos reseñas sin pedirlo. El panel de negativas nos ha ayudado a mejorar procesos.</p></article>
-            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=5" alt="Eco Abraham" width="54" height="54"></div><div><div class="review-name">Eco Abraham</div><div class="review-stars">★★★★★</div></div></div><p class="review-text">Nunca había conseguido tantas reseñas reales tan rápido. El flujo NFC es comodísimo.</p></article>
+            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=26" alt="Sara Cordero" width="54" height="54"></div><div><div class="review-name">Sara Cordero</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Instalación en 5 minutos. Los avisos de reseñas negativas nos han permitido corregir fallos en días.</p></article>
+            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=33" alt="Marlon Melara" width="54" height="54"></div><div><div class="review-name">Marlon Melara</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Ahorra tiempo en reputación online. Muy fácil para el cliente.</p></article>
+            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=12" alt="Joan Blanch" width="54" height="54"></div><div><div class="review-name">Joan Blanch</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Subimos reseñas sin pedirlo. El panel de negativas nos ha ayudado a mejorar procesos.</p></article>
+            <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=5" alt="Eco Abraham" width="54" height="54"></div><div><div class="review-name">Eco Abraham</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Nunca había conseguido tantas reseñas reales tan rápido. El flujo NFC es comodísimo.</p></article>
           </div>
         </div>
       </div>
@@ -277,7 +306,7 @@
     <button class="btn-accept" id="cookieAccept">Aceptar</button>
   </div>
 
-  <!-- MODAL CUENTA (mismo diseño que en suscripciones) -->
+  <!-- MODAL CUENTA -->
   <div id="acct-modal" class="acct-hidden" role="dialog" aria-modal="true" aria-labelledby="acct-title">
     <div class="acct-dialog">
       <div class="acct-head">
@@ -286,10 +315,10 @@
       </div>
       <p id="acct-msg" class="acct-msg"></p>
 
-      <div class="acct-tabs">
-        <button class="acct-tab acct-tab-active" data-tab="login">Iniciar sesión</button>
-        <button class="acct-tab" data-tab="register">Registrarse</button>
-        <button class="acct-tab" data-tab="forgot">Recuperar</button>
+      <div class="acct-tabs" role="tablist" aria-label="Pestañas de cuenta">
+        <button class="acct-tab acct-tab-active" data-tab="login" role="tab" aria-selected="true">Iniciar sesión</button>
+        <button class="acct-tab" data-tab="register" role="tab" aria-selected="false">Registrarse</button>
+        <button class="acct-tab" data-tab="forgot" role="tab" aria-selected="false">Recuperar</button>
       </div>
 
       <!-- LOGIN -->
@@ -302,7 +331,7 @@
         <label>Contraseña
           <span class="acct-input">
             <input id="acct-login-pass" type="password" required autocomplete="current-password" placeholder="••••••••">
-            <button type="button" class="toggle-eye" data-toggle="#acct-login-pass">👁</button>
+            <button type="button" class="toggle-eye" data-toggle="#acct-login-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
           </span>
         </label>
         <button type="submit" class="btn">Entrar</button>
@@ -317,14 +346,14 @@
         <label>Contraseña (mín. 6)
           <span class="acct-input">
             <input id="acct-reg-pass" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
-            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass">👁</button>
+            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
           </span>
         </label>
         <div class="pw-meter" aria-hidden="true"><span id="pwBar"></span></div>
         <label>Confirmar contraseña
           <span class="acct-input">
             <input id="acct-reg-pass2" type="password" required minlength="6" autocomplete="new-password" placeholder="Repite la contraseña">
-            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass2">👁</button>
+            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass2" aria-label="Mostrar u ocultar contraseña">👁</button>
           </span>
         </label>
         <button type="submit" class="btn">Crear cuenta</button>
@@ -355,6 +384,18 @@
     mobileMenu?.addEventListener('click', (e)=>{ const a = e.target.closest('a'); if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); } });
     window.addEventListener('resize', ()=>{ if(window.innerWidth > 768){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); } });
 
+    // Carrusel de reseñas (teclas, botones y smooth scroll)
+    (function(){
+      const track = document.getElementById('reviewsTrack');
+      const prev = document.getElementById('revPrev');
+      const next = document.getElementById('revNext');
+      const step = () => Math.min(480, Math.round(track.clientWidth * 0.8));
+      const go = (dir)=> track.scrollBy({left: dir*step(), behavior:'smooth'});
+      prev?.addEventListener('click', ()=>go(-1));
+      next?.addEventListener('click', ()=>go(+1));
+      track?.addEventListener('keydown', (e)=>{ if(e.key==='ArrowLeft') go(-1); else if(e.key==='ArrowRight') go(+1); });
+    })();
+
     // FAQ acordeón
     document.querySelectorAll('.acc-btn').forEach(btn=>{
       btn.setAttribute('aria-expanded','false');
@@ -375,7 +416,7 @@
       btn.addEventListener('click',()=>{ localStorage.setItem(KEY,'1'); bar.style.display='none'; });
     })();
 
-    /* ======= Cuenta: sesión + modal ======= */
+    /* ======= Cuenta: sesión + modal (persistente y con credenciales) ======= */
     (function(){
       const S = { user:null };
       const $ = s => document.querySelector(s);
@@ -394,6 +435,11 @@
       const regPass2= $('#acct-reg-pass2');
       const pwBar   = $('#pwBar');
 
+      // Persistencia
+      const KEY='acct_user';
+      function saveUser(u){ try{ localStorage.setItem(KEY, u ? JSON.stringify(u) : ''); }catch{} }
+      function readUser(){ try{ const v=localStorage.getItem(KEY)||''; return v?JSON.parse(v):null; }catch{ return null; } }
+
       function showModal(message){
         $('#acct-msg').textContent = message || 'Inicia sesión para continuar';
         modal.classList.remove('acct-hidden'); setTab('login'); setTimeout(()=>$('#acct-login-email')?.focus(),50);
@@ -404,18 +450,33 @@
         formReg.classList.toggle('acct-hidden',   name!=='register');
         formForgot.classList.toggle('acct-hidden',name!=='forgot');
         tabs.forEach(b=>b.classList.toggle('acct-tab-active', b.dataset.tab===name));
+        tabs.forEach(b=>b.setAttribute('aria-selected', String(b.dataset.tab===name)));
       }
+      function trapEsc(e){ if(e.key==='Escape') hideModal(); }
+      document.addEventListener('keydown', trapEsc);
       $('#acct-close')?.addEventListener('click', hideModal);
       modal?.addEventListener('click', e=>{ if(e.target===modal) hideModal(); });
       tabs.forEach(b=>b.addEventListener('click', ()=> setTab(b.dataset.tab)));
 
+      // API helper (con credenciales)
       async function api(method, url, body){
-        const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):undefined });
+        const res = await fetch(url, {
+          method,
+          headers:{'Content-Type':'application/json'},
+          credentials:'include',
+          cache:'no-store',
+          body: body?JSON.stringify(body):undefined
+        });
         let data=null; try{ data = await res.json(); }catch{}
         if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
       }
-      async function getSession(){ try{ const d=await api('GET','/api/session'); setUser(d?.user||null); }catch{ setUser(null); } }
-      function setUser(u){ S.user=u; try{ localStorage.setItem('acct_user', u ? JSON.stringify(u) : ''); }catch{} paintAccountNav(); }
+
+      async function getSession(){
+        // pinta inmediato desde cache
+        const cached = readUser(); if(cached){ S.user=cached; paintAccountNav(); }
+        try{ const d=await api('GET','/api/session'); setUser(d?.user||null); }catch{ if(!cached) setUser(null); }
+      }
+      function setUser(u){ S.user=u; saveUser(u); paintAccountNav(); }
       function initials(str){ const n=(str||'').trim().split(/\s+/).slice(0,2).map(s=>s[0]?.toUpperCase()||'').join(''); return n||'T'; }
       function displayName(u){ return (u?.name || u?.email || 'Mi cuenta').split('@')[0]; }
 
@@ -478,10 +539,14 @@
       // Gating “gestionar” sin sesión
       document.body.addEventListener('click',(e)=>{ const a=e.target.closest('a.acct-guard'); if(a && !S.user){ e.preventDefault(); showModal('Inicia sesión para gestionar tu suscripción.'); } });
 
+      // Sync entre pestañas
+      window.addEventListener('storage', (e)=>{
+        if(e.key===KEY){ try{ S.user = e.newValue ? JSON.parse(e.newValue) : null; }catch{ S.user=null; } paintAccountNav(); }
+      });
+
       getSession();
       window.TaplyOpenLogin = showModal;
     })();
   </script>
 </body>
 </html>
-
