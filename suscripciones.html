@@ -1,11 +1,9 @@
-<!doctype html> 
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="theme-color" content="#0b0f1a" />
-  <!-- CLIENT ID DE GOOGLE (para referencia del proyecto) -->
-  <meta name="google-signin-client_id" content="124694801200-ibn7tfgtle183n6gqkqk29egeu0j1t4c.apps.googleusercontent.com">
   <title>Taply — NFC + Suscripción</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
@@ -50,6 +48,8 @@
     .btn:focus-visible{outline:none; box-shadow:var(--focus)}
     .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--txt);box-shadow:none}
     .btn.line{background:transparent;border:1px dashed var(--border);color:var(--muted)}
+    .btn-google{background:#db4437;color:#fff}
+    .btn-google:hover{filter:brightness(.95)}
     .seg{display:flex;justify-content:center;gap:10px;margin:22px auto}
     .seg button{border:0;padding:10px 18px;border-radius:999px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.06);color:var(--muted);touch-action:manipulation;font-size:16px}
     .seg button.active{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017}
@@ -67,7 +67,7 @@
     .panel{display:none;margin-bottom:40px}
     .panel.show{display:block}
 
-    /* ===== PANEL/ MODAL DE ACCESO ===== */
+    /* ===== MODAL ACCESO ===== */
     #acct-modal.acct-hidden{display:none!important}
     #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.65);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
     .acct-dialog{
@@ -100,9 +100,6 @@
     .acct-ok{color:var(--ok);margin-top:2px}
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .acct-actions{display:grid;gap:10px}
-    .remember{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.95rem}
-    .meter{height:8px;border-radius:8px;background:#101826;border:1px solid rgba(255,255,255,.08);overflow:hidden}
-    .meter > i{display:block;height:100%;width:0%;background:#ef4444;transition:width .25s, background .25s}
 
     /* ===== Chips y datos cuenta ===== */
     .plan-badge{
@@ -268,8 +265,8 @@
 
         <div class="acct-actions">
           <button type="submit" class="btn">Iniciar sesión</button>
-          <!-- Google en nueva pestaña -->
-          <a href="/api/google-oauth-begin" target="_blank" rel="noopener" class="btn btn-google">Continuar con Google</a>
+          <!-- Abrir Google (OAuth) en pestaña nueva -->
+          <a href="/api/google?from=login" target="_blank" rel="noopener" class="btn btn-google">Continuar con Google</a>
           <p id="acct-error-login" class="acct-err" style="display:none"></p>
         </div>
       </form>
@@ -297,13 +294,13 @@
         <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
         <div class="acct-actions">
           <button type="submit" class="btn">Crear cuenta</button>
-          <!-- Google en nueva pestaña -->
-          <a href="/api/google-oauth-begin" target="_blank" rel="noopener" class="btn btn-google">Registrarse con Google</a>
+          <!-- Registrarse con Google en pestaña nueva -->
+          <a href="/api/google?from=register" target="_blank" rel="noopener" class="btn btn-google">Registrarme con Google</a>
           <p id="acct-error-register" class="acct-err" style="display:none"></p>
         </div>
       </form>
 
-      <!-- RECOVER (tarjeta separada) -->
+      <!-- RECOVER -->
       <form id="acct-form-recover" class="acct-form" style="display:none" autocomplete="on" novalidate>
         <p class="acct-small">Te enviaremos un enlace para restablecer tu contraseña.</p>
         <label class="acct-label">Correo
@@ -352,8 +349,10 @@
     $('#p-pro').textContent=yearly?fmt(planAmount('pro')):PRICE.monthly.pro+'€';
     $$('.per').forEach(el=>el.textContent=yearly?'/año':'/mes');
   }
-  $('#btn-month').addEventListener('click',()=>{yearly=false;$('#btn-month').classList.add('active');$('#btn-year').classList.remove('active');$('#btn-month').setAttribute('aria-selected','true'); $('#btn-year').setAttribute('aria-selected','false');paintPrices()});
-  $('#btn-year').addEventListener('click',()=>{yearly=true;$('#btn-year').classList.add('active');$('#btn-month').classList.remove('active');$('#btn-year').setAttribute('aria-selected','true'); $('#btn-month').setAttribute('aria-selected','false');paintPrices()});
+  $('#btn-month').addEventListener('click',()=>{yearly=false;$('#btn-month').classList.add('active');$('#btn-year').classList.remove('active');
+    $('#btn-month').setAttribute('aria-selected','true'); $('#btn-year').setAttribute('aria-selected','false');paintPrices()});
+  $('#btn-year').addEventListener('click',()=>{yearly=true;$('#btn-year').classList.add('active');$('#btn-month').classList.remove('active');
+    $('#btn-year').setAttribute('aria-selected','true'); $('#btn-month').setAttribute('aria-selected','false');paintPrices()});
   paintPrices();
 
   // Pago NFC
@@ -395,12 +394,10 @@
   const $$ = s => Array.from(document.querySelectorAll(s));
   const fmtDate = (d)=> new Intl.DateTimeFormat('es-ES',{dateStyle:'medium'}).format(d);
 
-  // Persistencia ligera
   const KEY='acct_user';
   function saveUser(u){ try{ localStorage.setItem(KEY, u ? JSON.stringify(u) : ''); }catch{} }
   function readUser(){ try{ const v=localStorage.getItem(KEY)||''; return v?JSON.parse(v):null; }catch{ return null; } }
 
-  /* === Helpers fecha === */
   function addDays(date, days){ const x = new Date(date); x.setDate(x.getDate()+days); return x; }
   function getInterval(u){ return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase(); }
   function computeNextRenewal30(u){
@@ -419,7 +416,6 @@
     return s === 'active' || s === 'trialing' || s === 'past_due' || u?.isSubscribed === true;
   }
 
-  // ===== Panel acceso =====
   const modal = $('#acct-modal'), title = $('#acct-title'), sub = $('#acct-sub');
   const tabBtns = $$('#acct-modal .acct-tab');
   const forms = { login:$('#acct-form-login'), register:$('#acct-form-register'), recover:$('#acct-form-recover') };
@@ -442,21 +438,17 @@
   tabBtns.forEach(b => b.addEventListener('click', ()=> setTab(b.dataset.tab)));
   $('#acct-open-from-section')?.addEventListener('click', ()=> openModal('login'));
 
-  // Toggle contraseña
   $$('.toggle-eye').forEach(btn=>btn.addEventListener('click', ()=>{ const sel = btn.getAttribute('data-toggle'); const input = document.querySelector(sel); if(!input) return; input.type = input.type==='password'?'text':'password'; }));
 
-  // Medidor registro
   const meter = $('#pw-meter');
   $('#acct-reg-pass')?.addEventListener('input', (e)=>{ const v=e.target.value||''; let score=0; if(v.length>=6) score+=33; if(/[A-Z]/.test(v)&&/[a-z]/.test(v)) score+=33; if(/\d/.test(v) || /[^A-Za-z0-9]/.test(v)) score+=34; if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; } });
 
-  // API helper
   async function api(method, url, body){
     const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, credentials:'include', cache:'no-store', body: body?JSON.stringify(body):undefined });
     let data=null; try{ data=await res.json(); }catch{}
     if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
   }
 
-  // ===== Enlaces recuperacion =====
   $('#link-forgot')?.addEventListener('click', ()=> setTab('recover'));
   $('#recover-back')?.addEventListener('click', ()=> setTab('login'));
   forms.recover?.addEventListener('submit', async (e)=>{
@@ -466,7 +458,6 @@
     catch(err){ errs.recover.textContent=String(err); errs.recover.style.display='block'; }
   });
 
-  // ===== Menú superior =====
   function paintNav(){
     const slot = document.querySelector('#acct-nav-slot');
     const htmlAnon = `<a class="btn ghost" id="acct-open-nav">Iniciar sesión</a>`;
@@ -493,7 +484,6 @@
     slot.querySelector('#acct-logout-nav')?.addEventListener('click', async (e)=>{ e.preventDefault(); try{ await api('POST','/api/logout',{});}catch{} S.user = null; saveUser(null); paintNav(); paintAccountSection(); });
   }
 
-  // ===== Sesión + gating =====
   async function getSession(){
     const cached = readUser(); if(cached){ S.user = cached; paintNav(); paintAccountSection(); }
     try{ const data = await api('GET','/api/session'); S.user = data?.user || null; saveUser(S.user); }catch{ S.user = cached || null; }
@@ -501,15 +491,11 @@
     document.body.addEventListener('click',(e)=>{ const g=e.target.closest('.acct-guard'); if(g && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); } }, true);
   }
 
-  // ===== Formularios =====
   forms.login?.addEventListener('submit', async (e)=>{
     e.preventDefault(); errs.login.style.display='none';
     const email = $('#acct-login-email').value.trim(); const password = $('#acct-login-pass').value;
-    try{
-      const data = await api('POST','/api/login',{ email, password });
-      S.user = data?.user || null; saveUser(S.user);
-      await forceSessionRefresh(); closeModal();
-    }catch(err){
+    try{ const data = await api('POST','/api/login',{ email, password }); S.user = data?.user || null; saveUser(S.user); await forceSessionRefresh(); closeModal(); }
+    catch(err){
       errs.login.textContent = (err==='account_not_found') ? 'No existe una cuenta con ese email.' :
                                (err==='invalid_credentials') ? 'Contraseña incorrecta.' :
                                (err==='password_not_set') ? 'Esta cuenta no tiene contraseña. Usa el enlace de recuperación.' :
@@ -527,8 +513,7 @@
     if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
     try{
       const data = await api('POST','/api/register',{ name, email, password: p1 });
-      S.user = data?.user || null; saveUser(S.user);
-      await forceSessionRefresh(); closeModal();
+      S.user = data?.user || null; saveUser(S.user); await forceSessionRefresh(); closeModal();
     }catch(err){
       errs.register.textContent = (err==='email_in_use_google') ? 'Ese correo ya existe como cuenta Google. Inicia sesión con Google.' :
                                   (err==='email_in_use') ? 'Ese correo ya tiene una cuenta. Inicia sesión.' :
@@ -539,47 +524,69 @@
     }
   });
 
-  // ===== “Mi suscripción” =====
   function paintAccountSection(){
-    const statusEl = $('#acct-status'), renewsEl = $('#acct-renews'), nfcEl = $('#acct-nfc'), logoutBtn = $('#acct-logout');
-    if(!S.user){
-      statusEl.textContent='Sesión no iniciada'; nfcEl.textContent='NFC comprados: 0'; renewsEl.textContent=''; logoutBtn?.setAttribute('disabled','disabled'); return;
-    }
-    logoutBtn?.removeAttribute('disabled'); logoutBtn.onclick = async ()=>{ try{ await api('POST','/api/logout',{}); }catch{} S.user = null; saveUser(null); paintNav(); paintAccountSection(); alert('Sesión cerrada'); };
-
-    if(isSubActive(S.user)) statusEl.textContent = prettyPlan(S.user); else statusEl.textContent = 'Sin plan activo';
-
-    const next = computeNextRenewal30(S.user);
-    renewsEl.textContent = next ? `Renovación / fin de periodo: ${fmtDate(next)}.` : '';
-
-    const qty = Number(S.user.nfc_qty || 0);
-    nfcEl.textContent = `NFC comprados: ${qty}`;
+    const statusEl = $('#acct-status'), renewsEl = $('#acct-renews'), nfcEl = $('#acct-nfc'], logoutBtn = $('#acct-logout');
   }
+</script>
+<script>
+  (function(){
+    const $ = s => document.querySelector(s);
+    const fmtDate = (d)=> new Intl.DateTimeFormat('es-ES',{dateStyle:'medium'}).format(d);
 
-  // Refresco rápido tras login/registro/Google (se activa también por evento storage del callback)
-  async function forceSessionRefresh(retries=4, delay=600){
-    for(let i=0;i<retries;i++){
+    function isSubActive(u){
+      const s = (u?.subscription?.status || u?.subscription_status || '').toLowerCase();
+      return s === 'active' || s === 'trialing' || s === 'past_due' || u?.isSubscribed === true;
+    }
+    function addDays(date, days){ const x = new Date(date); x.setDate(x.getDate()+days); return x; }
+    function getInterval(u){ return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase(); }
+    function computeNextRenewal30(u){
+      const start = u?.subscription?.current_period_start || u?.subscription_start || u?.subscription_created;
+      if(!start) return null;
+      const startDate = typeof start==='number' ? new Date(start*1000) : new Date(start);
+      return getInterval(u)==='year' ? addDays(startDate,365) : addDays(startDate,30);
+    }
+    function prettyPlan(u){
+      const nick = (u?.subscription?.plan?.nickname || u?.subscription?.price?.nickname || u?.plan || '').toLowerCase();
+      let base = 'Básico'; if(/pro/.test(nick)) base = 'Pro'; else if(/medio|standard|estándar/.test(nick)) base = 'Medio'; else if(/basic|básico|basico/.test(nick)) base = 'Básico';
+      const freq = getInterval(u)==='year' ? 'anual' : 'mensual'; return `${base} ${freq}`;
+    }
+
+    async function api(method, url, body){
+      const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, credentials:'include', cache:'no-store', body: body?JSON.stringify(body):undefined });
+      let data=null; try{ data=await res.json(); }catch{}
+      if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
+    }
+
+    async function refreshAndPaint(){
       try{
         const data = await api('GET','/api/session');
-        if(data?.user){
-          S.user = data.user; saveUser(S.user); paintNav(); paintAccountSection();
-          if(S.user.subscription || typeof S.user.nfc_qty === 'number') break;
+        const user = data?.user || null;
+        const statusEl = document.getElementById('acct-status');
+        const renewsEl = document.getElementById('acct-renews');
+        const nfcEl = document.getElementById('acct-nfc');
+        const logoutBtn = document.getElementById('acct-logout');
+
+        if(!user){
+          statusEl.textContent='Sesión no iniciada'; nfcEl.textContent='NFC comprados: 0'; renewsEl.textContent='';
+          logoutBtn?.setAttribute('disabled','disabled'); return;
         }
+        logoutBtn?.removeAttribute('disabled');
+        logoutBtn.onclick = async ()=>{ try{ await api('POST','/api/logout',{}); }catch{} location.reload(); };
+
+        statusEl.textContent = isSubActive(user) ? prettyPlan(user) : 'Sin plan activo';
+        const next = computeNextRenewal30(user); renewsEl.textContent = next ? `Renovación / fin de periodo: ${fmtDate(next)}.` : '';
+        const qty = Number(user.nfc_qty || 0); nfcEl.textContent = `NFC comprados: ${qty}`;
       }catch{}
-      await new Promise(r=>setTimeout(r,delay));
     }
-  }
+    refreshAndPaint();
 
-  // Sync entre pestañas (el callback de Google escribe acct_user)
-  window.addEventListener('storage', (e)=>{ if(e.key==='acct_user'){ try{ S.user = e.newValue ? JSON.parse(e.newValue) : null; }catch{ S.user=null; } paintNav(); paintAccountSection(); } });
-
-  // Exponer helpers
-  window.taplyAuth = { open: openModal, close: closeModal, get user(){ return S.user; } };
-  window.isSubActive = isSubActive; window.prettyPlan = prettyPlan;
-
-  // Arranque
-  getSession();
-})();
+    // Refresco rápido tras volver del flujo de Google (si llegas con #google=ok)
+    if(location.hash.includes('google=ok')) {
+      refreshAndPaint();
+      // opcional: limpia el hash
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  })();
 </script>
 </body>
 </html>
