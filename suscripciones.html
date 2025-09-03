@@ -8,9 +8,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     :root{
-      --bg:#0b0f1a; --bg-2:#0e1424; --txt:#e9eefc; --muted:#9fb0c6;
+      --bg:#0b0f1a; --bg-2:#0e1424; --card:#0d1220; --txt:#e9eefc; --muted:#9fb0c6;
       --brand-1:#00d4ff; --brand-2:#7c3aed; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
-      --border:rgba(255,255,255,.08); --radius:18px;
+      --border:rgba(255,255,255,.10); --radius:18px;
       --shadow:0 12px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
       --focus:0 0 0 3px rgba(0,212,255,.25),0 0 0 6px rgba(124,58,237,.18);
     }
@@ -35,10 +35,10 @@
     .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-size:12px}
 
     .chooser{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:24px auto}
-    .card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;justify-content:space-between}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;justify-content:space-between}
     .card h3{margin:0 0 6px;font-size:1.2rem}
     .card p{margin:0;color:var(--muted)}
-    .badge{font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.04);color:#cfe3ff;display:inline-block;margin-bottom:8px}
+    .badge{font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.06);color:#cfe3ff;display:inline-block;margin-bottom:8px}
     .actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
     .btn{
       padding:12px 16px;border:0;border-radius:999px;font-weight:800;cursor:pointer;display:inline-flex;justify-content:center;align-items:center;
@@ -47,6 +47,7 @@
     }
     .btn:focus-visible{outline:none; box-shadow:var(--focus)}
     .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--txt);box-shadow:none}
+    .btn.line{background:transparent;border:1px dashed var(--border);color:var(--muted)}
     .seg{display:flex;justify-content:center;gap:10px;margin:22px auto}
     .seg button{border:0;padding:10px 18px;border-radius:999px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.06);color:var(--muted);touch-action:manipulation;font-size:16px}
     .seg button.active{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017}
@@ -64,38 +65,50 @@
     .panel{display:none;margin-bottom:40px}
     .panel.show{display:block}
 
-    /* === MODAL / CUENTA === */
+    /* ===== PANEL/ MODAL DE ACCESO (nuevo look) ===== */
     #acct-modal.acct-hidden{display:none!important}
-    #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.6);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
-    .acct-dialog{width:min(560px,92%);background:var(--bg-2,#0e1424);color:var(--txt,#e9eefc);
-      border:1px solid var(--border,rgba(255,255,255,.08));border-radius:16px;box-shadow:var(--shadow);padding:20px}
-    .acct-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-    .acct-x{background:transparent;border:0;color:inherit;font-size:22px;cursor:pointer}
-    .acct-tabs{display:flex;gap:8px;margin:10px 0 12px}
-    .acct-tab{border:1px solid var(--border,rgba(255,255,255,.12));background:rgba(255,255,255,.04);
-      border-radius:999px;padding:8px 12px;cursor:pointer;color:inherit;font-weight:700}
-    .acct-tab.acct-tab-active{background:linear-gradient(135deg,var(--brand-1,#00d4ff),var(--brand-2,#7c3aed)); color:#061017}
-    .acct-form{display:grid;gap:10px}
-    .acct-form label{display:grid;gap:6px;font-weight:600}
+    #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.65);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
+    .acct-dialog{
+      width:min(560px,92%); background:var(--bg-2); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow);
+      padding:0; overflow:hidden; color:var(--txt)
+    }
+    .acct-cover{
+      background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
+      height:6px; width:100%;
+    }
+    .acct-body{padding:22px}
+    .acct-head{display:flex;justify-content:center;align-items:center;margin:10px 0 18px}
+    .acct-logo{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-weight:900}
+    .acct-title{margin:10px 0 0;text-align:center;font-weight:800;font-size:1.25rem}
+    .acct-sub{margin:6px 0 0;text-align:center;color:var(--muted);font-size:.96rem}
+
+    .acct-tabs{display:flex;gap:8px;margin:16px auto 12px;justify-content:center}
+    .acct-tab{border:1px solid var(--border);background:rgba(255,255,255,.05);
+      border-radius:999px;padding:8px 14px;cursor:pointer;color:inherit;font-weight:700}
+    .acct-tab.acct-tab-active{background:linear-gradient(135deg,var(--brand-1),var(--brand-2)); color:#061017}
+
+    .acct-form{display:grid;gap:12px;margin-top:6px}
+    .acct-label{font-weight:600}
     .acct-input{position:relative}
     .acct-input input{
-      width:100%;background:#0a0f16;border:1px solid var(--border,rgba(255,255,255,.12));color:inherit;border-radius:12px;padding:12px 42px 12px 12px;font-size:16px;
+      width:100%;background:#0a0f16;border:1px solid var(--border);color:inherit;border-radius:12px;padding:12px 42px 12px 12px;font-size:16px;
       transition:border .2s, box-shadow .2s
     }
     .acct-input input:focus{outline:none;border-color:rgba(0,212,255,.45); box-shadow:var(--focus)}
-    input,select,textarea,button{font-size:16px}
     .toggle-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
-    .acct-msg{color:#cfe3ff;margin:0 0 8px;font-size:.95rem}
-    .acct-err{color:var(--err);margin-top:4px}
-    .acct-small{color:var(--muted,#9fb0c6);font-size:.92rem;margin-top:6px}
-    .acct-link{color:#b3e1ff;text-decoration:underline;cursor:pointer}
+    .acct-err{color:var(--err);margin-top:2px}
+    .acct-ok{color:var(--ok);margin-top:2px}
+    .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+    .acct-actions{display:grid;gap:10px}
+    .btn-google{background:#dd4b39;color:#fff;border:0}
+    .btn-google:hover{filter:brightness(.95)}
+    .remember{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.95rem}
     .meter{height:8px;border-radius:8px;background:#101826;border:1px solid rgba(255,255,255,.08);overflow:hidden}
     .meter > i{display:block;height:100%;width:0%;background:#ef4444;transition:width .25s, background .25s}
-    .row-between{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-    .ok{color:#86efac}
 
-    .acct-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-    .acct-badge{display:inline-block;border:1px solid var(--border,rgba(255,255,255,.12));background:rgba(255,255,255,.04);padding:6px 10px;border-radius:999px;font-weight:800}
+    /* ===== Chips y datos cuenta ===== */
+    .acct-badge{display:inline-block;border:1px solid var(--border);background:rgba(255,255,255,.06);padding:6px 10px;border-radius:999px;font-weight:800}
+    .acct-small{color:var(--muted);font-size:.92rem;margin-top:6px}
   </style>
 </head>
 <body>
@@ -210,7 +223,7 @@
     </div>
 
     <p id="acct-renews" class="acct-small"></p>
-    <p class="acct-small">¿No tienes cuenta? <a id="acct-open-from-section" class="acct-link">Inicia sesión o regístrate</a>.</p>
+    <p class="acct-small">¿No tienes cuenta? <a id="acct-open-from-section" class="acct-badge" style="cursor:pointer">Inicia sesión o regístrate</a>.</p>
   </article>
 </section>
 
@@ -220,75 +233,89 @@
   </div>
 </footer>
 
-<!-- === MODAL CUENTA === -->
+<!-- === PANEL DE ACCESO === -->
 <div id="acct-modal" class="acct-hidden" role="dialog" aria-modal="true" aria-labelledby="acct-title">
   <div class="acct-dialog">
-    <div class="acct-head">
-      <h3 id="acct-title" style="margin:0">Tu cuenta</h3>
-      <button id="acct-close" class="acct-x" aria-label="Cerrar">×</button>
-    </div>
-    <p id="acct-msg" class="acct-msg">Inicia sesión o crea tu cuenta.</p>
-
-    <div class="acct-tabs" role="tablist">
-      <button class="acct-tab acct-tab-active" data-tab="login" role="tab" aria-selected="true">Iniciar sesión</button>
-      <button class="acct-tab" data-tab="register" role="tab" aria-selected="false">Crear cuenta</button>
-      <button class="acct-tab" data-tab="recover" role="tab" aria-selected="false">Recuperar</button>
-    </div>
-
-    <!-- LOGIN -->
-    <form id="acct-form-login" class="acct-form" autocomplete="on" novalidate>
-      <label>Email
-        <span class="acct-input">
-          <input id="acct-login-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
-        </span>
-      </label>
-      <label>Contraseña
-        <span class="acct-input">
-          <input id="acct-login-pass" type="password" required autocomplete="current-password" placeholder="••••••••">
-          <button type="button" class="toggle-eye" data-toggle="#acct-login-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
-        </span>
-      </label>
-      <div class="row-between">
-        <button type="submit" class="btn">Entrar</button>
-        <span class="acct-link" id="acct-forgot">¿Olvidaste la contraseña?</span>
+    <div class="acct-cover"></div>
+    <div class="acct-body">
+      <div class="acct-head">
+        <div class="acct-logo">⌁</div>
       </div>
-      <p class="acct-small">¿Prefieres página aparte? <a class="acct-link" href="login.html">Ir a iniciar sesión</a></p>
-      <p id="acct-error-login" class="acct-err" style="display:none"></p>
-    </form>
+      <h3 id="acct-title" class="acct-title">Inicia sesión en tu cuenta</h3>
+      <p id="acct-sub" class="acct-sub">Introduce tus datos de acceso o crea una cuenta nueva.</p>
 
-    <!-- REGISTER -->
-    <form id="acct-form-register" class="acct-form" style="display:none" autocomplete="on" novalidate>
-      <label>Nombre <input id="acct-reg-name" type="text" required autocomplete="name" placeholder="Nombre y apellidos"></label>
-      <label>Email <input id="acct-reg-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></label>
-      <label>Contraseña
-        <span class="acct-input">
-          <input id="acct-reg-pass" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
-          <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass">👁</button>
-        </span>
-      </label>
-      <label>Confirmar contraseña
-        <span class="acct-input">
-          <input id="acct-reg-pass2" type="password" required minlength="6" autocomplete="new-password" placeholder="Repite la contraseña">
-          <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass2">👁</button>
-        </span>
-      </label>
-      <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
-      <button type="submit" class="btn">Crear cuenta</button>
-      <p class="acct-small">¿Prefieres página aparte? <a class="acct-link" href="registro.html">Ir a registrarse</a></p>
-      <p id="acct-error-register" class="acct-err" style="display:none"></p>
-    </form>
-
-    <!-- RECOVER -->
-    <form id="acct-form-recover" class="acct-form" style="display:none" autocomplete="on" novalidate>
-      <p class="acct-msg">Te enviaremos un enlace para restablecer tu contraseña.</p>
-      <label>Email <input id="acct-recover-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></label>
-      <div class="row-between">
-        <button type="submit" class="btn">Enviar enlace</button>
-        <span class="acct-link" data-tab-go="login">Volver a iniciar sesión</span>
+      <div class="acct-tabs" role="tablist">
+        <button class="acct-tab acct-tab-active" data-tab="login" role="tab" aria-selected="true">Iniciar sesión</button>
+        <button class="acct-tab" data-tab="register" role="tab" aria-selected="false">Registrarse</button>
+        <button class="acct-tab" data-tab="recover" role="tab" aria-selected="false">Recuperar</button>
       </div>
-      <p id="acct-info-recover" class="ok" style="display:none"></p>
-      <p id="acct-error-recover" class="acct-err" style="display:none"></p>
-    </form>
+
+      <!-- LOGIN -->
+      <form id="acct-form-login" class="acct-form" autocomplete="on" novalidate>
+        <label class="acct-label">Correo
+          <span class="acct-input">
+            <input id="acct-login-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
+          </span>
+        </label>
+        <label class="acct-label">Contraseña
+          <span class="acct-input">
+            <input id="acct-login-pass" type="password" required autocomplete="current-password" placeholder="••••••••">
+            <button type="button" class="toggle-eye" data-toggle="#acct-login-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
+          </span>
+        </label>
+
+        <div class="acct-row">
+          <label class="remember"><input type="checkbox" checked> Mantener sesión activa</label>
+          <span class="acct-tab acct-link" data-tab-go="recover" style="background:transparent;border:0;cursor:pointer">¿Olvidaste la contraseña?</span>
+        </div>
+
+        <div class="acct-actions">
+          <button type="submit" class="btn">Iniciar sesión</button>
+          <button type="button" class="btn btn-google" id="btn-google-login" title="No configurado">Iniciar sesión con Google</button>
+          <p id="acct-error-login" class="acct-err" style="display:none"></p>
+        </div>
+      </form>
+
+      <!-- REGISTER -->
+      <form id="acct-form-register" class="acct-form" style="display:none" autocomplete="on" novalidate>
+        <label class="acct-label">Nombre
+          <input id="acct-reg-name" type="text" required autocomplete="name" placeholder="Nombre y apellidos">
+        </label>
+        <label class="acct-label">Correo
+          <input id="acct-reg-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
+        </label>
+        <label class="acct-label">Contraseña
+          <span class="acct-input">
+            <input id="acct-reg-pass" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass">👁</button>
+          </span>
+        </label>
+        <label class="acct-label">Confirmar contraseña
+          <span class="acct-input">
+            <input id="acct-reg-pass2" type="password" required minlength="6" autocomplete="new-password" placeholder="Repite la contraseña">
+            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass2">👁</button>
+          </span>
+        </label>
+        <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
+        <div class="acct-actions">
+          <button type="submit" class="btn">Crear cuenta</button>
+          <p id="acct-error-register" class="acct-err" style="display:none"></p>
+        </div>
+      </form>
+
+      <!-- RECOVER -->
+      <form id="acct-form-recover" class="acct-form" style="display:none" autocomplete="on" novalidate>
+        <p class="acct-small">Te enviaremos un enlace para restablecer tu contraseña.</p>
+        <label class="acct-label">Correo
+          <input id="acct-recover-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
+        </label>
+        <div class="acct-actions">
+          <button type="submit" class="btn">Enviar enlace</button>
+          <p id="acct-info-recover" class="acct-ok" style="display:none"></p>
+          <p id="acct-error-recover" class="acct-err" style="display:none"></p>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -446,9 +473,10 @@
     return s === 'active' || s === 'trialing' || s === 'past_due' || u?.isSubscribed === true;
   }
 
-  // Modal
+  // ===== Panel de acceso =====
   const modal = $('#acct-modal');
-  const msg = $('#acct-msg');
+  const title = $('#acct-title');
+  const sub = $('#acct-sub');
   const tabBtns = $$('#acct-modal .acct-tab');
   const forms = {
     login:   $('#acct-form-login'),
@@ -467,26 +495,20 @@
     tabBtns.forEach(b=>{
       const on = b.dataset.tab===name; b.classList.toggle('acct-tab-active',on); b.setAttribute('aria-selected', String(on));
     });
+    if(name==='login'){ title.textContent='Inicia sesión en tu cuenta'; sub.textContent='Introduce tus datos de acceso o crea una cuenta nueva.'; }
+    if(name==='register'){ title.textContent='Crea tu cuenta ahora mismo'; sub.textContent='Completa tus datos para registrarte en Taply.'; }
+    if(name==='recover'){ title.textContent='Recupera tu acceso'; sub.textContent='Te enviaremos un enlace para restablecer tu contraseña.'; }
   }
-  function openModal(text, tab='login'){
-    msg.textContent = text || 'Accede a tu cuenta';
-    modal.classList.remove('acct-hidden');
-    setTab(tab);
-    setTimeout(()=>$('#acct-login-email')?.focus(),40);
-  }
+  function openModal(tab='login'){ modal.classList.remove('acct-hidden'); setTab(tab); setTimeout(()=>$('#acct-login-email')?.focus(),40); }
   function closeModal(){
     modal.classList.add('acct-hidden');
     Object.values(errs).forEach(e=> e && (e.style.display='none'));
     okRecover.style.display='none';
   }
-  $('#acct-close')?.addEventListener('click', closeModal);
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeModal(); });
   modal?.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
   tabBtns.forEach(b => b.addEventListener('click', ()=> setTab(b.dataset.tab)));
   document.querySelectorAll('[data-tab-go]').forEach(el=> el.addEventListener('click', ()=> setTab(el.getAttribute('data-tab-go')) ));
-  $('#acct-forgot')?.addEventListener('click', ()=>{
-    const email = $('#acct-login-email')?.value || '';
-    setTab('recover'); const input = $('#acct-recover-email'); if(input&&email) input.value = email;
-  });
 
   $$('.toggle-eye').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -516,9 +538,14 @@
     return data;
   }
 
-  // Pintar nav
+  // Botón Google (placeholder)
+  $('#btn-google-login')?.addEventListener('click', ()=>{
+    alert('Inicio con Google no está configurado todavía.');
+  });
+
+  // ===== Menú superior =====
   function paintNav(){
-    const slots = ['#acct-nav-slot'].map(s=>document.querySelector(s)).filter(Boolean);
+    const slot = document.querySelector('#acct-nav-slot');
     const htmlAnon = `<a class="btn ghost" id="acct-open-nav">Iniciar sesión</a>`;
     const name = (S.user?.name || S.user?.email || '').split(' ')[0] || 'Mi cuenta';
     const htmlLogged = `
@@ -528,34 +555,31 @@
         </span>
         Hola, ${name}
       </span>
-      <div id="acct-menu-pop" style="display:none;position:absolute;transform:translateY(6px);background:#0e1424;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px;box-shadow:0 12px 28px rgba(0,0,0,.45)">
+      <div id="acct-menu-pop" style="display:none;position:absolute;transform:translateY(6px);right:0;background:#0e1424;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px;box-shadow:0 12px 28px rgba(0,0,0,.45)">
         <a class="ghost" href="gestionar.html" style="display:block;padding:8px 10px">Gestionar suscripción</a>
         <a class="ghost" id="acct-logout-nav" style="display:block;padding:8px 10px">Cerrar sesión</a>
       </div>
     `;
-    slots.forEach(slot=>{
-      slot.style.position = 'relative';
-      slot.innerHTML = S.user ? htmlLogged : htmlAnon;
+    slot.style.position='relative';
+    slot.innerHTML = S.user ? htmlLogged : htmlAnon;
 
-      slot.querySelector('#acct-open-nav')?.addEventListener('click', ()=> openModal('Accede para continuar'));
+    slot.querySelector('#acct-open-nav')?.addEventListener('click', ()=> openModal('login'));
 
-      const userBtn = slot.querySelector('#acct-user-menu');
-      const pop = slot.querySelector('#acct-menu-pop');
-      const toggle = ()=>{ if(pop) pop.style.display = pop.style.display==='block'?'none':'block'; };
-      userBtn?.addEventListener('click', toggle);
-      document.addEventListener('click', (e)=>{ if(!slot.contains(e.target)){ if(pop) pop.style.display='none'; } });
+    const userBtn = slot.querySelector('#acct-user-menu');
+    const pop = slot.querySelector('#acct-menu-pop');
+    const toggle = ()=>{ if(pop) pop.style.display = pop.style.display==='block'?'none':'block'; };
+    userBtn?.addEventListener('click', toggle);
+    document.addEventListener('click', (e)=>{ if(!slot.contains(e.target)){ if(pop) pop.style.display='none'; } });
 
-      slot.querySelector('#acct-logout-nav')?.addEventListener('click', async (e)=>{
-        e.preventDefault();
-        try{ await api('POST','/api/logout',{});}catch{}
-        S.user = null; saveUser(null); paintNav(); paintAccountSection();
-      });
+    slot.querySelector('#acct-logout-nav')?.addEventListener('click', async (e)=>{
+      e.preventDefault();
+      try{ await api('POST','/api/logout',{});}catch{}
+      S.user = null; saveUser(null); paintNav(); paintAccountSection();
     });
   }
 
-  // Sesión + gating
+  // ===== Sesión + gating =====
   async function getSession(){
-    // pinta rápido con cache local
     const cached = readUser();
     if(cached){ S.user = cached; paintNav(); paintAccountSection(); }
 
@@ -566,22 +590,13 @@
     }catch{ S.user = cached || null; }
     paintNav(); paintAccountSection();
 
-    // Gating: abrir modal y NO relanzar acción
-    const requireLogin = (ev) => {
-      if(!S.user){
-        ev.stopImmediatePropagation(); ev.preventDefault();
-        openModal('Inicia sesión o regístrate para continuar.');
-        return true;
-      } return false;
-    };
-
     document.body.addEventListener('click',(e)=>{
       const guarded = e.target.closest('.acct-guard');
-      if(guarded) requireLogin(e);
+      if(guarded && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); }
     }, true);
   }
 
-  // Forms
+  // ===== Formularios =====
   forms.login?.addEventListener('submit', async (e)=>{
     e.preventDefault(); errs.login.style.display='none';
     const email = $('#acct-login-email').value.trim();
@@ -626,7 +641,7 @@
     const email = $('#acct-recover-email').value.trim();
     try{
       await api('POST','/api/request-password-reset',{ email });
-      okRecover.textContent = 'Si el correo está registrado, te hemos enviado un enlace para restablecer la contraseña.';
+      okRecover.textContent = 'Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora). Revisa tu bandeja y spam.';
       okRecover.style.display='block';
     }catch(err){
       errs.recover.textContent = String(err); errs.recover.style.display='block';
@@ -642,14 +657,10 @@
     const nfcEl = $('#acct-nfc');
     const logoutBtn = $('#acct-logout');
 
-    if(!emailEl || !statusEl) return;
-
     if(!S.user){
       emailEl.textContent = '—';
       statusEl.textContent = 'Sesión no iniciada';
-      renewsEl.textContent = '';
-      planEl.textContent = '';
-      nfcEl.textContent = '';
+      renewsEl.textContent = ''; planEl.textContent = ''; nfcEl.textContent = '';
       logoutBtn?.setAttribute('disabled','disabled');
       return;
     }
@@ -674,7 +685,7 @@
     nfcEl.textContent = `NFC comprados: ${qty}`;
   }
 
-  document.getElementById('acct-open-from-section')?.addEventListener('click', ()=> openModal());
+  document.getElementById('acct-open-from-section')?.addEventListener('click', ()=> openModal('login'));
 
   // Sync entre pestañas
   window.addEventListener('storage', (e)=>{

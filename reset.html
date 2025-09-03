@@ -1,93 +1,64 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>Restablecer contraseña — Taply</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.1);
-           --brand1:#00d4ff; --brand2:#7c3aed; }
-    *{box-sizing:border-box} html,body{height:100%} html{-webkit-text-size-adjust:100%}
-    body{margin:0;display:grid;place-items:center;background:var(--bg);color:var(--txt);font-family:Inter,system-ui}
-    .card{width:min(520px,92%);background:var(--card);border:1px solid var(--b);border-radius:18px;padding:22px}
-    h1{margin:0 0 6px}
-    p{color:var(--muted)}
-    label{display:grid;gap:6px;margin:10px 0;font-weight:600}
-    .in{position:relative}
-    input{background:#0a0f16;border:1px solid var(--b);color:inherit;border-radius:12px;padding:12px 44px 12px 12px;font-size:16px}
-    button, input{font-size:16px}
-    .eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
-    .btn{width:100%;padding:12px 16px;border:0;border-radius:999px;font-weight:800;cursor:pointer;
-      background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017;margin-top:10px}
-    .err{color:#fca5a5}
-    .ok{color:#86efac}
+    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12); --brand1:#00d4ff; --brand2:#7c3aed; --err:#ef4444; --ok:#22c55e }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui}
+    .wrap{width:min(520px,94%);margin:40px auto}
+    .card{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:22px}
+    h1{margin:0 0 8px}
+    label{display:grid;gap:6px;margin:10px 0}
+    input{font-size:16px;background:#0a0f16;border:1px solid var(--b);color:inherit;border-radius:12px;padding:12px}
+    .btn{padding:12px 16px;border:0;border-radius:999px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017}
+    .muted{color:var(--muted)} .err{color:var(--err)} .ok{color:var(--ok)}
   </style>
 </head>
 <body>
-  <main class="card">
-    <h1>Restablecer contraseña</h1>
-    <p id="who"></p>
-
-    <form id="form" autocomplete="on">
-      <label>Nueva contraseña
-        <span class="in">
-          <input type="password" id="pass" minlength="6" required autocomplete="new-password" autofocus>
-          <button class="eye" type="button" data-t="#pass" aria-label="Mostrar u ocultar contraseña">👁</button>
-        </span>
-      </label>
-      <label>Confirmar contraseña
-        <span class="in">
-          <input type="password" id="pass2" minlength="6" required autocomplete="new-password">
-          <button class="eye" type="button" data-t="#pass2" aria-label="Mostrar u ocultar contraseña">👁</button>
-        </span>
-      </label>
-      <button class="btn" type="submit">Guardar</button>
-    </form>
-
-    <p id="msg"></p>
-    <p><a href="acceso.html" style="color:#b3e1ff">Volver a iniciar sesión</a></p>
+  <main class="wrap">
+    <article class="card">
+      <h1>Restablecer contraseña</h1>
+      <p class="muted">Introduce una nueva contraseña para tu cuenta.</p>
+      <form id="f" class="form" novalidate>
+        <label>Nueva contraseña
+          <input id="p1" type="password" minlength="6" required placeholder="Mínimo 6 caracteres">
+        </label>
+        <label>Confirmar contraseña
+          <input id="p2" type="password" minlength="6" required placeholder="Repite la contraseña">
+        </label>
+        <button class="btn" type="submit">Guardar</button>
+        <p id="msg" class="muted"></p>
+      </form>
+    </article>
   </main>
+<script>
+  const $=s=>document.querySelector(s);
+  const qs=new URLSearchParams(location.search);
+  const token=qs.get('token')||''; const email=qs.get('email')||'';
+  if(!token||!email){ $('#msg').textContent='Enlace inválido.'; $('#msg').className='err'; $('#f').style.display='none'; }
 
-  <script>
-    const qs = new URLSearchParams(location.search);
-    const token = qs.get('token'); const email = (qs.get('email')||'').trim().toLowerCase();
-    const $ = s=>document.querySelector(s); const msg=$('#msg');
-
-    const mask=(e)=>!e?'':e.replace(/^(.).+(@.+)$/, (_,a,b)=>a+'***'+b);
-    $('#who').textContent = email ? `Para: ${mask(email)}` : 'Escribe tu nueva contraseña. El enlace caduca en 1 hora.';
-
-    document.querySelectorAll('.eye').forEach(b=>{
-      b.addEventListener('click', ()=>{
-        const i = document.querySelector(b.dataset.t);
-        if(!i) return; i.type = i.type === 'password' ? 'text' : 'password';
-      });
-    });
-
-    if(!token || !email){
-      msg.textContent = 'Enlace inválido o incompleto.'; msg.className='err';
-      $('#form').style.display='none';
+  async function api(method,url,body){
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',body:body?JSON.stringify(body):undefined});
+    const d=await r.json().catch(()=>({})); if(!r.ok) throw (d?.error||'error'); return d;
+  }
+  $('#f').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const p1=$('#p1').value, p2=$('#p2').value;
+    const m=$('#msg'); m.className='muted'; m.textContent='Guardando…';
+    if(p1.length<6){ m.textContent='La contraseña debe tener al menos 6 caracteres.'; m.className='err'; return; }
+    if(p1!==p2){ m.textContent='Las contraseñas no coinciden.'; m.className='err'; return; }
+    try{
+      await api('POST','/api/reset-password',{ email, token, password:p1 });
+      m.textContent='Contraseña cambiada. Ya puedes iniciar sesión.'; m.className='ok';
+      setTimeout(()=>location.href='suscripciones.html#cuenta',1200);
+    }catch(err){
+      m.textContent = (err==='invalid_or_expired_token') ? 'El enlace no es válido o ha caducado.' : 'No se pudo restablecer.';
+      m.className='err';
     }
-
-    $('#form').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const p1 = $('#pass').value;
-      const p2 = $('#pass2').value;
-      if(p1.length < 6){ msg.textContent='La contraseña debe tener al menos 6 caracteres.'; msg.className='err'; return; }
-      if(p1 !== p2){ msg.textContent='Las contraseñas no coinciden.'; msg.className='err'; return; }
-      try{
-        const res = await fetch('/api/reset-password', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ email, token, password: p1 }) });
-        const data = await res.json();
-        if(!res.ok) throw (data?.error || 'No se pudo actualizar');
-        msg.textContent = 'Contraseña actualizada. Ya puedes iniciar sesión.'; msg.className='ok';
-        $('#form').style.display='none';
-      }catch(err){
-        const s = String(err);
-        msg.textContent = (s.includes('invalid')||s.includes('expired')) ? 'El enlace no es válido o ha caducado.' : s;
-        msg.className='err';
-      }
-    });
-  </script>
+  });
+</script>
 </body>
 </html>
