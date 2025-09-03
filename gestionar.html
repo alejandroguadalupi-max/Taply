@@ -1,4 +1,4 @@
-<!doctype html>
+<!doctype html> 
 <html lang="es">
 <head>
   <meta charset="utf-8"/>
@@ -7,7 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12);
-           --brand1:#00d4ff; --brand2:#7c3aed; --ok:#22c55e; --warn:#f59e0b; }
+           --brand1:#00d4ff; --brand2:#7c3aed; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444 }
     *{box-sizing:border-box} html,body{height:100%} html{-webkit-text-size-adjust:100%}
     body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui}
     .wrap{width:min(900px,94%);margin:32px auto}
@@ -20,6 +20,8 @@
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
     @media (max-width:780px){ .grid2{grid-template-columns:1fr} }
     input{font-size:16px}
+    .tag{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid var(--b);background:rgba(255,255,255,.04);font-weight:800}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
   </style>
 </head>
 <body>
@@ -40,11 +42,13 @@
           <h3>Suscripción</h3>
           <p id="subLine" class="muted">Cargando…</p>
           <p id="renewLine" class="muted"></p>
+          <div id="flags"></div>
           <div class="row" style="margin-top:8px">
             <button id="btnCancel" class="ghost">Cancelar al final del periodo</button>
             <button id="btnResume" class="ghost" style="display:none">Reanudar</button>
             <button id="btnPortal" class="btn">Abrir portal</button>
           </div>
+          <p id="msg" class="muted" style="margin-top:8px"></p>
         </div>
         <div>
           <h3>NFC</h3>
@@ -72,7 +76,13 @@
     const $=s=>document.querySelector(s);
 
     async function api(method, url, body){
-      const res = await fetch(url,{method,headers:{'Content-Type':'application/json'},body: body?JSON.stringify(body):undefined});
+      const res = await fetch(url,{
+        method,
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        cache:'no-store',
+        body: body?JSON.stringify(body):undefined
+      });
       let data=null; try{ data=await res.json(); }catch{}
       if(!res.ok) throw (data?.error||'error');
       return data;
@@ -105,50 +115,95 @@
     function prettySubLine(u){
       const st=(u?.subscription?.status||'').toLowerCase();
       if(!st) return 'Sin suscripción';
+      const flags=[];
+      if(u?.subscription?.cancel_at_period_end) flags.push('<span class="tag warn">Cancela al final de periodo</span>');
+      $('#flags').innerHTML = flags.join(' ');
       return `${prettyPlan(u)} · estado: ${st}`;
     }
 
-    async function load(){
-      try{
-        const d = await api('GET','/api/session');
-        const u = d?.user;
-        if(!u){ alert('Inicia sesión para gestionar tu suscripción.'); location.href='suscripciones.html#cuenta'; return; }
+    let USER=null;
 
-        $('#email').textContent=u.email||'—';
-        $('#subLine').textContent = prettySubLine(u);
-        $('#nfcQty').textContent = Number(u.nfc_qty||0);
+    async function refreshUser(paintOnly=false){
+      const d = await api('GET','/api/session');
+      const u = d?.user;
+      if(!u){ alert('Inicia sesión para gestionar tu suscripción.'); location.href='suscripciones.html#cuenta'; return; }
+      USER=u;
 
-        const next = computeNextRenewal30(u);
-        $('#renewLine').textContent = next ? ('Renovación / fin de periodo: '+fmtDate(next)) : '';
+      $('#email').textContent=u.email||'—';
+      $('#subLine').innerHTML = prettySubLine(u);
+      $('#nfcQty').textContent = Number(u.nfc_qty||0);
 
-        const st=(u?.subscription?.status||'').toLowerCase();
-        if(st==='active' || st==='trialing' || st==='past_due'){
-          $('#btnCancel').style.display='inline-flex';
-          $('#btnResume').style.display='none';
-        }else if(st==='canceled'){
-          $('#btnCancel').style.display='none';
-          $('#btnResume').style.display='inline-flex';
-        }
-      }catch(e){
-        alert('No se pudo cargar tu cuenta.'); location.href='suscripciones.html#cuenta';
+      const next = computeNextRenewal30(u);
+      $('#renewLine').textContent = next ? ('Renovación / fin de periodo: '+fmtDate(next)) : '';
+
+      const st=(u?.subscription?.status||'').toLowerCase();
+      const cancelAtEnd=!!u?.subscription?.cancel_at_period_end;
+
+      // Botones
+      if(st==='active' || st==='trialing' || st==='past_due'){
+        $('#btnCancel').style.display = cancelAtEnd ? 'none' : 'inline-flex';
+        $('#btnResume').style.display = cancelAtEnd ? 'inline-flex' : 'none';
+      }else{
+        $('#btnCancel').style.display='none';
+        $('#btnResume').style.display='none';
       }
+
+      if(!paintOnly){ $('#msg').textContent=''; }
     }
 
-    // Portal (todas las acciones van al portal — estable y seguro con tu API actual)
+    // Ejecuta fallback de post-pago si venimos de Stripe con ?session_id=...
+    async function runPostPagoIfNeeded(){
+      const qs = new URLSearchParams(location.search);
+      const sid = qs.get('session_id');
+      if(!sid) return;
+      try{ await api('POST','/api/post-pago',{ session_id: sid }); await refreshUser(true); }
+      catch(e){ /* silencioso */ }
+      // Limpia el parámetro de la URL
+      try{
+        qs.delete('session_id');
+        const url = location.pathname + (qs.toString()?('?'+qs.toString()):'');
+        history.replaceState({}, '', url);
+      }catch{}
+    }
+
+    // Portal (alias estable). Si falla, mostramos instrucción
     async function openPortal(){
       try{
         const r=await api('POST','/api/create-portal-session',{});
-        if(r?.url) location.href=r.url; else alert('No se pudo abrir el portal.');
-      }catch{ alert('No se pudo abrir el portal'); }
+        if(r?.url) location.href=r.url; else throw 'portal_unavailable';
+      }catch(e){
+        $('#msg').innerHTML = 'No se pudo abrir el portal. <span class="err">Revisa que estés logueado y las variables STRIPE estén configuradas.</span>';
+        alert('No se pudo abrir el portal');
+      }
     }
 
+    // Acciones
     $('#btnPortal').addEventListener('click', openPortal);
     $('#changePlan').addEventListener('click', openPortal);
     $('#updateCard').addEventListener('click', openPortal);
     $('#invoices').addEventListener('click', openPortal);
-    // Para que "Cancelar" y "Reanudar" SIEMPRE funcionen sin nuevos endpoints, los enviamos al portal:
-    $('#btnCancel').addEventListener('click', openPortal);
-    $('#btnResume').addEventListener('click', openPortal);
+
+    // Cancelar al final del periodo (sin portal)
+    $('#btnCancel').addEventListener('click', async ()=>{
+      try{
+        await api('POST','/api/subscription/cancel',{ at_period_end:true });
+        $('#msg').innerHTML = '<span class="warn">Tu suscripción seguirá activa hasta fin de periodo.</span>';
+        await refreshUser();
+      }catch(e){
+        alert('No se pudo cancelar. Abriremos el portal.'); openPortal();
+      }
+    });
+
+    // Reanudar (quitar cancel_at_period_end)
+    $('#btnResume').addEventListener('click', async ()=>{
+      try{
+        await api('POST','/api/subscription/resume',{});
+        $('#msg').innerHTML = '<span class="ok">La suscripción seguirá renovándose.</span>';
+        await refreshUser();
+      }catch(e){
+        alert('No se pudo reanudar. Abriremos el portal.'); openPortal();
+      }
+    });
 
     // NFC
     $('#buyNfc').addEventListener('click', async ()=>{
@@ -156,7 +211,7 @@
       try{
         const r = await api('POST','/api/buy-nfc',{quantity:q});
         if(r?.url) location.href=r.url; else alert('No se pudo iniciar la compra.');
-      }catch(e){ alert('No se pudo iniciar la compra.'); }
+      }catch{ alert('No se pudo iniciar la compra.'); }
     });
 
     // Logout
@@ -165,7 +220,12 @@
       location.href='suscripciones.html#cuenta';
     });
 
-    load();
+    (async function init(){
+      // Si venimos de Stripe, suma NFC / cierra ciclo
+      await runPostPagoIfNeeded();
+      await refreshUser();
+    })();
   </script>
 </body>
 </html>
+

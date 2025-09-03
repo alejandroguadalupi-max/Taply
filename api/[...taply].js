@@ -218,7 +218,7 @@ async function session(req, res){
   const best = await getBestSubscription(stripe, sess.customerId);
   const sub = normalizeSub(best);
 
-  // Próxima “renovación” aparente: year = +1 año; month = +30 días (tu requerimiento)
+  // Próxima “renovación” aparente: year = +1 año; month = +30 días
   let nextGuess = null;
   if (sub?.current_period_start) {
     const start = new Date(sub.current_period_start * 1000);
@@ -299,7 +299,7 @@ async function resetPassword(req, res){
 }
 
 /* ======== Portal de facturación ======== */
-// POST /api/create-portal-session
+// POST /api/create-portal-session (+ alias /api/portal y /api/create-billing-portal)
 async function createPortalSession(req, res){
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error:'auth_required' });
@@ -343,7 +343,6 @@ async function subscriptionResume(req, res){
   const sub = await getBestSubscription(stripe, sess.customerId);
   if(!sub) return res.status(400).json({ error:'no_active_subscription' });
 
-  // Reanuda si estaba marcada para cancelar al final de periodo
   const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: false });
   return res.status(200).json({ subscription: normalizeSub(updated) });
 }
@@ -363,7 +362,7 @@ async function subscriptionSwap(req, res){
   const currentItemId = sub.items.data[0].id;
   const updated = await stripe.subscriptions.update(sub.id, {
     items: [{ id: currentItemId, price: priceId }],
-    proration_behavior: 'create_prorations' // factura prorrateo inmediato
+    proration_behavior: 'create_prorations'
   });
 
   return res.status(200).json({ subscription: normalizeSub(updated) });
@@ -472,7 +471,7 @@ async function postPago(req, res){
         }
       }
     }catch(e){
-      console.error('post-pago retrieve error', e);
+      console.error('post-pago retrieve error', e?.message || e);
     }
   }
 
@@ -507,11 +506,56 @@ async function postPago(req, res){
   return res.status(200).json({ ok:true });
 }
 
+/* ======== NUEVO: POST /api/store-customer-from-session =========
+   - Usa session_id de Stripe para:
+     * recuperar el customer y su email/nombre
+     * crear cookie de sesión (si no existe)
+     * devolver user “flat” para el front
+*/
+async function storeCustomerFromSession(req, res){
+  const { session_id } = getBody(req);
+  if(!session_id) return res.status(400).json({ error:'missing_params' });
+
+  try{
+    const stripe = getStripe();
+    const cs = await stripe.checkout.sessions.retrieve(session_id, { expand:['customer','customer_details'] });
+
+    const custObj = (typeof cs.customer === 'string') ? await stripe.customers.retrieve(cs.customer) : cs.customer;
+    const customerId = custObj?.id || null;
+    const email = cs.customer_details?.email || custObj?.email || null;
+    const name  = cs.customer_details?.name  || custObj?.name  || null;
+
+    if(!customerId || !email){
+      return res.status(400).json({ error:'no_customer_in_session' });
+    }
+
+    // Si el customer existe pero no tiene nombre y ahora sí, lo actualizamos
+    if(name && custObj && !custObj.name){
+      try{ await stripe.customers.update(customerId, { name }); }catch{}
+    }
+
+    // Guarda cookie de sesión para la web
+    setSession(res, { email, name: name || null, customerId });
+
+    return res.status(200).json({ user: { email, name: name || null, customerId }});
+  }catch(e){
+    console.error('storeCustomerFromSession error', e?.message || e);
+    return res.status(500).json({ error:'server_error' });
+  }
+}
+
 /* ================== Router ================== */
 export default async function handler(req, res){
   try{
     assertEnv();
     const route = routeOf(req);
+
+    // Preflight muy básico si alguna vez incrustas el API cross-origin
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      return res.status(204).end();
+    }
 
     if (req.method === 'GET' && route === 'session') return session(req,res);
 
@@ -522,7 +566,9 @@ export default async function handler(req, res){
       if (route === 'request-password-reset') return requestPasswordReset(req,res);
       if (route === 'reset-password') return resetPassword(req,res);
 
-      if (route === 'create-portal-session') return createPortalSession(req,res);
+      // Portal (alias válidos)
+      if (route === 'create-portal-session' || route === 'portal' || route === 'create-billing-portal')
+        return createPortalSession(req,res);
 
       // Suscripción
       if (route === 'subscription/cancel') return subscriptionCancel(req,res);
@@ -533,8 +579,9 @@ export default async function handler(req, res){
       if (route === 'create-checkout-session') return createCheckoutSession(req,res);
       if (route === 'buy-nfc') return buyNfc(req,res);
 
-      // Post-pago (fallback)
+      // Post-pago (fallback) + compat
       if (route === 'post-pago') return postPago(req,res);
+      if (route === 'store-customer-from-session') return storeCustomerFromSession(req,res);
     }
 
     return res.status(404).json({ error:'not_found', route, method:req.method });
