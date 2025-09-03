@@ -21,8 +21,8 @@ function parseIntSafe(v, def=0){ const n = parseInt(v,10); return Number.isFinit
 
 let stripeSingleton = null;
 function stripeClient(){
-  if(!process.env.STRIPE_SECRET_KEY) throw new Error('Missing STRIPE_SECRET_KEY');
   if(!stripeSingleton){
+    if(!process.env.STRIPE_SECRET_KEY) throw new Error('Missing STRIPE_SECRET_KEY');
     stripeSingleton = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
   }
   return stripeSingleton;
@@ -32,12 +32,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method not allowed');
 
   try {
-    if(!process.env.STRIPE_SECRET_KEY) return res.status(500).send('Missing STRIPE_SECRET_KEY');
     if(!process.env.STRIPE_WEBHOOK_SECRET) return res.status(500).send('Missing STRIPE_WEBHOOK_SECRET');
 
     const stripe = stripeClient();
-    const sig = req.headers['stripe-signature'];
-    const raw = await getRawBody(req);
+    const sig  = req.headers['stripe-signature'];
+    const raw  = await getRawBody(req);
     const event = stripe.webhooks.constructEvent(raw, sig, process.env.STRIPE_WEBHOOK_SECRET);
 
     async function upsertCustomerMeta(customerId, patch){
@@ -68,7 +67,7 @@ export default async function handler(req, res) {
         }
       }catch(e){ console.error('customer update err', e?.message || e); }
 
-      // Sumar NFC comprados en ese checkout de pago único
+      // Sumar NFC si procede
       if (cs.mode === 'payment' && cs.customer) {
         try{
           const addQty = await sumNfcFromSession(cs);
@@ -80,14 +79,14 @@ export default async function handler(req, res) {
         }catch(e){ console.error('sum NFC error', e?.message || e); }
       }
 
-      // Emails básicos
+      // Emails simples
       const amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '-';
       const html = `<h2>${title}</h2><p>Gracias por tu compra en Taply.</p><p>Importe: ${amountText}</p>`;
       if(email) await sendEmail({ to: email, subject: `Taply — ${title}`, html });
       if(process.env.EMAIL_FROM) await sendEmail({ to: process.env.EMAIL_FROM, subject: `Taply — ${title}`, html: `<p>${title}</p><p>Cliente: ${email || '—'}</p>` });
     }
 
-    // Persistir estado de suscripción en metadata (sirve de “BD” ligera)
+    // Persistir estado de suscripción en metadata (por si quieres consultarlo sin listar)
     if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
       const sub = event.data.object;
       const price = sub.items?.data?.[0]?.price || null;
@@ -108,3 +107,4 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err?.message || 'unknown'}`);
   }
 }
+

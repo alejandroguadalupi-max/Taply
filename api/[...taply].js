@@ -27,7 +27,6 @@ function assertEnv() {
   if (!process.env.APP_SECRET) throw Object.assign(new Error('missing APP_SECRET'), { statusCode: 500 });
   if (!process.env.STRIPE_SECRET_KEY) throw Object.assign(new Error('missing STRIPE_SECRET_KEY'), { statusCode: 500 });
 }
-
 function baseUrl(req) {
   const proto = req.headers['x-forwarded-proto'] || 'https';
   const host  = req.headers['x-forwarded-host'] || req.headers.host;
@@ -44,15 +43,8 @@ function getBody(req) {
 function getCookies(req){
   try { return cookie.parse(req.headers.cookie || ''); } catch { return {}; }
 }
-function normalizeEmail(email=''){
-  return String(email).trim().toLowerCase();
-}
+function normalizeEmail(email=''){ return String(email).trim().toLowerCase(); }
 function setSession(res, payload){
-  if(!process.env.APP_SECRET){
-    const e = new Error('missing APP_SECRET');
-    e.statusCode = 500;
-    throw e;
-  }
   const token = jwt.sign(payload, process.env.APP_SECRET, { expiresIn: '90d' });
   const isProd = process.env.NODE_ENV === 'production';
   res.setHeader('Set-Cookie', cookie.serialize(COOKIE_NAME, token, {
@@ -67,7 +59,7 @@ function clearSession(res){
 }
 function getSessionFromCookie(req){
   const token = getCookies(req)[COOKIE_NAME];
-  if(!token || !process.env.APP_SECRET) return null;
+  if(!token) return null;
   try { return jwt.verify(token, process.env.APP_SECRET); } catch { return null; }
 }
 function routeOf(req){
@@ -76,27 +68,11 @@ function routeOf(req){
   return p.startsWith('api/') ? p.slice(4) : p;
 }
 
-/* ============ Admin guard ============ */
-function assertAdmin(req){
-  const k = req.headers['x-admin-key'] || req.headers['X-Admin-Key'] || req.headers['x-admin-key'.toLowerCase()];
-  if(!process.env.ADMIN_KEY || k !== process.env.ADMIN_KEY){
-    const e = new Error('unauthorized_admin');
-    e.statusCode = 401; throw e;
-  }
-}
-
 /* ============ Stripe helpers ============ */
 let stripeSingleton = null;
 function getStripe(){
-  if (!process.env.STRIPE_SECRET_KEY) {
-    const e = new Error('missing STRIPE_SECRET_KEY');
-    e.statusCode = 500;
-    throw e;
-  }
   if (!stripeSingleton) {
-    stripeSingleton = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2024-06-20',
-    });
+    stripeSingleton = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
   }
   return stripeSingleton;
 }
@@ -111,12 +87,10 @@ async function ensureCustomerId(stripe, sess){
   const found = await stripe.customers.search({ query: q, limit: 1 });
   if(found.data.length) {
     const id = found.data[0].id;
-    if (sess.name && !found.data[0].name) {
-      try { await stripe.customers.update(id, { name: sess.name }); } catch {}
-    }
+    if (sess.name && !found.data[0].name) { try{ await stripe.customers.update(id, { name: sess.name }); }catch{} }
     return id;
   }
-  const created = await stripe.customers.create({ email: sess.email, name: sess.name || undefined, metadata:{ app:'taply' }});
+  const created = await stripe.customers.create({ email: sess.email, name: sess.name || undefined, metadata:{ app:'taply', taply_nfc_qty: '0' }});
   return created.id;
 }
 function normalizeSub(sub){
@@ -126,6 +100,7 @@ function normalizeSub(sub){
   return {
     id: sub.id,
     status: sub.status,
+    cancel_at_period_end: !!sub.cancel_at_period_end,
     current_period_end: sub.current_period_end,
     current_period_start: sub.current_period_start,
     plan: { nickname: price?.nickname || sub.plan?.nickname || null },
@@ -133,7 +108,11 @@ function normalizeSub(sub){
   };
 }
 async function getBestSubscription(stripe, customerId){
-  const subs = await stripe.subscriptions.list({ customer: customerId, status:'all', expand:['data.items.data.price'] });
+  const subs = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'all',
+    expand: ['data.items.data.price']
+  });
   const order = { active:3, trialing:2, past_due:1 };
   const best = subs.data.sort((a,b)=> (order[b.status]||0)-(order[a.status]||0) || (b.current_period_end||0)-(a.current_period_end||0))[0];
   return best || null;
@@ -142,17 +121,11 @@ async function hasValidSubscription(stripe, customerId){
   const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
   return subs.data.some(s => ['active','trialing','past_due'].includes(s.status));
 }
-function addMonthsPreservingDay(date, months){
-  const y = date.getFullYear(), m = date.getMonth(), d = date.getDate();
-  const targetMonth = m + months;
-  const targetYear = y + Math.floor(targetMonth/12);
-  const monthIndex = (targetMonth % 12 + 12) % 12;
-  const daysInTarget = new Date(targetYear, monthIndex+1, 0).getDate();
-  const day = Math.min(d, daysInTarget);
-  return new Date(targetYear, monthIndex, day, date.getHours(), date.getMinutes(), date.getSeconds());
-}
 
-/* ========= Envíos (SendGrid / WhatsApp opcional) ========= */
+/* ===== util fechas: mensual = 30 días exactos (tu requerimiento) ===== */
+function addDays(d, days){ return new Date(d.getTime() + days*24*60*60*1000); }
+
+/* ========= Envíos opcionales ========= */
 async function sendEmail({to, subject, text, html}){
   try{
     if(!process.env.SENDGRID_API_KEY || !process.env.EMAIL_FROM) return;
@@ -167,16 +140,6 @@ async function sendEmail({to, subject, text, html}){
       html: html || `<p>${text || ''}</p>`
     });
   }catch(e){ console.error('sendEmail error', e); }
-}
-async function sendWhatsApp({toNumber, body}){
-  try{
-    if(!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_WHATSAPP_FROM || !toNumber) return;
-    const { default: Twilio } = await import('twilio');
-    const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    const from = 'whatsapp:' + process.env.TWILIO_WHATSAPP_FROM;
-    const to   = 'whatsapp:' + (toNumber.startsWith('+') ? toNumber : `${process.env.WHATSAPP_DEFAULT_PREFIX || '+34'}${toNumber}`);
-    await client.messages.create({ from, to, body });
-  }catch(e){ console.error('sendWhatsApp error', e); }
 }
 
 /* ================== Handlers ================== */
@@ -200,7 +163,7 @@ async function register(req, res){
       return res.status(409).json({ error:'email_in_use' });
     } else {
       const hash = await bcrypt.hash(password, 10);
-      const meta = Object.assign({}, customer.metadata||{}, { taply_pass_hash: hash, app:'taply' });
+      const meta = Object.assign({}, customer.metadata||{}, { taply_pass_hash: hash, app:'taply', taply_nfc_qty: customer.metadata?.taply_nfc_qty || '0' });
       const updated = await stripe.customers.update(customer.id, { name, metadata: meta });
       setSession(res, { email, name: updated.name || name, customerId: customer.id });
       return res.status(200).json({ user:{ email, name: updated.name || name, customerId: customer.id }});
@@ -233,19 +196,17 @@ async function login(req, res){
 }
 
 // POST /api/logout
-async function logout(_req, res){
-  clearSession(res);
-  return res.status(200).json({ ok:true });
-}
+async function logout(_req, res){ clearSession(res); return res.status(200).json({ ok:true }); }
 
 // GET /api/session
 async function session(req, res){
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(200).json({ user:null });
+
   const stripe = getStripe();
 
-  let nfcQty = 0;
-  let customer = null;
+  // Customer y NFC
+  let nfcQty = 0, customer = null;
   try {
     customer = await stripe.customers.retrieve(sess.customerId);
     nfcQty = parseInt(customer?.metadata?.taply_nfc_qty || '0', 10) || 0;
@@ -253,18 +214,17 @@ async function session(req, res){
     return res.status(200).json({ user: { email: sess.email, name: sess.name || null, customerId: null, subscription: null, subscription_status: null, nfc_qty: 0 }});
   }
 
+  // Suscripción
   const best = await getBestSubscription(stripe, sess.customerId);
   const sub = normalizeSub(best);
 
-  // Próxima renovación (aparente) desde el inicio del periodo
+  // Próxima “renovación” aparente: year = +1 año; month = +30 días (tu requerimiento)
   let nextGuess = null;
   if (sub?.current_period_start) {
-    const start = new Date((sub.current_period_start * 1000));
-    if ((sub.price?.interval || 'month') === 'year') {
-      nextGuess = new Date(start.getFullYear()+1, start.getMonth(), start.getDate()).getTime()/1000;
-    } else {
-      nextGuess = addMonthsPreservingDay(start, 1).getTime()/1000;
-    }
+    const start = new Date(sub.current_period_start * 1000);
+    nextGuess = (sub.price?.interval === 'year')
+      ? new Date(start.getFullYear()+1, start.getMonth(), start.getDate()).getTime()/1000
+      : Math.floor(addDays(start, 30).getTime()/1000);
   } else if (sub?.current_period_end) {
     nextGuess = sub.current_period_end;
   }
@@ -284,7 +244,7 @@ async function session(req, res){
   });
 }
 
-// POST /api/request-password-reset {email}
+/* ======== Recuperación de contraseña ======== */
 async function requestPasswordReset(req, res){
   const email = normalizeEmail(getBody(req).email);
   if(!email) return res.status(400).json({ error:'email_required' });
@@ -292,18 +252,14 @@ async function requestPasswordReset(req, res){
   const stripe = getStripe();
   const q = `email:'${escapeStripeQueryValue(email)}'`;
   const found = await stripe.customers.search({ query: q, limit: 1 });
-  if(!found.data.length){
-    return res.status(200).json({ ok:true });
-  }
+  if(!found.data.length) return res.status(200).json({ ok:true });
+
   const customer = found.data[0];
   const token = crypto.randomBytes(24).toString('hex');
   const exp = Math.floor(Date.now()/1000) + RESET_TTL_SECONDS;
 
   await stripe.customers.update(customer.id, {
-    metadata: Object.assign({}, customer.metadata||{}, {
-      taply_reset_token: token,
-      taply_reset_exp: String(exp),
-    })
+    metadata: { ...(customer.metadata||{}), taply_reset_token: token, taply_reset_exp: String(exp) }
   });
 
   const link = `${appBase(req)}/reset.html?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
@@ -317,8 +273,6 @@ async function requestPasswordReset(req, res){
 
   return res.status(200).json({ ok:true });
 }
-
-// POST /api/reset-password {email, token, password}
 async function resetPassword(req, res){
   const email = normalizeEmail(getBody(req).email);
   const { token, password } = getBody(req);
@@ -340,28 +294,82 @@ async function resetPassword(req, res){
   }
 
   const hash = await bcrypt.hash(password, 10);
-  const newMeta = Object.assign({}, meta, {
-    taply_pass_hash: hash,
-    taply_reset_token: '',
-    taply_reset_exp: ''
-  });
-
-  await stripe.customers.update(customer.id, { metadata: newMeta });
+  await stripe.customers.update(customer.id, { metadata: { ...meta, taply_pass_hash: hash, taply_reset_token: '', taply_reset_exp: '' }});
   return res.status(200).json({ ok:true });
 }
 
+/* ======== Portal de facturación ======== */
 // POST /api/create-portal-session
 async function createPortalSession(req, res){
   const sess = getSessionFromCookie(req);
-  if(!sess?.customerId) return res.status(401).json({ error:'No autenticado' });
+  if(!sess) return res.status(401).json({ error:'auth_required' });
   const stripe = getStripe();
-  const portal = await stripe.billingPortal.sessions.create({
-    customer: sess.customerId,
-    return_url: appBase(req) + '/suscripciones.html#cuenta'
-  });
-  return res.status(200).json({ url: portal.url });
+  const customerId = await ensureCustomerId(stripe, sess);
+  if(!customerId) return res.status(401).json({ error:'auth_required' });
+
+  try{
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: appBase(req) + '/gestionar.html'
+    });
+    return res.status(200).json({ url: portal.url });
+  }catch(e){
+    console.error('createPortalSession error:', e?.message || e);
+    return res.status(500).json({ error:'portal_unavailable' });
+  }
 }
 
+/* ======== Suscripciones: cancelar / reanudar / cambiar plan ======== */
+// POST /api/subscription/cancel  { at_period_end?: boolean }
+async function subscriptionCancel(req, res){
+  const sess = getSessionFromCookie(req);
+  if(!sess) return res.status(401).json({ error:'auth_required' });
+
+  const stripe = getStripe();
+  const sub = await getBestSubscription(stripe, sess.customerId);
+  if(!sub) return res.status(400).json({ error:'no_active_subscription' });
+
+  const atPeriodEnd = (getBody(req).at_period_end !== false); // por defecto: true
+  const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: !!atPeriodEnd });
+  return res.status(200).json({ subscription: normalizeSub(updated) });
+}
+
+// POST /api/subscription/resume
+async function subscriptionResume(req, res){
+  const sess = getSessionFromCookie(req);
+  if(!sess) return res.status(401).json({ error:'auth_required' });
+
+  const stripe = getStripe();
+  const sub = await getBestSubscription(stripe, sess.customerId);
+  if(!sub) return res.status(400).json({ error:'no_active_subscription' });
+
+  // Reanuda si estaba marcada para cancelar al final de periodo
+  const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: false });
+  return res.status(200).json({ subscription: normalizeSub(updated) });
+}
+
+// POST /api/subscription/swap { priceId }
+async function subscriptionSwap(req, res){
+  const sess = getSessionFromCookie(req);
+  if(!sess) return res.status(401).json({ error:'auth_required' });
+
+  const { priceId } = getBody(req);
+  if(!priceId) return res.status(400).json({ error:'missing_params' });
+
+  const stripe = getStripe();
+  const sub = await getBestSubscription(stripe, sess.customerId);
+  if(!sub) return res.status(400).json({ error:'no_active_subscription' });
+
+  const currentItemId = sub.items.data[0].id;
+  const updated = await stripe.subscriptions.update(sub.id, {
+    items: [{ id: currentItemId, price: priceId }],
+    proration_behavior: 'create_prorations' // factura prorrateo inmediato
+  });
+
+  return res.status(200).json({ subscription: normalizeSub(updated) });
+}
+
+/* ======== Checkout ======== */
 // POST /api/create-checkout-session  (suscripciones)
 async function createCheckoutSession(req, res){
   const { tier, frequency } = getBody(req);
@@ -392,7 +400,9 @@ async function createCheckoutSession(req, res){
     cancel_url:  `${appBase(req)}/cancelado.html`,
     phone_number_collection: { enabled: true },
     customer: customerId,
-    subscription_data: { metadata: { type: 'subscription', tier, frequency, app:'taply' } },
+    subscription_data: {
+      metadata: { type: 'subscription', tier, frequency, app:'taply' }
+    },
     metadata: { type: 'subscription', tier, frequency, app:'taply' }
   });
 
@@ -403,6 +413,7 @@ async function createCheckoutSession(req, res){
 // POST /api/buy-nfc  (pago único)
 async function buyNfc(req, res){
   if (!PRICE_ID_NFC) return res.status(500).json({ error: 'missing_nfc_price_id' });
+
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error: 'auth_required' });
 
@@ -431,7 +442,7 @@ async function buyNfc(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-/* ========= POST /api/post-pago (opcional; emails tras compra) ========= */
+/* ========= POST /api/post-pago  (fallback por si el webhook no corre) ========= */
 async function postPago(req, res){
   const stripe = getStripe();
   const url = new URL(req.url, 'http://x');
@@ -439,19 +450,27 @@ async function postPago(req, res){
   const { session_id: bodySession, type } = getBody(req);
   const sessionId = bodySession || qpSession || null;
 
-  let buyerEmail = null;
-  let buyerPhone = null;
-  let lineSummary = '';
-  let amountText = '';
+  let buyerEmail = null, buyerPhone = null, lineSummary = '', amountText = '', customerId = null;
 
   if(sessionId){
     try{
       const cs = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['line_items','customer_details'] });
       buyerEmail = cs.customer_details?.email || null;
       buyerPhone = cs.customer_details?.phone || null;
+      customerId = typeof cs.customer === 'string' ? cs.customer : cs.customer?.id || null;
       const li = cs.line_items?.data || [];
       lineSummary = li.map(i => `${i.quantity} × ${i.description || i.price?.nickname || i.price?.id}`).join(', ');
       amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '';
+
+      // Fallback: sumar NFC aquí también
+      if (cs.mode === 'payment' && PRICE_ID_NFC && customerId) {
+        const addQty = li.reduce((acc, it) => acc + ((it.price?.id === PRICE_ID_NFC) ? (it.quantity || 0) : 0), 0);
+        if(addQty > 0){
+          const cust = await stripe.customers.retrieve(customerId);
+          const prev = parseInt(cust?.metadata?.taply_nfc_qty || '0', 10) || 0;
+          await stripe.customers.update(customerId, { metadata: { ...(cust.metadata||{}), taply_nfc_qty: String(prev + addQty) }});
+        }
+      }
     }catch(e){
       console.error('post-pago retrieve error', e);
     }
@@ -485,82 +504,7 @@ async function postPago(req, res){
     await sendEmail({ to: process.env.EMAIL_FROM, subject: subjAdm, html: htmlAdm });
   }
 
-  if(buyerPhone){
-    await sendWhatsApp({ toNumber: buyerPhone, body: '¡Gracias! Hemos recibido tu compra. Te escribimos ahora con los pasos.' });
-  }
-
   return res.status(200).json({ ok:true });
-}
-
-/* ================== Admin endpoints ================== */
-/** POST /api/admin/find  { email? , customerId? } */
-async function adminFind(req,res){
-  assertAdmin(req);
-  const { email:rawEmail, customerId } = getBody(req);
-  const stripe = getStripe();
-
-  let customer = null;
-  if(customerId){
-    try{ customer = await stripe.customers.retrieve(customerId); }catch{}
-  }else if(rawEmail){
-    const email = normalizeEmail(rawEmail);
-    const q = `email:'${escapeStripeQueryValue(email)}'`;
-    const found = await stripe.customers.search({ query:q, limit:1 });
-    customer = found.data[0] || null;
-  }
-  if(!customer) return res.status(404).json({ error:'not_found' });
-
-  const sub = await getBestSubscription(stripe, customer.id);
-  const norm = normalizeSub(sub);
-
-  return res.status(200).json({
-    customer: {
-      id: customer.id,
-      email: customer.email,
-      name: customer.name || null,
-      phone: customer.phone || null,
-      metadata: customer.metadata || {}
-    },
-    subscription: norm
-  });
-}
-
-/** POST /api/admin/set-nfc { customerId, qty } */
-async function adminSetNfc(req,res){
-  assertAdmin(req);
-  const { customerId, qty } = getBody(req);
-  if(!customerId || qty==null) return res.status(400).json({ error:'missing_params' });
-  const stripe = getStripe();
-  const cust = await stripe.customers.retrieve(customerId);
-  const meta = Object.assign({}, cust.metadata||{}, { taply_nfc_qty: String(Math.max(0, parseInt(qty,10)||0)) });
-  await stripe.customers.update(customerId, { metadata: meta });
-  return res.status(200).json({ ok:true, nfc_qty: parseInt(meta.taply_nfc_qty,10)||0 });
-}
-
-/** POST /api/admin/add-nfc { customerId, delta } */
-async function adminAddNfc(req,res){
-  assertAdmin(req);
-  const { customerId, delta } = getBody(req);
-  if(!customerId || delta==null) return res.status(400).json({ error:'missing_params' });
-  const stripe = getStripe();
-  const cust = await stripe.customers.retrieve(customerId);
-  const prev = parseInt(cust?.metadata?.taply_nfc_qty || '0',10) || 0;
-  const next = Math.max(0, prev + (parseInt(delta,10)||0));
-  await stripe.customers.update(customerId, { metadata: { ...(cust.metadata||{}), taply_nfc_qty: String(next) }});
-  return res.status(200).json({ ok:true, nfc_qty: next });
-}
-
-/** POST /api/admin/create-portal { customerId } */
-async function adminCreatePortal(req,res){
-  assertAdmin(req);
-  const { customerId } = getBody(req);
-  if(!customerId) return res.status(400).json({ error:'missing_params' });
-  const stripe = getStripe();
-  const portal = await stripe.billingPortal.sessions.create({
-    customer: customerId,
-    return_url: appBase(req) + '/admin.html'
-  });
-  return res.status(200).json({ url: portal.url });
 }
 
 /* ================== Router ================== */
@@ -572,22 +516,25 @@ export default async function handler(req, res){
     if (req.method === 'GET' && route === 'session') return session(req,res);
 
     if (req.method === 'POST') {
-      // auth
       if (route === 'register') return register(req,res);
       if (route === 'login') return login(req,res);
       if (route === 'logout') return logout(req,res);
       if (route === 'request-password-reset') return requestPasswordReset(req,res);
       if (route === 'reset-password') return resetPassword(req,res);
-      // billing
+
       if (route === 'create-portal-session') return createPortalSession(req,res);
+
+      // Suscripción
+      if (route === 'subscription/cancel') return subscriptionCancel(req,res);
+      if (route === 'subscription/resume') return subscriptionResume(req,res);
+      if (route === 'subscription/swap')   return subscriptionSwap(req,res);
+
+      // Checkout
       if (route === 'create-checkout-session') return createCheckoutSession(req,res);
       if (route === 'buy-nfc') return buyNfc(req,res);
+
+      // Post-pago (fallback)
       if (route === 'post-pago') return postPago(req,res);
-      // admin
-      if (route === 'admin/find') return adminFind(req,res);
-      if (route === 'admin/set-nfc') return adminSetNfc(req,res);
-      if (route === 'admin/add-nfc') return adminAddNfc(req,res);
-      if (route === 'admin/create-portal') return adminCreatePortal(req,res);
     }
 
     return res.status(404).json({ error:'not_found', route, method:req.method });
