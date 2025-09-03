@@ -57,7 +57,35 @@ export default async function handler(req, res) {
         })
     );
 
-  // 5) Primer paso: redirigir a Google
+  // --- DEBUG extra ---
+// /api/google?debug=auth  -> te devuelve la URL de autorización exacta
+// /api/google?debug=auth-go -> te redirige a esa URL (para probar directo)
+const debugMode = url.searchParams.get("debug");
+if (debugMode === "auth" || debugMode === "auth-go") {
+  const auth = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  auth.searchParams.set("client_id", clientId);
+  auth.searchParams.set("redirect_uri", redirectUri);
+  auth.searchParams.set("response_type", "code");
+  auth.searchParams.set("scope", "openid email profile");
+  auth.searchParams.set("access_type", "offline");
+  auth.searchParams.set("prompt", "select_account");
+  auth.searchParams.set("state", "debug-state");
+
+  if (debugMode === "auth") {
+    return res.status(200).json({
+      authUrl: auth.toString(),
+      clientId,
+      redirectUri,
+      clientIdLength: clientId.length,
+    });
+  } else {
+    res.writeHead(302, { Location: auth.toString() });
+    return res.end();
+  }
+}
+ 
+  
+    // 5) Primer paso: redirigir a Google
   if (!code) {
     const st = crypto.randomUUID();
     res.setHeader("Set-Cookie", `${cookieName}=${encodeURIComponent(st)}; Max-Age=600; ${cookieFlags}`);
