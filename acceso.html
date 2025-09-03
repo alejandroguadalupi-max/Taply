@@ -35,11 +35,11 @@
       <section class="card">
         <h2 style="margin:0 0 8px">Iniciar sesión</h2>
         <form id="form-login" autocomplete="on">
-          <label>Email <input id="login-email" type="email" required autocomplete="email" inputmode="email"></label>
+          <label>Email <input id="login-email" type="email" required autocomplete="email" inputmode="email" autofocus></label>
           <label>Contraseña
             <span class="in">
               <input id="login-pass" type="password" required autocomplete="current-password">
-              <button class="eye" type="button" data-t="#login-pass">👁</button>
+              <button class="eye" type="button" data-t="#login-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
             </span>
           </label>
           <button class="btn" type="submit">Entrar</button>
@@ -60,13 +60,13 @@
           <label>Contraseña (mín. 6)
             <span class="in">
               <input id="reg-pass" type="password" required minlength="6" autocomplete="new-password">
-              <button class="eye" type="button" data-t="#reg-pass">👁</button>
+              <button class="eye" type="button" data-t="#reg-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
             </span>
           </label>
           <label>Confirmar contraseña
             <span class="in">
               <input id="reg-pass2" type="password" required minlength="6" autocomplete="new-password">
-              <button class="eye" type="button" data-t="#reg-pass2">👁</button>
+              <button class="eye" type="button" data-t="#reg-pass2" aria-label="Mostrar u ocultar contraseña">👁</button>
             </span>
           </label>
           <button class="btn" type="submit">Crear cuenta</button>
@@ -82,6 +82,7 @@
     const $=s=>document.querySelector(s);
     document.querySelectorAll('.eye').forEach(b=>b.addEventListener('click',()=>{const i=document.querySelector(b.dataset.t); if(i) i.type=i.type==='password'?'text':'password';}));
 
+    // API helper
     async function api(method, url, body){
       const res = await fetch(url,{method,headers:{'Content-Type':'application/json'},body: body?JSON.stringify(body):undefined});
       let data=null; try{ data=await res.json(); }catch{}
@@ -89,13 +90,30 @@
       return data;
     }
 
+    // Destino tras login/registro (?next=URL) o gestionar.html por defecto
+    const qs = new URLSearchParams(location.search);
+    const NEXT = (qs.get('next') && decodeURIComponent(qs.get('next'))) || 'gestionar.html';
+
+    // Si ya está logueado, redirige
+    (async ()=>{
+      try{ const s=await api('GET','/api/session'); if(s?.user){ location.replace(NEXT); } }catch{}
+    })();
+
+    // LOGIN
     $('#form-login').addEventListener('submit', async (e)=>{
       e.preventDefault(); $('#err-login').style.display='none';
       const email=$('#login-email').value.trim(); const password=$('#login-pass').value;
-      try{ await api('POST','/api/login',{email,password}); location.href='gestionar.html'; }
-      catch(err){ const s=String(err); $('#err-login').textContent = s==='account_not_found'?'No existe esa cuenta.': s==='invalid_credentials'?'Contraseña incorrecta.': s==='password_not_set'?'Esa cuenta no tiene contraseña, usa recuperar.': s; $('#err-login').style.display='block'; }
+      try{ await api('POST','/api/login',{email,password}); location.href=NEXT; }
+      catch(err){
+        const s=String(err);
+        $('#err-login').textContent = s==='account_not_found'?'No existe esa cuenta.':
+                                       s==='invalid_credentials'?'Contraseña incorrecta.':
+                                       s==='password_not_set'?'Esa cuenta no tiene contraseña, usa recuperar.': s;
+        $('#err-login').style.display='block';
+      }
     });
 
+    // Forgot
     $('#forgotLink').addEventListener('click', async (e)=>{
       e.preventDefault();
       const email = ($('#login-email').value||'').trim();
@@ -104,6 +122,7 @@
       catch{ alert('Si el correo existe, te hemos enviado instrucciones.'); }
     });
 
+    // REGISTER
     $('#form-register').addEventListener('submit', async (e)=>{
       e.preventDefault(); const err=$('#err-reg'); err.style.display='none';
       const name=$('#reg-name').value.trim(); const email=$('#reg-email').value.trim();
@@ -111,7 +130,7 @@
       if(!name || name.length<2){ err.textContent='El nombre es obligatorio.'; return void(err.style.display='block'); }
       if(p1.length<6){ err.textContent='La contraseña debe tener al menos 6 caracteres.'; return void(err.style.display='block'); }
       if(p1!==p2){ err.textContent='Las contraseñas no coinciden.'; return void(err.style.display='block'); }
-      try{ await api('POST','/api/register',{name,email,password:p1}); location.href='gestionar.html'; }
+      try{ await api('POST','/api/register',{name,email,password:p1}); location.href=NEXT; }
       catch(ex){ const s=String(ex); err.textContent = s==='email_in_use'?'Ese correo ya tiene cuenta. Inicia sesión.': s; err.style.display='block'; }
     });
   </script>

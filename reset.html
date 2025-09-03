@@ -27,32 +27,35 @@
 <body>
   <main class="card">
     <h1>Restablecer contraseña</h1>
-    <p>Escribe tu nueva contraseña. El enlace caduca a la hora.</p>
+    <p id="who"></p>
 
     <form id="form" autocomplete="on">
       <label>Nueva contraseña
         <span class="in">
-          <input type="password" id="pass" minlength="6" required autocomplete="new-password">
-          <button class="eye" type="button" data-t="#pass">👁</button>
+          <input type="password" id="pass" minlength="6" required autocomplete="new-password" autofocus>
+          <button class="eye" type="button" data-t="#pass" aria-label="Mostrar u ocultar contraseña">👁</button>
         </span>
       </label>
       <label>Confirmar contraseña
         <span class="in">
           <input type="password" id="pass2" minlength="6" required autocomplete="new-password">
-          <button class="eye" type="button" data-t="#pass2">👁</button>
+          <button class="eye" type="button" data-t="#pass2" aria-label="Mostrar u ocultar contraseña">👁</button>
         </span>
       </label>
       <button class="btn" type="submit">Guardar</button>
     </form>
 
     <p id="msg"></p>
-    <p><a href="suscripciones.html" style="color:#b3e1ff">Volver a iniciar sesión</a></p>
+    <p><a href="acceso.html" style="color:#b3e1ff">Volver a iniciar sesión</a></p>
   </main>
 
   <script>
     const qs = new URLSearchParams(location.search);
-    const token = qs.get('token'); const email = qs.get('email');
+    const token = qs.get('token'); const email = (qs.get('email')||'').trim().toLowerCase();
     const $ = s=>document.querySelector(s); const msg=$('#msg');
+
+    const mask=(e)=>!e?'':e.replace(/^(.).+(@.+)$/, (_,a,b)=>a+'***'+b);
+    $('#who').textContent = email ? `Para: ${mask(email)}` : 'Escribe tu nueva contraseña. El enlace caduca en 1 hora.';
 
     document.querySelectorAll('.eye').forEach(b=>{
       b.addEventListener('click', ()=>{
@@ -74,7 +77,7 @@
       if(p1 !== p2){ msg.textContent='Las contraseñas no coinciden.'; msg.className='err'; return; }
       try{
         const res = await fetch('/api/reset-password', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ email: String(email).trim().toLowerCase(), token, password: p1 }) });
+          body: JSON.stringify({ email, token, password: p1 }) });
         const data = await res.json();
         if(!res.ok) throw (data?.error || 'No se pudo actualizar');
         msg.textContent = 'Contraseña actualizada. Ya puedes iniciar sesión.'; msg.className='ok';

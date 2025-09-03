@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": ">=18.18.0"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.0",
