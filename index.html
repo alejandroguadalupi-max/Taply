@@ -133,15 +133,6 @@
     .carousel-btn.right{right:14px}
     .carousel-btn span{font-size:clamp(20px,3.8vw,26px);line-height:1}
 
-    .faq{max-width:900px;margin-inline:auto}
-    .acc{border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.02);box-shadow:var(--shadow)}
-    .acc-item + .acc-item{border-top:1px solid rgba(255,255,255,.08)}
-    .acc-btn{width:100%;background:transparent;border:0;color:var(--txt);
-      padding:18px 20px;font-size:1rem;font-weight:700;
-      display:flex;justify-content:center;align-items:center;gap:10px;text-align:center}
-    .acc-panel{max-height:0;overflow:hidden;transition:max-height .3s ease}
-    .acc-panel > div{padding:0 20px 18px;color:var(--muted);text-align:center}
-
     input,select,textarea,button{font-size:16px}
     :focus-visible{outline:2px solid #7c3aed; outline-offset:2px; border-radius:8px}
 
@@ -160,7 +151,7 @@
     }
     @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
-    /* ===== MODAL ACCESO (como suscripciones.html) ===== */
+    /* ===== MODAL ACCESO ===== */
     #acct-modal.acct-hidden{display:none!important}
     #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.65);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
     .acct-dialog{
@@ -176,8 +167,8 @@
     .acct-sub{margin:6px 0 0;text-align:center;color:var(--muted);font-size:.96rem}
 
     .acct-tabs{display:flex;gap:8px;margin:16px auto 12px;justify-content:center}
-    .acct-tab{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;padding:8px 14px;cursor:pointer;color:inherit;font-weight:700}
-    .acct-tab.acct-tab-active{background:linear-gradient(135deg,var(--brand-1),var(--brand-2)); color:#061017}
+    .acct-tabs .acct-tab{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;padding:8px 14px;cursor:pointer;color:inherit;font-weight:700}
+    .acct-tabs .acct-tab.acct-tab-active{background:linear-gradient(135deg,var(--brand-1),var(--brand-2)); color:#061017}
 
     .acct-form{display:grid;gap:12px;margin-top:6px}
     .acct-label{font-weight:600}
@@ -263,7 +254,6 @@
         <h2 id="reviews-title">Valorado 4,8/5 por más de 30 negocios</h2>
 
         <div class="reviews-window">
-          <!-- Flechas azules dentro del padding lateral -->
           <button class="carousel-btn left" id="revPrev" aria-label="Opinión anterior"><span>‹</span></button>
           <button class="carousel-btn right" id="revNext" aria-label="Opinión siguiente"><span>›</span></button>
 
@@ -308,7 +298,7 @@
     </div>
   </footer>
 
-  <!-- ===== MODAL CUENTA (dos pestañas; sin RECUPERAR) ===== -->
+  <!-- ===== MODAL CUENTA (2 pestañas; vista RECUPERAR al darle “Olvidaste…”) ===== -->
   <div id="acct-modal" class="acct-hidden" role="dialog" aria-modal="true" aria-labelledby="acct-title">
     <div class="acct-dialog">
       <div class="acct-cover"></div>
@@ -344,7 +334,6 @@
           <div class="acct-actions">
             <button type="submit" class="btn">Iniciar sesión</button>
             <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google">Continuar con Google</a>
-            <p id="acct-info-login" class="acct-ok" style="display:none"></p>
             <p id="acct-error-login" class="acct-err" style="display:none"></p>
           </div>
         </form>
@@ -376,6 +365,20 @@
             <p id="acct-error-register" class="acct-err" style="display:none"></p>
           </div>
         </form>
+
+        <!-- RECOVER (se muestra solo al pulsar “¿Olvidaste…?”) -->
+        <form id="acct-form-recover" class="acct-form" style="display:none" autocomplete="on" novalidate>
+          <p class="acct-small">Te enviaremos un enlace para restablecer tu contraseña.</p>
+          <label class="acct-label">Correo
+            <span class="acct-input"><input id="acct-recover-email" type="email" autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></span>
+          </label>
+          <div class="acct-actions">
+            <button type="submit" class="btn">Enviar enlace</button>
+            <button type="button" class="btn ghost" id="recover-back">Volver</button>
+            <p id="acct-info-recover" class="acct-ok" style="display:none"></p>
+            <p id="acct-error-recover" class="acct-err" style="display:none"></p>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -394,79 +397,69 @@
     mobileMenu?.addEventListener('click', (e)=>{ const a = e.target.closest('a'); if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); } });
     window.addEventListener('resize', ()=>{ if(window.innerWidth > 768){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); } });
 
-    // Carrusel de reseñas: flechas azules + paso 1 a 1
+    // Carrusel de reseñas
     (function(){
       const track = document.getElementById('reviewsTrack');
       const prev = document.getElementById('revPrev');
       const next = document.getElementById('revNext');
-
       const cards = () => Array.from(track.querySelectorAll('.review-card'));
       const centerX = () => track.scrollLeft + track.clientWidth/2;
-
-      function nearestIndex(){
-        const cx = centerX();
-        let best = 0, bestDist = Infinity;
-        cards().forEach((el,i)=>{
-          const mid = el.offsetLeft + el.clientWidth/2;
-          const d = Math.abs(mid - cx);
-          if(d < bestDist){ bestDist = d; best = i; }
-        });
-        return best;
-      }
-      function scrollToIndex(i){
-        const arr = cards(); i = Math.max(0, Math.min(arr.length-1, i));
-        const el = arr[i];
-        const target = el.offsetLeft - (track.clientWidth - el.clientWidth)/2;
-        track.scrollTo({ left: target, behavior:'smooth' });
-      }
-      function step(dir){ scrollToIndex(nearestIndex() + dir); }
-      prev?.addEventListener('click', ()=> step(-1));
-      next?.addEventListener('click', ()=> step(+1));
-      track?.addEventListener('keydown', (e)=>{ if(e.key==='ArrowLeft') step(-1); else if(e.key==='ArrowRight') step(+1); });
-
-      // “Auto-snap” al elemento más cercano tras el desplazamiento (también en móvil)
-      let snapTimer;
-      track.addEventListener('scroll', ()=>{ clearTimeout(snapTimer); snapTimer=setTimeout(()=>scrollToIndex(nearestIndex()), 120); }, {passive:true});
+      function nearestIndex(){ const cx=centerX(); let best=0,dist=1/0; cards().forEach((el,i)=>{ const mid=el.offsetLeft+el.clientWidth/2; const d=Math.abs(mid-cx); if(d<dist){dist=d;best=i;} }); return best; }
+      function scrollToIndex(i){ const arr=cards(); i=Math.max(0,Math.min(arr.length-1,i)); const el=arr[i]; const x=el.offsetLeft-(track.clientWidth-el.clientWidth)/2; track.scrollTo({left:x,behavior:'smooth'}); }
+      function step(d){ scrollToIndex(nearestIndex()+d); }
+      prev?.addEventListener('click',()=>step(-1)); next?.addEventListener('click',()=>step(1));
+      track?.addEventListener('keydown',(e)=>{ if(e.key==='ArrowLeft')step(-1); else if(e.key==='ArrowRight')step(1); });
+      let t; track.addEventListener('scroll',()=>{ clearTimeout(t); t=setTimeout(()=>scrollToIndex(nearestIndex()),120); }, {passive:true});
     })();
 
-    /* ======= Cuenta (dos pestañas, sin sección RECUPERAR) ======= */
+    /* ======= Cuenta (2 pestañas; vista RECOVER al pulsar enlace) ======= */
     (function(){
       const S = { user:null, polling:null };
-      const $ = s => document.querySelector(s);
+      const $  = s => document.querySelector(s);
       const $$ = s => Array.from(document.querySelectorAll(s));
       const modal = $('#acct-modal');
-      const forms = { login:$('#acct-form-login'), register:$('#acct-form-register') };
-      const errs  = { login:$('#acct-error-login'), register:$('#acct-error-register') };
-      const okLogin = $('#acct-info-login');
+
+      const forms = {
+        login:   $('#acct-form-login'),
+        register:$('#acct-form-register'),
+        recover: $('#acct-form-recover')
+      };
+      const errs  = {
+        login:   $('#acct-error-login'),
+        register:$('#acct-error-register'),
+        recover: $('#acct-error-recover')
+      };
+      const okRecover = $('#acct-info-recover');
 
       function setTab(name){
-        forms.login.style.display   = name==='login'   ? 'grid' : 'none';
-        forms.register.style.display= name==='register'? 'grid' : 'none';
-        document.querySelectorAll('#acct-modal .acct-tab').forEach(b=>{
-          const on=b.dataset.tab===name; b.classList.toggle('acct-tab-active',on); b.setAttribute('aria-selected',String(on));
+        forms.login.style.display    = name==='login'    ? 'grid' : 'none';
+        forms.register.style.display = name==='register' ? 'grid' : 'none';
+        forms.recover.style.display  = name==='recover'  ? 'grid' : 'none';
+        // activar solo los botones de la barra de pestañas (no el enlace "¿Olvidaste...?")
+        document.querySelectorAll('#acct-modal .acct-tabs .acct-tab').forEach(b=>{
+          const on=b.dataset.tab===name; b.classList.toggle('acct-tab-active', on);
+          b.setAttribute('aria-selected', String(on));
         });
         if(name==='login'){ $('#acct-title').textContent='Inicia sesión en tu cuenta'; $('#acct-sub').textContent='Introduce tus datos de acceso o crea una cuenta nueva.'; }
         if(name==='register'){ $('#acct-title').textContent='Crea tu cuenta ahora mismo'; $('#acct-sub').textContent='Completa tus datos para registrarte en Taply.'; }
+        if(name==='recover'){ $('#acct-title').textContent='Recuperar contraseña'; $('#acct-sub').textContent='Te enviaremos un enlace a tu correo para restablecerla.'; }
       }
       function openModal(tab='login'){ modal.classList.remove('acct-hidden'); setTab(tab); setTimeout(()=>$('#acct-login-email')?.focus(),40); }
-      function closeModal(){ modal.classList.add('acct-hidden'); Object.values(errs).forEach(e=>e&&(e.style.display='none')); okLogin.style.display='none'; }
+      function closeModal(){ modal.classList.add('acct-hidden'); Object.values(errs).forEach(e=>e&&(e.style.display='none')); okRecover.style.display='none'; }
       document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
       modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
-      document.querySelectorAll('#acct-modal .acct-tab').forEach(b=> b.addEventListener('click', ()=> setTab(b.dataset.tab)));
+
+      document.querySelectorAll('#acct-modal .acct-tabs .acct-tab').forEach(b=> b.addEventListener('click', ()=> setTab(b.dataset.tab)));
+      $('#link-forgot')?.addEventListener('click', ()=> setTab('recover'));
+      $('#recover-back')?.addEventListener('click', ()=> setTab('login'));
       $$('.toggle-eye').forEach(btn=>btn.addEventListener('click', ()=>{ const sel=btn.getAttribute('data-toggle'); const input=document.querySelector(sel); if(!input) return; input.type = input.type==='password' ? 'text' : 'password'; }));
 
-      // “¿Olvidaste la contraseña?” -> envía email directo (sin pestaña extra)
-      $('#link-forgot')?.addEventListener('click', async ()=>{
-        const email = ($('#acct-login-email')?.value || '').trim();
-        if(!email){ alert('Escribe tu correo primero.'); return; }
-        try{
-          await api('POST','/api/request-password-reset',{ email });
-          okLogin.textContent='Si el correo está registrado, te hemos enviado un enlace para restablecerla (caduca en 1 hora).';
-          okLogin.style.display='block';
-        }catch(_){
-          okLogin.textContent='Si el correo está registrado, te hemos enviado un enlace para restablecerla (caduca en 1 hora).';
-          okLogin.style.display='block';
-        }
+      // Métrica de contraseña (registro)
+      const meter = document.getElementById('pw-meter');
+      document.getElementById('acct-reg-pass')?.addEventListener('input', e=>{
+        const v=e.target.value||''; let score=0;
+        if(v.length>=6) score+=33; if(/[A-Z]/.test(v)&&/[a-z]/.test(v)) score+=33; if(/\d/.test(v)||/[^A-Za-z0-9]/.test(v)) score+=34;
+        if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; }
       });
 
       async function api(method,url,body){
@@ -477,24 +470,33 @@
 
       function setUser(u){
         S.user = u || null;
-        try { localStorage.setItem('acct_user', u ? JSON.stringify(u) : ""); } catch(e){}
-        window.taplyAuth = window.taplyAuth || {};
-        window.taplyAuth.user = S.user;
+        try{ localStorage.setItem('acct_user', u ? JSON.stringify(u) : ""); }catch{}
+        window.taplyAuth = window.taplyAuth || {}; window.taplyAuth.user = S.user;
         paintNav();
       }
 
+      // Recover
+      forms.recover?.addEventListener('submit', async e=>{
+        e.preventDefault(); errs.recover.style.display='none'; okRecover.style.display='none';
+        const email=$('#acct-recover-email').value.trim();
+        try{ await api('POST','/api/request-password-reset',{email}); okRecover.textContent='Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora).'; okRecover.style.display='block'; }
+        catch(err){ errs.recover.textContent=String(err); errs.recover.style.display='block'; }
+      });
+
+      // Login
       forms.login?.addEventListener('submit', async e=>{
-        e.preventDefault(); errs.login.style.display='none'; okLogin.style.display='none';
+        e.preventDefault(); errs.login.style.display='none';
         const email=$('#acct-login-email').value.trim(); const password=$('#acct-login-pass').value;
         try{ const data=await api('POST','/api/login',{email,password}); setUser(data?.user||null); await forceSessionRefresh(); closeModal(); }
         catch(err){
           errs.login.textContent=(err==='account_not_found')?'No existe una cuenta con ese email.':
                                  (err==='invalid_credentials')?'Contraseña incorrecta.':
-                                 (err==='password_not_set')?'Esta cuenta no tiene contraseña. Usa el enlace de recuperación.':String(err);
+                                 (err==='password_not_set')?'Esta cuenta no tiene contraseña. Usa “¿Olvidaste la contraseña?”':String(err);
           errs.login.style.display='block';
         }
       });
 
+      // Registro
       forms.register?.addEventListener('submit', async e=>{
         e.preventDefault(); errs.register.style.display='none';
         const name=$('#acct-reg-name').value.trim(); const email=$('#acct-reg-email').value.trim();
@@ -512,18 +514,11 @@
         }
       });
 
-      // Google en la misma pestaña + polling
+      // Google en misma pestaña + polling
       function startGooglePolling(){
         if(S.polling) clearInterval(S.polling);
         let tries=0;
-        S.polling=setInterval(async ()=>{
-          tries++;
-          try{
-            const data=await api('GET','/api/session');
-            if(data?.user){ setUser(data.user); closeModal(); clearInterval(S.polling); S.polling=null; }
-          }catch{}
-          if(tries>30){ clearInterval(S.polling); S.polling=null; }
-        },2000);
+        S.polling=setInterval(async ()=>{ tries++; try{ const data=await api('GET','/api/session'); if(data?.user){ setUser(data.user); closeModal(); clearInterval(S.polling); S.polling=null; } }catch{} if(tries>30){ clearInterval(S.polling); S.polling=null; } },2000);
       }
       function bindGoogle(id, from){
         const el=document.getElementById(id); if(!el) return; el.removeAttribute('target');
@@ -534,7 +529,7 @@
       bindGoogle('btn-google-login','login');
       bindGoogle('btn-google-register','register');
 
-      // Nav: botón “Iniciar sesión” visible (gradiente)
+      // Menú / sesión
       function paintNav(){
         const slots = ['#acct-nav-slot','#acct-nav-slot-mobile'].map(s=>document.querySelector(s)).filter(Boolean);
         slots.forEach(slot=>{
@@ -562,21 +557,18 @@
       }
 
       async function forceSessionRefresh(retries=4, delay=600){
-        for(let i=0;i<retries;i++){
-          try{ const data=await api('GET','/api/session'); if(data?.user){ setUser(data.user); break; } }catch{}
-          await new Promise(r=>setTimeout(r,delay));
-        }
+        for(let i=0;i<retries;i++){ try{ const data=await api('GET','/api/session'); if(data?.user){ setUser(data.user); break; } }catch{} await new Promise(r=>setTimeout(r,delay)); }
       }
 
       async function handleGoogleHash(){
         const raw = (location.hash || '').replace(/^#/, ''); if(!raw) return;
         const params = new URLSearchParams(raw.replace(/;/g,'&'));
-        const g = params.get('google'); const from = (params.get('from') || 'login').toLowerCase(); const code = params.get('code');
-        if (g === 'ok') { await forceSessionRefresh(); history.replaceState(null,'',location.pathname + location.search); return; }
-        if (g === 'err') {
-          openModal(from === 'register' ? 'register' : 'login');
-          const target = (from === 'register') ? errs.register : errs.login;
-          if (target){
+        const g=params.get('google'); const from=(params.get('from')||'login').toLowerCase(); const code=params.get('code');
+        if(g==='ok'){ await forceSessionRefresh(); history.replaceState(null,'',location.pathname + location.search); return; }
+        if(g==='err'){
+          openModal(from==='register' ? 'register' : 'login');
+          const target = (from==='register') ? errs.register : errs.login;
+          if(target){
             target.textContent =
               (code==='email_in_use_password') ? 'Ese correo ya tiene una cuenta con contraseña. Inicia sesión con tu contraseña.' :
               (code==='email_in_use_google')   ? 'Ese correo ya está registrado con Google. Inicia sesión con Google.' :
@@ -587,7 +579,7 @@
               (code==='google_auth_failed')    ? 'No se pudo completar con Google. Inténtalo otra vez.' :
               (code==='server_error')          ? 'Error del servidor. Intenta de nuevo.' :
                                                   'No se pudo completar con Google. Inténtalo otra vez.';
-            target.style.display = 'block';
+            target.style.display='block';
           }
           history.replaceState(null,'',location.pathname + location.search);
         }
@@ -602,8 +594,6 @@
       getSession();
       window.TaplyOpenLogin = openModal;
     })();
-
-    // Cookiebar eliminada por no disponer de política de cookies.
   </script>
 </body>
 </html>
