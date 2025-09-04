@@ -100,7 +100,7 @@
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .acct-actions{display:grid;gap:10px}
 
-    /* ——— estilos reforzados para plan + NFC ——— */
+    /* ——— plan + NFC ——— */
     .plan-badge{
       display:inline-flex;align-items:center;gap:8px;padding:12px 16px;border-radius:999px;
       background:linear-gradient(135deg,#22c55e,#00d4ff);color:#061017;font-weight:900;
@@ -378,7 +378,7 @@
       return getInterval(u)==='year' ? addDays(startDate,365) : addDays(startDate,30);
     }
 
-    // === FIX: mostrar EXACTAMENTE el plan de Stripe si hay nickname ===
+    // === Mostrar nombre de plan si Stripe trae nickname ===
     function prettyPlan(u){
       const nick = (u?.subscription?.price?.nickname || u?.subscription?.plan?.nickname || '').trim();
       if(nick) return nick;
@@ -404,7 +404,6 @@
       if(name==='login'){ title.textContent='Inicia sesión en tu cuenta'; sub.textContent='Introduce tus datos de acceso o crea una cuenta nueva.'; }
       if(name==='register'){ title.textContent='Crea tu cuenta ahora mismo'; sub.textContent='Completa tus datos para registrarte en Taply.'; }
       if(name==='recover'){ title.textContent='Recuperar contraseña'; sub.textContent='Te enviaremos un enlace a tu correo para restablecerla.'; }
-      // limpiar mensajes
       Object.values(errs).forEach(x=>x&&(x.style.display='none'));
       Object.values(oks).forEach(x=>x&&(x.style.display='none'));
     }
@@ -431,12 +430,10 @@
       if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
     }
 
-    // Centraliza set de usuario (S + LS + window.taplyAuth)
     function setUser(u){
       S.user = u || null;
-      try { localStorage.setItem(KEY, u ? JSON.stringify(u) : ""); } catch(e){}
-      window.taplyAuth = window.taplyAuth || {};
-      window.taplyAuth.user = S.user;
+      try { localStorage.setItem('acct_user', u ? JSON.stringify(u) : ""); } catch(e){}
+      window.taplyAuth = window.taplyAuth || {}; window.taplyAuth.user = S.user;
     }
 
     // -------- Formularios --------
@@ -447,7 +444,6 @@
       catch(err){ errs.recover.textContent=String(err); errs.recover.style.display='block'; }
     });
 
-    // Reenvío verificación
     async function resendVerification(email){
       if(!email) return;
       try{
@@ -485,7 +481,6 @@
       if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
       try{
         const data=await api('POST','/api/register',{name,email,password:p1});
-        // No iniciamos sesión; mostramos aviso de verificación
         oks.register.textContent = `Te hemos enviado un correo de verificación a ${email}. Sigue el enlace para activar tu cuenta.`;
         oks.register.style.display='block';
       }catch(err){
@@ -497,7 +492,7 @@
       }
     });
 
-    // -------- Google: misma pestaña --------
+    // -------- Google OAuth en la misma pestaña (sin GIS) --------
     function startGooglePolling(){
       if(S.polling) clearInterval(S.polling);
       let tries=0;
@@ -523,7 +518,7 @@
         e.preventDefault();
         e.stopImmediatePropagation();
         try{ startGooglePolling(); }catch{}
-        location.href = `/api/google-oauth-begin?from=${encodeURIComponent(from)}`; // endpoint actualizado
+        location.href = `/api/google-oauth-begin?from=${encodeURIComponent(from)}`;
         return false;
       };
       el.addEventListener('click', handler, true);
@@ -585,14 +580,13 @@
       }
     }
 
-    // Manejo de señal de Google (query o hash)
+    // Señales de Google si vuelves con ?google=...
     function parseSignal(){
-      const params = new URLSearchParams(location.search.replace(/^\?/,''));
+      const params = new URLSearchParams(location.search.replace(/^\?/,'')); 
       const hashParams = new URLSearchParams((location.hash||'').replace(/^#/, '').replace(/;/g,'&'));
       return {
         google: params.get('google') || hashParams.get('google'),
         from: (params.get('from') || hashParams.get('from') || 'login').toLowerCase(),
-        code: params.get('code') || hashParams.get('code')
       };
     }
     async function handleGoogleSignal(){
