@@ -100,10 +100,16 @@
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .acct-actions{display:grid;gap:10px}
 
-    .plan-badge{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;
-      background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-weight:800}
-    .nfc-chip{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:10px 14px;border-radius:14px;
-      background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);font-weight:800}
+    /* ——— estilos reforzados para plan + NFC ——— */
+    .plan-badge{
+      display:inline-flex;align-items:center;gap:8px;padding:12px 16px;border-radius:999px;
+      background:linear-gradient(135deg,#22c55e,#00d4ff);color:#061017;font-weight:900;
+      letter-spacing:.3px;text-transform:uppercase;box-shadow:0 10px 28px rgba(0,212,255,.25),inset 0 1px 0 rgba(255,255,255,.35)
+    }
+    .nfc-chip{
+      display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:12px 16px;border-radius:14px;
+      background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.35);font-weight:800;color:#cfe3ff
+    }
     .acct-small{color:var(--muted);font-size:.92rem;margin-top:6px}
   </style>
 </head>
@@ -210,11 +216,12 @@
       </div>
       <div class="actions">
         <a href="gestionar.html" id="acct-manage" class="btn acct-guard">Gestionar suscripción</a>
-        <button id="acct-logout" class="btn ghost">Cerrar sesión</button>
       </div>
     </div>
-    <p id="acct-renews" class="acct-small" style="margin-top:10px"></p>
-    <p class="acct-small" style="margin-top:8px">¿No tienes cuenta? <a id="acct-open-from-section" class="badge" style="cursor:pointer">Inicia sesión o regístrate</a></p>
+    <p id="acct-auth-cta" class="acct-small" style="margin-top:10px;display:none">
+      ¿No tienes cuenta?
+      <a id="acct-open-from-section" class="badge" style="cursor:pointer">Inicia sesión o regístrate</a>
+    </p>
   </article>
 </section>
 
@@ -259,9 +266,9 @@
 
         <div class="acct-actions">
           <button type="submit" class="btn">Iniciar sesión</button>
-          <!-- Misma pestaña; el JS intercepta el click -->
-          <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google">Continuar con Google</a>
+          <a id="btn-google-login" href="/api/google-oauth-begin?from=login" class="btn btn-google">Continuar con Google</a>
           <p id="acct-error-login" class="acct-err" style="display:none"></p>
+          <p id="acct-info-login" class="acct-ok" style="display:none"></p>
         </div>
       </form>
 
@@ -288,8 +295,9 @@
         <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
         <div class="acct-actions">
           <button type="submit" class="btn">Crear cuenta</button>
-          <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google">Registrarme con Google</a>
+          <a id="btn-google-register" href="/api/google-oauth-begin?from=register" class="btn btn-google">Registrarme con Google</a>
           <p id="acct-error-register" class="acct-err" style="display:none"></p>
+          <p id="acct-info-register" class="acct-ok" style="display:none"></p>
         </div>
       </form>
 
@@ -359,7 +367,7 @@
     const modal = $('#acct-modal'), title = $('#acct-title'), sub = $('#acct-sub');
     const forms = { login:$('#acct-form-login'), register:$('#acct-form-register'), recover:$('#acct-form-recover') };
     const errs  = { login:$('#acct-error-login'), register:$('#acct-error-register'), recover:$('#acct-error-recover') };
-    const okRecover = $('#acct-info-recover');
+    const oks   = { login:$('#acct-info-login'), register:$('#acct-info-register'), recover:$('#acct-info-recover') };
 
     function getInterval(u){ return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase(); }
     function addDays(date, days){ const x=new Date(date); x.setDate(x.getDate()+days); return x; }
@@ -369,10 +377,17 @@
       const startDate = typeof start==='number' ? new Date(start*1000) : new Date(start);
       return getInterval(u)==='year' ? addDays(startDate,365) : addDays(startDate,30);
     }
+
+    // === FIX: mostrar EXACTAMENTE el plan de Stripe si hay nickname ===
     function prettyPlan(u){
-      const nick = (u?.subscription?.plan?.nickname || u?.subscription?.price?.nickname || u?.plan || '').toLowerCase();
-      let base='Básico'; if(/pro/.test(nick)) base='Pro'; else if(/medio|standard|estándar/.test(nick)) base='Medio';
-      const freq=getInterval(u)==='year'?'anual':'mensual'; return `${base} ${freq}`;
+      const nick = (u?.subscription?.price?.nickname || u?.subscription?.plan?.nickname || '').trim();
+      if(nick) return nick;
+      const interval=(getInterval(u)==='year')?'Anual':'Mensual';
+      const idOrNick=((u?.subscription?.price?.id||'')+' '+(u?.subscription?.plan?.nickname||'')).toLowerCase();
+      let base='Básico';
+      if(/pro/.test(idOrNick)) base='Pro';
+      else if(/medio|standard|estándar/.test(idOrNick)) base='Medio';
+      return `${base} ${interval}`;
     }
     function isSubActive(u){
       const s=(u?.subscription?.status || u?.subscription_status || '').toLowerCase();
@@ -389,9 +404,12 @@
       if(name==='login'){ title.textContent='Inicia sesión en tu cuenta'; sub.textContent='Introduce tus datos de acceso o crea una cuenta nueva.'; }
       if(name==='register'){ title.textContent='Crea tu cuenta ahora mismo'; sub.textContent='Completa tus datos para registrarte en Taply.'; }
       if(name==='recover'){ title.textContent='Recuperar contraseña'; sub.textContent='Te enviaremos un enlace a tu correo para restablecerla.'; }
+      // limpiar mensajes
+      Object.values(errs).forEach(x=>x&&(x.style.display='none'));
+      Object.values(oks).forEach(x=>x&&(x.style.display='none'));
     }
     function openModal(tab='login'){ modal.classList.remove('acct-hidden'); setTab(tab); setTimeout(()=>$('#acct-login-email')?.focus(),40); }
-    function closeModal(){ modal.classList.add('acct-hidden'); Object.values(errs).forEach(e=>e&&(e.style.display='none')); okRecover.style.display='none'; }
+    function closeModal(){ modal.classList.add('acct-hidden'); Object.values(errs).forEach(e=>e&&(e.style.display='none')); Object.values(oks).forEach(e=>e&&(e.style.display='none')); }
     document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
     modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
     $('#acct-open-from-section')?.addEventListener('click', ()=> openModal('login'));
@@ -423,19 +441,34 @@
 
     // -------- Formularios --------
     forms.recover?.addEventListener('submit', async e=>{
-      e.preventDefault(); errs.recover.style.display='none'; okRecover.style.display='none';
+      e.preventDefault(); errs.recover.style.display='none'; oks.recover.style.display='none';
       const email=$('#acct-recover-email').value.trim();
-      try{ await api('POST','/api/request-password-reset',{email}); okRecover.textContent='Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora).'; okRecover.style.display='block'; }
+      try{ await api('POST','/api/request-password-reset',{email}); oks.recover.textContent='Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora).'; oks.recover.style.display='block'; }
       catch(err){ errs.recover.textContent=String(err); errs.recover.style.display='block'; }
     });
 
+    // Reenvío verificación
+    async function resendVerification(email){
+      if(!email) return;
+      try{
+        await api('POST','/api/resend-verification',{email});
+        oks.login.textContent='Te hemos reenviado el correo de verificación.'; oks.login.style.display='block';
+      }catch(e){}
+    }
+
     forms.login?.addEventListener('submit', async e=>{
-      e.preventDefault(); errs.login.style.display='none';
+      e.preventDefault(); errs.login.style.display='none'; oks.login.style.display='none';
       const email=$('#acct-login-email').value.trim(); const password=$('#acct-login-pass').value;
       try{
         const data=await api('POST','/api/login',{email,password});
         setUser(data?.user||null); await forceSessionRefresh(); closeModal();
       }catch(err){
+        if(err==='email_not_verified'){
+          errs.login.innerHTML = 'Tu correo no está verificado. <a id="resend-link" style="text-decoration:underline;cursor:pointer">Reenviar verificación</a>';
+          errs.login.style.display='block';
+          setTimeout(()=>{ document.getElementById('resend-link')?.addEventListener('click',()=>resendVerification(email)); },0);
+          return;
+        }
         errs.login.textContent=(err==='account_not_found')?'No existe una cuenta con ese email.':
                                (err==='invalid_credentials')?'Contraseña incorrecta.':
                                (err==='password_not_set')?'Esta cuenta no tiene contraseña. Usa el enlace de recuperación.':String(err);
@@ -444,7 +477,7 @@
     });
 
     forms.register?.addEventListener('submit', async e=>{
-      e.preventDefault(); errs.register.style.display='none';
+      e.preventDefault(); errs.register.style.display='none'; oks.register.style.display='none';
       const name=$('#acct-reg-name').value.trim(); const email=$('#acct-reg-email').value.trim();
       const p1=$('#acct-reg-pass').value; const p2=$('#acct-reg-pass2').value;
       if(p1!==p2){ errs.register.textContent='Las contraseñas no coinciden.'; errs.register.style.display='block'; return; }
@@ -452,7 +485,9 @@
       if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
       try{
         const data=await api('POST','/api/register',{name,email,password:p1});
-        setUser(data?.user||null); await forceSessionRefresh(); closeModal();
+        // No iniciamos sesión; mostramos aviso de verificación
+        oks.register.textContent = `Te hemos enviado un correo de verificación a ${email}. Sigue el enlace para activar tu cuenta.`;
+        oks.register.style.display='block';
       }catch(err){
         errs.register.textContent=(err==='email_in_use_google')?'Ese correo ya existe como cuenta Google. Inicia sesión con Google.':
                                  (err==='email_in_use')?'Ese correo ya tiene una cuenta. Inicia sesión.':
@@ -462,7 +497,7 @@
       }
     });
 
-    // -------- Google: UNA pestaña (misma pestaña siempre) + polling --------
+    // -------- Google: misma pestaña --------
     function startGooglePolling(){
       if(S.polling) clearInterval(S.polling);
       let tries=0;
@@ -488,11 +523,11 @@
         e.preventDefault();
         e.stopImmediatePropagation();
         try{ startGooglePolling(); }catch{}
-        location.href = `/api/google?from=${encodeURIComponent(from)}`; // siempre misma pestaña
+        location.href = `/api/google-oauth-begin?from=${encodeURIComponent(from)}`; // endpoint actualizado
         return false;
       };
       el.addEventListener('click', handler, true);
-      el.addEventListener('mousedown', (e)=>{ e.preventDefault(); }, true); // evita aperturas raras en móviles
+      el.addEventListener('mousedown', (e)=>{ e.preventDefault(); }, true);
     }
     bindGoogle('btn-google-login','login');
     bindGoogle('btn-google-register','register');
@@ -524,14 +559,15 @@
     }
 
     function paintAccountSection(){
-      const statusEl = $('#acct-status'), renewsEl = $('#acct-renews'), nfcEl = $('#acct-nfc'), logoutBtn = $('#acct-logout');
+      const statusEl = $('#acct-status'), nfcEl = $('#acct-nfc'), authCta = $('#acct-auth-cta');
       if(!S.user){
-        statusEl.textContent='Sesión no iniciada'; nfcEl.textContent='NFC comprados: 0'; renewsEl.textContent=''; logoutBtn?.setAttribute('disabled','disabled'); return;
+        statusEl.textContent='Sesión no iniciada';
+        nfcEl.textContent='NFC comprados: 0';
+        if(authCta) authCta.style.display='block';
+        return;
       }
-      logoutBtn?.removeAttribute('disabled');
-      logoutBtn.onclick = async ()=>{ try{ await api('POST','/api/logout',{}); }catch{} setUser(null); paintNav(); paintAccountSection(); alert('Sesión cerrada'); };
+      if(authCta) authCta.style.display='none';
       statusEl.textContent = isSubActive(S.user) ? prettyPlan(S.user) : 'Sin plan activo';
-      const next = computeNextRenewal30(S.user); renewsEl.textContent = next ? `Renovación / fin de periodo: ${fmtDate(next)}.` : '';
       const qty = Number(S.user.nfc_qty || 0); nfcEl.textContent = `NFC comprados: ${qty}`;
     }
 
@@ -549,43 +585,30 @@
       }
     }
 
-    // ====== Mapeo errores Google + manejo del hash ======
-    function mapGoogleError(code){
-      switch(String(code||'').toLowerCase()){
-        case 'email_in_use_password': return 'Ese correo ya tiene una cuenta con contraseña. Inicia sesión con tu contraseña.';
-        case 'email_in_use_google':   return 'Ese correo ya está registrado con Google. Inicia sesión con Google.';
-        case 'email_in_use':          return 'Ese correo ya está en uso.';
-        case 'use_password_login':    return 'Esa cuenta no está vinculada a Google. Usa correo y contraseña (o “¿Olvidaste la contraseña?”).';
-        case 'not_registered':        return 'No existe ninguna cuenta registrada con ese Google. Regístrate primero.';
-        case 'email_not_verified':    return 'Tu correo de Google no está verificado.';
-        case 'state_error':           return 'Error de seguridad (state). Inténtalo de nuevo.';
-        case 'google_auth_failed':    return 'No se pudo completar con Google. Inténtalo otra vez.';
-        case 'server_error':          return 'Error del servidor. Intenta de nuevo.';
-        default:                      return 'No se pudo completar con Google. Inténtalo otra vez.';
-      }
+    // Manejo de señal de Google (query o hash)
+    function parseSignal(){
+      const params = new URLSearchParams(location.search.replace(/^\?/,''));
+      const hashParams = new URLSearchParams((location.hash||'').replace(/^#/, '').replace(/;/g,'&'));
+      return {
+        google: params.get('google') || hashParams.get('google'),
+        from: (params.get('from') || hashParams.get('from') || 'login').toLowerCase(),
+        code: params.get('code') || hashParams.get('code')
+      };
     }
-    async function handleGoogleHash(){
-      const raw = (location.hash || '').replace(/^#/, '');
-      if(!raw) return;
-      const params = new URLSearchParams(raw.replace(/;/g,'&'));
-      const g = params.get('google');      // ok | err
-      const from = (params.get('from') || 'login').toLowerCase();
-      const code = params.get('code');
-
-      if (g === 'ok') {
+    async function handleGoogleSignal(){
+      const sig = parseSignal();
+      if(!sig.google) return;
+      if (sig.google === 'ok') {
         await forceSessionRefresh();
-        history.replaceState(null,'',location.pathname + location.search);
-        return;
-      }
-      if (g === 'err') {
-        openModal(from === 'register' ? 'register' : 'login');
-        const target = (from === 'register') ? errs.register : errs.login;
+      } else if (sig.google === 'err') {
+        openModal(sig.from === 'register' ? 'register' : 'login');
+        const target = (sig.from === 'register') ? errs.register : errs.login;
         if (target){
-          target.textContent = mapGoogleError(code);
+          target.textContent = 'No se pudo completar con Google. Inténtalo de nuevo.';
           target.style.display = 'block';
         }
-        history.replaceState(null,'',location.pathname + location.search);
       }
+      history.replaceState(null,'',location.pathname);
     }
 
     async function getSession(){
@@ -598,7 +621,7 @@
         const g=e.target.closest('.acct-guard'); if(g && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); }
       }, true);
 
-      await handleGoogleHash();
+      await handleGoogleSignal();
     }
 
     // Sync entre pestañas
@@ -620,7 +643,7 @@
 
     if (window.taplyAuth?.user && (window.taplyAuth.user.subscription || window.taplyAuth.user.isSubscribed)) {
       const u = window.taplyAuth.user;
-      const planName = (u.subscription && (u.subscription.plan?.nickname||u.subscription.price?.nickname)) || 'actual';
+      const planName = (u.subscription && (u.subscription.price?.nickname||u.subscription.plan?.nickname)) || 'actual';
       if (confirm(`Ya tienes un plan ${planName} activo.\n\n¿Quieres ir a “Gestionar suscripción” para cambiarlo?`)) { location.href = 'gestionar.html'; return; }
     }
 
