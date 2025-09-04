@@ -24,7 +24,7 @@
     .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
     /* Bloque llamativo de suscripción */
     .sub-hero{
-      border:1px solid var(--b); border-radius:16px; padding:16px;
+      border:1px solid var(--b); border-radius:16px; padding:16px; margin-top:4px;
       background:
         linear-gradient(135deg, rgba(124,58,237,.22), rgba(0,212,255,.18)) border-box,
         linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.02)) padding-box;
@@ -37,6 +37,7 @@
     }
     .sub-meta{margin:.25rem 0 0; font-size:.98rem; color:var(--muted)}
     .divider{height:1px;background:var(--b);margin:18px 0}
+    .hidden{display:none !important}
   </style>
 </head>
 <body>
@@ -51,7 +52,7 @@
 
     <section class="card" id="acctBox">
       <h2 style="margin:0 0 6px">Tu cuenta</h2>
-      <p class="muted" id="email">—</p>
+      <p class="muted" id="email">Cargando…</p>
 
       <!-- Bloque SUSCRIPCIÓN (llamativo) -->
       <div class="sub-hero" id="subHero">
@@ -63,14 +64,15 @@
       <!-- Botones debajo del bloque de suscripción -->
       <div class="row" style="margin-top:12px">
         <button id="btnChangePlan" class="btn">Cambiar de plan</button>
-        <button id="btnCancel" class="ghost">Cancelar plan (al final del periodo)</button>
-        <button id="btnResume" class="ghost" style="display:none">Reanudar plan</button>
+        <button id="btnCancel" class="ghost hidden">Cancelar plan (al final del periodo)</button>
+        <button id="btnResume" class="ghost hidden">Reanudar plan</button>
+        <a id="btnSeePlans" class="ghost hidden" href="suscripciones.html#planes">Ver planes</a>
       </div>
       <p id="msg" class="muted" style="margin-top:6px"></p>
 
       <div class="divider"></div>
 
-      <!-- NFC (debajo, tal cual) -->
+      <!-- NFC -->
       <section id="nfcBlock">
         <h3 style="margin:0 0 6px">NFC</h3>
         <p class="muted">Has comprado: <strong id="nfcQty">0</strong> dispositivos.</p>
@@ -86,7 +88,10 @@
     // Fallback directo al portal (si tu API no devuelve una URL)
     const PORTAL_LOGIN_URL = "https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00";
 
-    const $=s=>document.querySelector(s);
+    const $ = s => document.querySelector(s);
+    const show  = el => el.classList.remove('hidden');
+    const hide  = el => el.classList.add('hidden');
+    const setTxt = (sel, txt) => { const el=$(sel); if(el) el.textContent = txt; };
 
     async function api(method, url, body){
       const res = await fetch(url,{
@@ -97,11 +102,11 @@
         body: body?JSON.stringify(body):undefined
       });
       let data=null; try{ data=await res.json(); }catch{}
-      if(!res.ok) throw (data?.error||'error');
+      if(!res.ok) throw (data?.error||('HTTP_'+res.status));
       return data;
     }
 
-    // Helpers de plan + fechas (mostramos solo nombre "bonito", no "estado: active")
+    // Helpers de plan + fechas (mostramos solo nombre "bonito")
     function getInterval(u){
       return (u?.subscription?.price?.interval ||
               u?.subscription?.plan?.interval ||
@@ -132,39 +137,58 @@
       return ['active','trialing','past_due'].includes(st);
     }
 
+    function paintNoSubscription(){
+      $('#subName').textContent = 'No tienes suscripción activa';
+      setTxt('#renewLine','');
+      $('#flags').innerHTML = '';
+      hide($('#btnCancel'));
+      hide($('#btnResume'));
+      show($('#btnSeePlans'));
+    }
+
     async function refreshUser(paintOnly=false){
-      const d = await api('GET','/api/session');
-      const u = d?.user;
-      if(!u){ location.href='suscripciones.html#cuenta'; return; }
+      try{
+        const d = await api('GET','/api/session');
+        const u = d?.user;
+        if(!u){
+          setTxt('#email','Debes iniciar sesión para gestionar tu cuenta.');
+          paintNoSubscription();
+          return;
+        }
+        USER=u;
 
-      // Si NO tiene suscripción válida, fuera de esta página
-      if(!hasValidSub(u)){ location.href='suscripciones.html#planes'; return; }
+        setTxt('#email', u.email || '—');
 
-      USER=u;
+        if(hasValidSub(u)){
+          $('#subName').textContent = prettyPlan(u);
+          const flags=[];
+          if(u?.subscription?.cancel_at_period_end) flags.push('<span class="tag warn">Cancela al final del periodo</span>');
+          $('#flags').innerHTML = flags.join(' ');
 
-      $('#email').textContent=u.email||'—';
+          const next = computeNextRenewal30(u);
+          setTxt('#renewLine', next ? ('Renovación / fin de periodo: '+fmtDate(next)) : '');
 
-      // Nombre bonito de suscripción (llamativo, sin "estado: active")
-      $('#subName').textContent = prettyPlan(u);
+          const cancelAtEnd=!!u?.subscription?.cancel_at_period_end;
+          if(cancelAtEnd){ hide($('#btnCancel')); show($('#btnResume')); }
+          else { show($('#btnCancel')); hide($('#btnResume')); }
+          hide($('#btnSeePlans'));
+        }else{
+          paintNoSubscription();
+        }
 
-      // Chips/flags (solo si está marcada para cancelar al final)
-      const flags=[];
-      if(u?.subscription?.cancel_at_period_end) flags.push('<span class="tag warn">Cancela al final del periodo</span>');
-      $('#flags').innerHTML = flags.join(' ');
+        // NFC
+        setTxt('#nfcQty', String(Number(u.nfc_qty||0)));
 
-      // Renovación / fin de periodo
-      const next = computeNextRenewal30(u);
-      $('#renewLine').textContent = next ? ('Renovación / fin de periodo: '+fmtDate(next)) : '';
-
-      // NFC
-      $('#nfcQty').textContent = Number(u.nfc_qty||0);
-
-      // Mostrar/ocultar botones Cancelar/Reanudar
-      const cancelAtEnd=!!u?.subscription?.cancel_at_period_end;
-      $('#btnCancel').style.display = cancelAtEnd ? 'none' : 'inline-flex';
-      $('#btnResume').style.display = cancelAtEnd ? 'inline-flex' : 'none';
-
-      if(!paintOnly){ $('#msg').textContent=''; }
+        if(!paintOnly){ setTxt('#msg',''); }
+      }catch(e){
+        // Error general: mostramos mensaje amable y no redirigimos
+        setTxt('#email','No se pudo cargar la sesión.');
+        $('#subName').textContent = 'Intenta recargar la página';
+        setTxt('#renewLine','');
+        $('#flags').innerHTML = '';
+        show($('#btnSeePlans'));
+        console.error('refreshUser error', e);
+      }
     }
 
     // Si venimos de Stripe con ?session_id=..., guardamos cookie y ejecutamos post-pago
@@ -184,12 +208,19 @@
       }catch{}
     }
 
-    // Abrir portal (para cambiar de plan). Primero vía backend; si falla, fallback URL.
+    // Abrir portal (para cambiar de plan).
     async function openPortal(){
       try{
         const r=await api('POST','/api/create-portal-session',{});
         if(r?.url){ location.href=r.url; return; }
-      }catch(e){ /* fallback */ }
+      }catch(e){
+        // Si tu backend bloquea por no_active_subscription, no pasa nada: fallback
+      }
+      // Fallback o sin suscripción -> vamos al login del portal o a planes
+      if(!USER || !hasValidSub(USER)){
+        location.href = 'suscripciones.html#planes';
+        return;
+      }
       let url = PORTAL_LOGIN_URL;
       try{
         if(USER?.email){
@@ -202,7 +233,10 @@
     }
 
     // Eventos
-    $('#btnChangePlan').addEventListener('click', openPortal);
+    $('#btnChangePlan').addEventListener('click', ()=>{
+      if(!USER || !hasValidSub(USER)) { location.href='suscripciones.html#planes'; return; }
+      openPortal();
+    });
 
     $('#btnCancel').addEventListener('click', async ()=>{
       try{
