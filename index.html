@@ -7,16 +7,6 @@
   <title>Taply — Sube la valoración de tu negocio sin esfuerzo</title>
   <meta name="description" content="Sé un imán de clientes con Taply: más y mejores reseñas online con tecnología NFC. Convierte opiniones positivas en reseñas de Google y aprende de las negativas.">
 
-  <!-- SEO / OG -->
-  <link rel="canonical" href="https://tu-dominio.com/">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="Taply — Sube la valoración de tu negocio sin esfuerzo">
-  <meta property="og:description" content="Más reseñas, mejor reputación y más ingresos con NFC.">
-  <meta property="og:image" content="https://tu-dominio.com/og.jpg">
-  <meta property="og:url" content="https://tu-dominio.com/">
-  <meta name="twitter:card" content="summary_large_image">
-
-  <!-- Fuentes -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -25,9 +15,9 @@
     :root{
       --bg:#0b0f1a; --bg-2:#0e1424; --txt:#e9eefc; --muted:#94a3b8;
       --brand-1:#00d4ff; --brand-2:#7c3aed;
-      --blue-1:#38bdf8; --blue-2:#2563eb; /* flechas azules */
+      --blue-1:#38bdf8; --blue-2:#2563eb;
       --radius:20px; --shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
-      --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 28px);
+      --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 36px); /* más margen para que no tape nada */
     }
     *{box-sizing:border-box}
     html{-webkit-text-size-adjust:100%}
@@ -52,7 +42,7 @@
     .ghost{padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);color:var(--txt);touch-action:manipulation}
     .menu{display:none}
 
-    /* Cuenta (avatar + dropdown) */
+    /* Cuenta */
     .acct-chip{display:inline-flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(255,255,255,.04);cursor:pointer}
     .acct-avatar{width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));display:grid;place-items:center;font-weight:800;color:#061017}
     .acct-dd{position:relative}
@@ -129,15 +119,15 @@
     }
     .carousel-btn:hover{ filter:brightness(1.1) }
     .carousel-btn:active{ transform:translateY(-50%) scale(.98) }
-    .carousel-btn.left{left:14px}
-    .carousel-btn.right{right:14px}
+    .carousel-btn.left{left:10px}
+    .carousel-btn.right{right:10px}
     .carousel-btn span{font-size:clamp(20px,3.8vw,26px);line-height:1}
 
     input,select,textarea,button{font-size:16px}
     :focus-visible{outline:2px solid #7c3aed; outline-offset:2px; border-radius:8px}
 
     @media (max-width: 768px){
-      :root{ --arrowSize:48px; --edgePad:72px; }
+      :root{ --arrowSize:44px; --edgePad:calc(var(--arrowSize) + 30px); }
       section{padding:48px 0}
       header{background:#0a0f16}
       .grid-3{grid-template-columns:1fr}
@@ -148,6 +138,11 @@
       }
       .menu:hover{filter:brightness(1.08)}
       .menu:active{transform:translateY(1px)}
+    }
+    @media (max-width:480px){
+      /* en móviles muy pequeños, ocultamos flechas y dejamos swipe */
+      .carousel-btn{display:none}
+      .reviews-track{padding:0 18px}
     }
     @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
@@ -298,7 +293,7 @@
     </div>
   </footer>
 
-  <!-- ===== MODAL CUENTA (2 pestañas; vista RECUPERAR al darle “Olvidaste…”) ===== -->
+  <!-- ===== MODAL ACCESO ===== -->
   <div id="acct-modal" class="acct-hidden" role="dialog" aria-modal="true" aria-labelledby="acct-title">
     <div class="acct-dialog">
       <div class="acct-cover"></div>
@@ -333,7 +328,7 @@
 
           <div class="acct-actions">
             <button type="submit" class="btn">Iniciar sesión</button>
-            <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google">Continuar con Google</a>
+            <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google" rel="nofollow">Continuar con Google</a>
             <p id="acct-error-login" class="acct-err" style="display:none"></p>
           </div>
         </form>
@@ -361,12 +356,12 @@
           <div class="meter" aria-hidden="true"><i id="pw-meter" style="display:block;height:6px;border-radius:6px;background:#1f2937;width:0"></i></div>
           <div class="acct-actions">
             <button type="submit" class="btn">Crear cuenta</button>
-            <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google">Registrarme con Google</a>
+            <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google" rel="nofollow">Registrarme con Google</a>
             <p id="acct-error-register" class="acct-err" style="display:none"></p>
           </div>
         </form>
 
-        <!-- RECOVER (se muestra solo al pulsar “¿Olvidaste…?”) -->
+        <!-- RECOVER -->
         <form id="acct-form-recover" class="acct-form" style="display:none" autocomplete="on" novalidate>
           <p class="acct-small">Te enviaremos un enlace para restablecer tu contraseña.</p>
           <label class="acct-label">Correo
@@ -412,7 +407,7 @@
       let t; track.addEventListener('scroll',()=>{ clearTimeout(t); t=setTimeout(()=>scrollToIndex(nearestIndex()),120); }, {passive:true});
     })();
 
-    /* ======= Cuenta (2 pestañas; vista RECOVER al pulsar enlace) ======= */
+    /* ======= Cuenta ======= */
     (function(){
       const S = { user:null, polling:null };
       const $  = s => document.querySelector(s);
@@ -431,11 +426,32 @@
       };
       const okRecover = $('#acct-info-recover');
 
-      function setTab(name){
+      // ---- Navegación / historial para cerrar con "Atrás"
+      const AUTH_HASHES = ['#auth-login','#auth-register','#auth-recover'];
+      function pushAuthState(tab){
+        const h = '#auth-' + tab;
+        history.pushState({auth:true, tab}, '', h);
+      }
+      window.addEventListener('popstate', (e)=>{
+        if(e.state && e.state.auth){
+          // cambiaron entre tabs con atrás/adelante
+          setTab(e.state.tab);
+          if(modal.classList.contains('acct-hidden')) modal.classList.remove('acct-hidden');
+        }else{
+          // salimos del modal
+          closeModal(true);
+        }
+      });
+      function cleanAuthHash(){
+        if (AUTH_HASHES.includes(location.hash)) {
+          history.replaceState(null,'',location.pathname + location.search);
+        }
+      }
+
+      function setTab(name, fromHistory=false){
         forms.login.style.display    = name==='login'    ? 'grid' : 'none';
         forms.register.style.display = name==='register' ? 'grid' : 'none';
         forms.recover.style.display  = name==='recover'  ? 'grid' : 'none';
-        // activar solo los botones de la barra de pestañas (no el enlace "¿Olvidaste...?")
         document.querySelectorAll('#acct-modal .acct-tabs .acct-tab').forEach(b=>{
           const on=b.dataset.tab===name; b.classList.toggle('acct-tab-active', on);
           b.setAttribute('aria-selected', String(on));
@@ -443,15 +459,21 @@
         if(name==='login'){ $('#acct-title').textContent='Inicia sesión en tu cuenta'; $('#acct-sub').textContent='Introduce tus datos de acceso o crea una cuenta nueva.'; }
         if(name==='register'){ $('#acct-title').textContent='Crea tu cuenta ahora mismo'; $('#acct-sub').textContent='Completa tus datos para registrarte en Taply.'; }
         if(name==='recover'){ $('#acct-title').textContent='Recuperar contraseña'; $('#acct-sub').textContent='Te enviaremos un enlace a tu correo para restablecerla.'; }
+        if(!fromHistory) pushAuthState(name);
       }
       function openModal(tab='login'){ modal.classList.remove('acct-hidden'); setTab(tab); setTimeout(()=>$('#acct-login-email')?.focus(),40); }
-      function closeModal(){ modal.classList.add('acct-hidden'); Object.values(errs).forEach(e=>e&&(e.style.display='none')); okRecover.style.display='none'; }
+      function closeModal(fromHistory=false){
+        modal.classList.add('acct-hidden');
+        Object.values(errs).forEach(e=>e&&(e.style.display='none')); okRecover.style.display='none';
+        if(!fromHistory) cleanAuthHash(); // si cerramos nosotros, limpiamos hash
+      }
       document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
       modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
 
       document.querySelectorAll('#acct-modal .acct-tabs .acct-tab').forEach(b=> b.addEventListener('click', ()=> setTab(b.dataset.tab)));
       $('#link-forgot')?.addEventListener('click', ()=> setTab('recover'));
       $('#recover-back')?.addEventListener('click', ()=> setTab('login'));
+
       $$('.toggle-eye').forEach(btn=>btn.addEventListener('click', ()=>{ const sel=btn.getAttribute('data-toggle'); const input=document.querySelector(sel); if(!input) return; input.type = input.type==='password' ? 'text' : 'password'; }));
 
       // Métrica de contraseña (registro)
@@ -514,17 +536,12 @@
         }
       });
 
-      // Google en misma pestaña + polling
-      function startGooglePolling(){
-        if(S.polling) clearInterval(S.polling);
-        let tries=0;
-        S.polling=setInterval(async ()=>{ tries++; try{ const data=await api('GET','/api/session'); if(data?.user){ setUser(data.user); closeModal(); clearInterval(S.polling); S.polling=null; } }catch{} if(tries>30){ clearInterval(S.polling); S.polling=null; } },2000);
-      }
+      // ---- Google: dejar que el <a> navegue nativo (evita bloqueos "usar otra cuenta")
       function bindGoogle(id, from){
-        const el=document.getElementById(id); if(!el) return; el.removeAttribute('target');
-        const handler=(e)=>{ e.preventDefault(); e.stopImmediatePropagation(); try{ startGooglePolling(); }catch{} location.href=`/api/google?from=${encodeURIComponent(from)}`; return false; };
-        el.addEventListener('click', handler, true);
-        el.addEventListener('mousedown', (e)=>{ e.preventDefault(); }, true);
+        const el=document.getElementById(id); if(!el) return;
+        el.removeAttribute('target'); // misma pestaña
+        el.addEventListener('click', ()=>{ try{ sessionStorage.setItem('taply_from', from); }catch{} }, {capture:true});
+        // NO preventDefault; dejamos que siga el href
       }
       bindGoogle('btn-google-login','login');
       bindGoogle('btn-google-register','register');
@@ -560,27 +577,38 @@
         for(let i=0;i<retries;i++){ try{ const data=await api('GET','/api/session'); if(data?.user){ setUser(data.user); break; } }catch{} await new Promise(r=>setTimeout(r,delay)); }
       }
 
+      // Mapeo errores Google + manejo del hash y sessionStorage 'from'
+      function mapGoogleError(code){
+        switch(String(code||'').toLowerCase()){
+          case 'email_in_use_password': return 'Ese correo ya tiene una cuenta con contraseña. Inicia sesión con tu contraseña.';
+          case 'email_in_use_google':   return 'Ese correo ya está registrado con Google. Inicia sesión con Google.';
+          case 'email_in_use':          return 'Ese correo ya está en uso.';
+          case 'use_password_login':    return 'Esa cuenta no está vinculada a Google. Usa correo y contraseña.';
+          case 'not_registered':        return 'No existe ninguna cuenta registrada con ese Google. Regístrate primero.';
+          case 'email_not_verified':    return 'Tu correo de Google no está verificado.';
+          case 'state_error':           return 'Error de seguridad (state). Inténtalo de nuevo.';
+          case 'google_auth_failed':    return 'No se pudo completar con Google. Inténtalo otra vez.';
+          case 'server_error':          return 'Error del servidor. Intenta de nuevo.';
+          default:                      return 'No se pudo completar con Google. Inténtalo otra vez.';
+        }
+      }
       async function handleGoogleHash(){
-        const raw = (location.hash || '').replace(/^#/, ''); if(!raw) return;
+        const raw = (location.hash || '').replace(/^#/, '');
+        if(!raw) return;
         const params = new URLSearchParams(raw.replace(/;/g,'&'));
-        const g=params.get('google'); const from=(params.get('from')||'login').toLowerCase(); const code=params.get('code');
-        if(g==='ok'){ await forceSessionRefresh(); history.replaceState(null,'',location.pathname + location.search); return; }
-        if(g==='err'){
-          openModal(from==='register' ? 'register' : 'login');
-          const target = (from==='register') ? errs.register : errs.login;
-          if(target){
-            target.textContent =
-              (code==='email_in_use_password') ? 'Ese correo ya tiene una cuenta con contraseña. Inicia sesión con tu contraseña.' :
-              (code==='email_in_use_google')   ? 'Ese correo ya está registrado con Google. Inicia sesión con Google.' :
-              (code==='use_password_login')    ? 'Esa cuenta no está vinculada a Google. Usa correo y contraseña.' :
-              (code==='not_registered')        ? 'No existe ninguna cuenta registrada con ese Google. Regístrate primero.' :
-              (code==='email_not_verified')    ? 'Tu correo de Google no está verificado.' :
-              (code==='state_error')           ? 'Error de seguridad (state). Inténtalo de nuevo.' :
-              (code==='google_auth_failed')    ? 'No se pudo completar con Google. Inténtalo otra vez.' :
-              (code==='server_error')          ? 'Error del servidor. Intenta de nuevo.' :
-                                                  'No se pudo completar con Google. Inténtalo otra vez.';
-            target.style.display='block';
-          }
+        const g = params.get('google');      // ok | err
+        let from = (params.get('from') || sessionStorage.getItem('taply_from') || 'login').toLowerCase();
+        const code = params.get('code');
+        try{ sessionStorage.removeItem('taply_from'); }catch{}
+        if (g === 'ok') {
+          await forceSessionRefresh();
+          history.replaceState(null,'',location.pathname + location.search);
+          return;
+        }
+        if (g === 'err') {
+          openModal(from === 'register' ? 'register' : 'login');
+          const target = (from === 'register') ? errs.register : errs.login;
+          if (target){ target.textContent = mapGoogleError(code); target.style.display = 'block'; }
           history.replaceState(null,'',location.pathname + location.search);
         }
       }
@@ -593,7 +621,13 @@
 
       getSession();
       window.TaplyOpenLogin = openModal;
+
+      // Si recargan con hash #auth-* (por compartir URL), abrir el modal correspondiente
+      if(['#auth-login','#auth-register','#auth-recover'].includes(location.hash)){
+        openModal(location.hash.replace('#auth-',''));
+      }
     })();
   </script>
 </body>
 </html>
+
