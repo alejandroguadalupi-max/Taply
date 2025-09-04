@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="theme-color" content="#0b0f1a" />
   <title>Taply — Sube la valoración de tu negocio sin esfuerzo</title>
-  <meta name="description" content="Sé un imán de clientes con Taply: más y mejores reseñas online con tecnología NFC. Convierte opiniones positivas en reseñas de Google y aprende de las negativas." />
+  <meta name="description" content="Sé un imán de clientes con Taply: más y mejores reseñas online con tecnología NFC. Convierte opiniones positivas en reseñas de Google y aprende de las negativas.">
 
   <!-- SEO / OG -->
   <link rel="canonical" href="https://tu-dominio.com/">
@@ -24,7 +24,8 @@
   <style>
     :root{
       --bg:#0b0f1a; --bg-2:#0e1424; --txt:#e9eefc; --muted:#94a3b8;
-      --brand-1:#00d4ff; --brand-2:#7c3aed; --ok:#22c55e; --warn:#f59e0b;
+      --brand-1:#00d4ff; --brand-2:#7c3aed;
+      --blue-1:#38bdf8; --blue-2:#2563eb; /* flechas azules */
       --radius:20px; --shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
       --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 28px);
     }
@@ -96,17 +97,21 @@
     /* Reviews / carrusel */
     .reviews{position:relative;margin:36px 0}
     .reviews h2{margin:0 0 14px}
-    .reviews-window{position:relative;overflow:hidden}
+
+    .reviews-window{position:relative}
     .reviews-track{
       display:flex;gap:22px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
       padding:0 var(--edgePad);scroll-padding:0 var(--edgePad);scrollbar-width:none;
       overscroll-behavior-x: contain; touch-action: pan-y;
     }
+    .reviews-track::-webkit-scrollbar{display:none}
+
     .review-card{
-      flex:0 0 clamp(360px, 40vw, 480px);max-width:520px;
+      flex:0 0 clamp(320px, 86vw, 520px);
+      max-width:520px;
       background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
       border:1px solid rgba(255,255,255,.1);
-      border-radius:16px;padding:20px;scroll-snap-align:center;scroll-snap-stop:normal;
+      border-radius:16px;padding:20px;scroll-snap-align:center;scroll-snap-stop:always;
       text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.35);
     }
     .review-header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
@@ -117,12 +122,16 @@
 
     .carousel-btn{
       position:absolute;top:50%;transform:translateY(-50%);
-      width:44px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,.16);
-      background:rgba(10,15,22,.7);backdrop-filter:blur(6px);color:#e9eefc;cursor:pointer;
-      display:grid;place-items:center;box-shadow:var(--shadow)
+      width:var(--arrowSize);height:var(--arrowSize);border-radius:999px;border:0;
+      background:linear-gradient(135deg,var(--blue-1),var(--blue-2));color:#fff;cursor:pointer;
+      display:grid;place-items:center;box-shadow:0 10px 30px rgba(37,99,235,.45),0 6px 18px rgba(56,189,248,.35);
+      transition:filter .2s ease, transform .1s ease; z-index:2;
     }
-    .carousel-btn.left{left:12px}
-    .carousel-btn.right{right:12px}
+    .carousel-btn:hover{ filter:brightness(1.1) }
+    .carousel-btn:active{ transform:translateY(-50%) scale(.98) }
+    .carousel-btn.left{left:14px}
+    .carousel-btn.right{right:14px}
+    .carousel-btn span{font-size:clamp(20px,3.8vw,26px);line-height:1}
 
     .faq{max-width:900px;margin-inline:auto}
     .acc{border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.02);box-shadow:var(--shadow)}
@@ -132,10 +141,6 @@
       display:flex;justify-content:center;align-items:center;gap:10px;text-align:center}
     .acc-panel{max-height:0;overflow:hidden;transition:max-height .3s ease}
     .acc-panel > div{padding:0 20px 18px;color:var(--muted);text-align:center}
-
-    .cookiebar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#0a0f16;color:#dbeafe;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:14px;justify-content:space-between;padding:12px 16px}
-    .cookiebar p{margin:0;font-size:.95rem;text-align:left}
-    .cookiebar .btn-accept{background:#6366f1;border:0;color:#fff;border-radius:8px;padding:8px 16px;cursor:pointer}
 
     input,select,textarea,button{font-size:16px}
     :focus-visible{outline:2px solid #7c3aed; outline-offset:2px; border-radius:8px}
@@ -152,30 +157,43 @@
       }
       .menu:hover{filter:brightness(1.08)}
       .menu:active{transform:translateY(1px)}
-      .cookiebar{flex-direction:column;align-items:flex-start;gap:10px}
     }
     @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
-    /* MODAL CUENTA */
+    /* ===== MODAL ACCESO (idéntico a suscripciones.html) ===== */
     #acct-modal.acct-hidden{display:none!important}
-    #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.6);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
-    .acct-dialog{width:min(520px,92%);background:var(--bg-2);color:var(--txt);border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:var(--shadow);padding:20px}
-    .acct-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-    .acct-x{background:transparent;border:0;color:inherit;font-size:22px;cursor:pointer}
-    .acct-tabs{display:flex;gap:8px;margin:10px 0 12px}
-    .acct-tab{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);border-radius:999px;padding:8px 12px;cursor:pointer;font-weight:700}
-    .acct-tab.acct-tab-active{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017}
-    .acct-form{display:grid;gap:10px}
-    .acct-form label{display:grid;gap:6px;font-weight:600}
+    #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.65);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
+    .acct-dialog{
+      width:min(560px,92%); max-height:90vh; overflow:auto;
+      background:var(--bg-2); border:1px solid rgba(255,255,255,.10); border-radius:20px; box-shadow:var(--shadow);
+      padding:0; color:var(--txt)
+    }
+    .acct-cover{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));height:6px;width:100%}
+    .acct-body{padding:22px}
+    .acct-head{display:flex;justify-content:center;align-items:center;margin:10px 0 18px}
+    .acct-logo{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-weight:900}
+    .acct-title{margin:10px 0 0;text-align:center;font-weight:800;font-size:1.25rem}
+    .acct-sub{margin:6px 0 0;text-align:center;color:var(--muted);font-size:.96rem}
+
+    .acct-tabs{display:flex;gap:8px;margin:16px auto 12px;justify-content:center}
+    .acct-tab{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;padding:8px 14px;cursor:pointer;color:inherit;font-weight:700}
+    .acct-tab.acct-tab-active{background:linear-gradient(135deg,var(--brand-1),var(--brand-2)); color:#061017}
+
+    .acct-form{display:grid;gap:12px;margin-top:6px}
+    .acct-label{font-weight:600}
     .acct-input{position:relative}
-    .acct-input input{background:#0a0f16;border:1px solid rgba(255,255,255,.12);color:inherit;border-radius:12px;padding:12px;width:100%}
+    .acct-input input{
+      width:100%;background:#0a0f16;border:1px solid rgba(255,255,255,.14);color:inherit;border-radius:12px;padding:12px 42px 12px 12px;font-size:16px;
+      transition:border .2s, box-shadow .2s
+    }
+    .acct-input input:focus{outline:none;border-color:rgba(0,212,255,.45); box-shadow:0 0 0 3px rgba(0,212,255,.25),0 0 0 6px rgba(124,58,237,.18)}
     .toggle-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
-    .acct-msg{color:#cfe3ff;margin:0 0 8px;font-size:.95rem}
-    .acct-err{color:#fca5a5}
-    .acct-small{color:var(--muted);font-size:.92rem;margin-top:6px}
-    .acct-link{color:#b3e1ff;text-decoration:underline;cursor:pointer}
-    .pw-meter{height:6px;border-radius:6px;background:#1f2937;overflow:hidden}
-    .pw-meter > span{display:block;height:100%;width:0;background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e)}
+    .acct-err{color:#ef4444;margin-top:2px}
+    .acct-ok{color:#22c55e;margin-top:2px}
+    .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+    .acct-actions{display:grid;gap:10px}
+    .btn-google{background:#db4437;color:#fff}
+    .btn-google:hover{filter:brightness(.95)}
   </style>
 </head>
 <body>
@@ -221,7 +239,7 @@
           <div class="pills"><div class="pill">Mejores reseñas</div><div class="pill">Más clientes</div><div class="pill">Más dinero</div></div>
           <div class="cta-row">
             <a class="btn" href="suscripciones.html">Ver suscripciones</a>
-            <a class="ghost acct-guard" href="gestionar.html">Gestionar suscripción</a>
+            <!-- Se elimina "Gestionar suscripción" -->
           </div>
         </div>
       </div>
@@ -240,14 +258,16 @@
       </div>
     </section>
 
+    <!-- RESEÑAS -->
     <section class="reviews" id="reviews" aria-labelledby="reviews-title">
       <div class="container">
         <h2 id="reviews-title">Valorado 4,8/5 por más de 30 negocios</h2>
 
-        <button class="carousel-btn left" id="revPrev" aria-label="Opinión anterior">‹</button>
-        <button class="carousel-btn right" id="revNext" aria-label="Opinión siguiente">›</button>
-
         <div class="reviews-window">
+          <!-- Flechas azules; ocupan su propia “columna” gracias a --edgePad -->
+          <button class="carousel-btn left" id="revPrev" aria-label="Opinión anterior"><span>‹</span></button>
+          <button class="carousel-btn right" id="revNext" aria-label="Opinión siguiente"><span>›</span></button>
+
           <div class="reviews-track" id="reviewsTrack" tabindex="0" aria-label="Opiniones de clientes">
             <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=26" alt="Sara Cordero" width="54" height="54"></div><div><div class="review-name">Sara Cordero</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Instalación en 5 minutos. Los avisos de reseñas negativas nos han permitido corregir fallos en días.</p></article>
             <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=33" alt="Marlon Melara" width="54" height="54"></div><div><div class="review-name">Marlon Melara</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Ahorra tiempo en reputación online. Muy fácil para el cliente.</p></article>
@@ -268,17 +288,6 @@
         <div class="card"><h3>5) Todo suma</h3><p>Mejores valoraciones elevan tu visibilidad en el buscador, aumentan la confianza y traen más clientes.</p></div>
       </div>
     </section>
-
-    <section id="faq">
-      <div class="container faq">
-        <h2>Preguntas frecuentes</h2>
-        <div class="acc" role="tablist">
-          <div class="acc-item"><button class="acc-btn" aria-expanded="false">¿En qué me ayuda Taply? <span>+</span></button><div class="acc-panel"><div>Consigue <strong>mejores reseñas</strong> con un flujo sin fricción y <strong>escucha</strong> al cliente: las positivas se publican; las negativas se quedan en privado para actuar.</div></div></div>
-          <div class="acc-item"><button class="acc-btn" aria-expanded="false">¿Necesito algo especial? <span>+</span></button><div class="acc-panel"><div>Solo nuestro dispositivo NFC. Funciona con la mayoría de smartphones. También te mandamos un QR.</div></div></div>
-          <div class="acc-item"><button class="acc-btn" aria-expanded="false">¿Puedo ver y filtrar negativas? <span>+</span></button><div class="acc-panel"><div>Sí: en tu panel podrás ver todas, filtrarlas y detectar <strong>puntos de mejora</strong>.</div></div></div>
-        </div>
-      </div>
-    </section>
   </main>
 
   <footer>
@@ -291,7 +300,7 @@
         <div>
           <p><a href="#beneficios">Beneficios</a></p>
           <p><a href="suscripciones.html">Suscripciones</a></p>
-          <p><a href="gestionar.html" class="acct-guard">Gestionar suscripción</a></p>
+          <!-- Eliminado "Gestionar suscripción" -->
         </div>
         <div>
           <p><a href="#como-funciona">Cómo funciona</a></p>
@@ -301,72 +310,90 @@
     </div>
   </footer>
 
-  <div class="cookiebar" id="cookiebar" role="dialog" aria-live="polite" aria-label="Aviso de cookies">
-    <p>Usamos cookies para ver cómo interactúas con la web. Al aceptarlas, estás de acuerdo con nuestro uso de cookies. <a href="#" style="color:#b3e1ff;text-decoration:underline">Política de privacidad</a></p>
-    <button class="btn-accept" id="cookieAccept">Aceptar</button>
-  </div>
-
-  <!-- MODAL CUENTA -->
+  <!-- ===== MODAL CUENTA (mismo que en suscripciones.html) ===== -->
   <div id="acct-modal" class="acct-hidden" role="dialog" aria-modal="true" aria-labelledby="acct-title">
     <div class="acct-dialog">
-      <div class="acct-head">
-        <h3 id="acct-title" style="margin:0">Accede a tu cuenta</h3>
-        <button id="acct-close" class="acct-x" aria-label="Cerrar">×</button>
+      <div class="acct-cover"></div>
+      <div class="acct-body">
+        <div class="acct-head"><div class="acct-logo">⌁</div></div>
+        <h3 id="acct-title" class="acct-title">Inicia sesión en tu cuenta</h3>
+        <p id="acct-sub" class="acct-sub">Introduce tus datos de acceso o crea una cuenta nueva.</p>
+
+        <div class="acct-tabs" role="tablist">
+          <button class="acct-tab acct-tab-active" data-tab="login" role="tab" aria-selected="true">Iniciar sesión</button>
+          <button class="acct-tab" data-tab="register" role="tab" aria-selected="false">Registrarse</button>
+          <button class="acct-tab" data-tab="recover" role="tab" aria-selected="false">Recuperar</button>
+        </div>
+
+        <!-- LOGIN -->
+        <form id="acct-form-login" class="acct-form" autocomplete="on" novalidate>
+          <label class="acct-label">Correo
+            <span class="acct-input">
+              <input id="acct-login-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
+            </span>
+          </label>
+          <label class="acct-label">Contraseña
+            <span class="acct-input">
+              <input id="acct-login-pass" type="password" required autocomplete="current-password" placeholder="••••••••">
+              <button type="button" class="toggle-eye" data-toggle="#acct-login-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
+            </span>
+          </label>
+
+          <div class="acct-row">
+            <label class="remember"><input type="checkbox" checked> Mantener sesión activa</label>
+            <span id="link-forgot" class="acct-tab" style="background:transparent;border:1px dashed rgba(255,255,255,.18);cursor:pointer">¿Olvidaste la contraseña?</span>
+          </div>
+
+          <div class="acct-actions">
+            <button type="submit" class="btn">Iniciar sesión</button>
+            <!-- Misma pestaña; el JS intercepta el click -->
+            <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google">Continuar con Google</a>
+            <p id="acct-error-login" class="acct-err" style="display:none"></p>
+          </div>
+        </form>
+
+        <!-- REGISTER -->
+        <form id="acct-form-register" class="acct-form" style="display:none" autocomplete="on" novalidate>
+          <label class="acct-label">Nombre
+            <span class="acct-input"><input id="acct-reg-name" type="text" required autocomplete="name" placeholder="Nombre y apellidos"></span>
+          </label>
+          <label class="acct-label">Correo
+            <span class="acct-input"><input id="acct-reg-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></span>
+          </label>
+          <label class="acct-label">Contraseña
+            <span class="acct-input">
+              <input id="acct-reg-pass" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+              <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass">👁</button>
+            </span>
+          </label>
+          <label class="acct-label">Confirmar contraseña
+            <span class="acct-input">
+              <input id="acct-reg-pass2" type="password" required minlength="6" autocomplete="new-password" placeholder="Repite la contraseña">
+              <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass2">👁</button>
+            </span>
+          </label>
+          <div class="meter" aria-hidden="true"><i id="pw-meter" style="display:block;height:6px;border-radius:6px;background:#1f2937;width:0"></i></div>
+          <div class="acct-actions">
+            <button type="submit" class="btn">Crear cuenta</button>
+            <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google">Registrarme con Google</a>
+            <p id="acct-error-register" class="acct-err" style="display:none"></p>
+          </div>
+        </form>
+
+        <!-- RECOVER -->
+        <form id="acct-form-recover" class="acct-form" style="display:none" autocomplete="on" novalidate>
+          <p class="acct-small">Te enviaremos un enlace para restablecer tu contraseña.</p>
+          <label class="acct-label">Correo
+            <span class="acct-input"><input id="acct-recover-email" type="email" autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></span>
+          </label>
+          <div class="acct-actions">
+            <button type="submit" class="btn">Enviar enlace</button>
+            <button type="button" class="btn ghost" id="recover-back">Volver</button>
+            <p id="acct-info-recover" class="acct-ok" style="display:none"></p>
+            <p id="acct-error-recover" class="acct-err" style="display:none"></p>
+          </div>
+        </form>
       </div>
-      <p id="acct-msg" class="acct-msg"></p>
-
-      <div class="acct-tabs" role="tablist" aria-label="Pestañas de cuenta">
-        <button class="acct-tab acct-tab-active" data-tab="login" role="tab" aria-selected="true">Iniciar sesión</button>
-        <button class="acct-tab" data-tab="register" role="tab" aria-selected="false">Registrarse</button>
-        <button class="acct-tab" data-tab="forgot" role="tab" aria-selected="false">Recuperar</button>
-      </div>
-
-      <!-- LOGIN -->
-      <form id="acct-form-login" class="acct-form" autocomplete="on">
-        <label>Email
-          <span class="acct-input">
-            <input id="acct-login-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
-          </span>
-        </label>
-        <label>Contraseña
-          <span class="acct-input">
-            <input id="acct-login-pass" type="password" required autocomplete="current-password" placeholder="••••••••">
-            <button type="button" class="toggle-eye" data-toggle="#acct-login-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
-          </span>
-        </label>
-        <button type="submit" class="btn">Entrar</button>
-        <p class="acct-small">¿Has olvidado la contraseña? Abre la pestaña <strong>Recuperar</strong>.</p>
-        <p id="acct-error-login" class="acct-err" style="display:none"></p>
-      </form>
-
-      <!-- REGISTER -->
-      <form id="acct-form-register" class="acct-form acct-hidden" autocomplete="on" novalidate>
-        <label>Nombre <input id="acct-reg-name" type="text" required autocomplete="name" minlength="2" maxlength="60" placeholder="Nombre y apellidos"></label>
-        <label>Email <input id="acct-reg-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></label>
-        <label>Contraseña (mín. 6)
-          <span class="acct-input">
-            <input id="acct-reg-pass" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
-            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
-          </span>
-        </label>
-        <div class="pw-meter" aria-hidden="true"><span id="pwBar"></span></div>
-        <label>Confirmar contraseña
-          <span class="acct-input">
-            <input id="acct-reg-pass2" type="password" required minlength="6" autocomplete="new-password" placeholder="Repite la contraseña">
-            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass2" aria-label="Mostrar u ocultar contraseña">👁</button>
-          </span>
-        </label>
-        <button type="submit" class="btn">Crear cuenta</button>
-        <p id="acct-error-register" class="acct-err" style="display:none"></p>
-      </form>
-
-      <!-- FORGOT -->
-      <form id="acct-form-forgot" class="acct-form acct-hidden" autocomplete="on">
-        <label>Email <input id="acct-forgot-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></label>
-        <button type="submit" class="btn">Enviar instrucciones</button>
-        <p class="acct-small">Si el correo existe, recibirás un email para restablecer la contraseña.</p>
-        <p id="acct-error-forgot" class="acct-err" style="display:none"></p>
-      </form>
     </div>
   </div>
 
@@ -384,19 +411,64 @@
     mobileMenu?.addEventListener('click', (e)=>{ const a = e.target.closest('a'); if(a){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); } });
     window.addEventListener('resize', ()=>{ if(window.innerWidth > 768){ mobileMenu.style.display='none'; menuBtn.setAttribute('aria-expanded','false'); } });
 
-    // Carrusel de reseñas (teclas, botones y smooth scroll)
+    // ===== Carrusel de reseñas: flechas azules + paso 1 a 1 (desktop y móvil)
     (function(){
       const track = document.getElementById('reviewsTrack');
       const prev = document.getElementById('revPrev');
       const next = document.getElementById('revNext');
-      const step = () => Math.min(480, Math.round(track.clientWidth * 0.8));
-      const go = (dir)=> track.scrollBy({left: dir*step(), behavior:'smooth'});
-      prev?.addEventListener('click', ()=>go(-1));
-      next?.addEventListener('click', ()=>go(+1));
-      track?.addEventListener('keydown', (e)=>{ if(e.key==='ArrowLeft') go(-1); else if(e.key==='ArrowRight') go(+1); });
+
+      const cards = () => Array.from(track.querySelectorAll('.review-card'));
+      const centerX = () => track.scrollLeft + track.clientWidth/2;
+
+      function nearestIndex(){
+        const cx = centerX();
+        const items = cards();
+        let best = 0, bestDist = Infinity;
+        items.forEach((el,i)=>{
+          const left = el.offsetLeft + el.clientWidth/2;
+          const d = Math.abs(left - cx);
+          if(d < bestDist){ bestDist = d; best = i; }
+        });
+        return best;
+      }
+
+      function scrollToIndex(i){
+        const items = cards();
+        i = Math.max(0, Math.min(items.length-1, i));
+        const el = items[i];
+        const target = el.offsetLeft - (track.clientWidth - el.clientWidth)/2;
+        track.scrollTo({ left: target, behavior:'smooth' });
+      }
+
+      function step(dir){ scrollToIndex(nearestIndex() + dir); }
+
+      prev?.addEventListener('click', ()=> step(-1));
+      next?.addEventListener('click', ()=> step(+1));
+
+      // Teclado
+      track?.addEventListener('keydown', (e)=>{ if(e.key==='ArrowLeft') step(-1); else if(e.key==='ArrowRight') step(+1); });
+
+      // Al final de un scroll, corrige al snap más cercano (también en móvil)
+      let ticking = null;
+      track.addEventListener('scroll', ()=>{
+        if(ticking) return;
+        ticking = requestAnimationFrame(()=>{
+          ticking = null;
+          // Nada agresivo: solo si el usuario deja de mover (timeout corto)
+        });
+      }, {passive:true});
+
+      let scrollTimeout;
+      track.addEventListener('scroll', ()=>{
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(()=> scrollToIndex(nearestIndex()), 120);
+      }, {passive:true});
+
+      // Evita que las flechas tapen contenido: ya hay padding lateral (var(--edgePad))
+      // y las flechas se colocan dentro de esa “columna”.
     })();
 
-    // FAQ acordeón
+    // ===== FAQ acordeón
     document.querySelectorAll('.acc-btn').forEach(btn=>{
       btn.setAttribute('aria-expanded','false');
       const panel=btn.nextElementSibling; if(panel) panel.style.maxHeight='0px';
@@ -407,95 +479,152 @@
       });
     });
 
-    // Cookies
+    /* ======= Cuenta: (idéntico a suscripciones.html, sin "Gestionar suscripción") ======= */
     (function(){
-      const KEY='taply_cookie_consent';
-      const bar=document.getElementById('cookiebar');
-      const btn=document.getElementById('cookieAccept');
-      if(localStorage.getItem(KEY)==='1'){ bar.style.display='none'; }
-      btn.addEventListener('click',()=>{ localStorage.setItem(KEY,'1'); bar.style.display='none'; });
-    })();
-
-    /* ======= Cuenta: sesión + modal (persistente y con credenciales) ======= */
-    (function(){
-      const S = { user:null };
+      const S = { user:null, polling:null };
       const $ = s => document.querySelector(s);
       const $$ = s => Array.from(document.querySelectorAll(s));
       const modal = $('#acct-modal');
-      const tabs = $$('#acct-modal .acct-tab');
-      const formLogin   = $('#acct-form-login');
-      const formReg     = $('#acct-form-register');
-      const formForgot  = $('#acct-form-forgot');
-      const errLogin   = $('#acct-error-login');
-      const errReg     = $('#acct-error-register');
-      const errForgot  = $('#acct-error-forgot');
-      const regName = $('#acct-reg-name');
-      const regEmail= $('#acct-reg-email');
-      const regPass = $('#acct-reg-pass');
-      const regPass2= $('#acct-reg-pass2');
-      const pwBar   = $('#pwBar');
+      const forms = { login:$('#acct-form-login'), register:$('#acct-form-register'), recover:$('#acct-form-recover') };
+      const errs  = { login:$('#acct-error-login'), register:$('#acct-error-register'), recover:$('#acct-error-recover') };
+      const okRecover = $('#acct-info-recover');
 
-      // Persistencia
-      const KEY='acct_user';
-      function saveUser(u){ try{ localStorage.setItem(KEY, u ? JSON.stringify(u) : ''); }catch{} }
-      function readUser(){ try{ const v=localStorage.getItem(KEY)||''; return v?JSON.parse(v):null; }catch{ return null; } }
-
-      function showModal(message){
-        $('#acct-msg').textContent = message || 'Inicia sesión para continuar';
-        modal.classList.remove('acct-hidden'); setTab('login'); setTimeout(()=>$('#acct-login-email')?.focus(),50);
-      }
-      function hideModal(){ modal.classList.add('acct-hidden'); [errLogin,errReg,errForgot].forEach(e=>e&&(e.style.display='none')); }
       function setTab(name){
-        formLogin.classList.toggle('acct-hidden', name!=='login');
-        formReg.classList.toggle('acct-hidden',   name!=='register');
-        formForgot.classList.toggle('acct-hidden',name!=='forgot');
-        tabs.forEach(b=>b.classList.toggle('acct-tab-active', b.dataset.tab===name));
-        tabs.forEach(b=>b.setAttribute('aria-selected', String(b.dataset.tab===name)));
-      }
-      function trapEsc(e){ if(e.key==='Escape') hideModal(); }
-      document.addEventListener('keydown', trapEsc);
-      $('#acct-close')?.addEventListener('click', hideModal);
-      modal?.addEventListener('click', e=>{ if(e.target===modal) hideModal(); });
-      tabs.forEach(b=>b.addEventListener('click', ()=> setTab(b.dataset.tab)));
-
-      // API helper (con credenciales)
-      async function api(method, url, body){
-        const res = await fetch(url, {
-          method,
-          headers:{'Content-Type':'application/json'},
-          credentials:'include',
-          cache:'no-store',
-          body: body?JSON.stringify(body):undefined
+        forms.login.style.display   = name==='login'   ? 'grid' : 'none';
+        forms.register.style.display= name==='register'? 'grid' : 'none';
+        forms.recover.style.display = name==='recover' ? 'grid' : 'none';
+        document.querySelectorAll('#acct-modal .acct-tab').forEach(b=>{
+          const on=b.dataset.tab===name; b.classList.toggle('acct-tab-active',on); b.setAttribute('aria-selected',String(on));
         });
-        let data=null; try{ data = await res.json(); }catch{}
+        if(name==='login'){ $('#acct-title').textContent='Inicia sesión en tu cuenta'; $('#acct-sub').textContent='Introduce tus datos de acceso o crea una cuenta nueva.'; }
+        if(name==='register'){ $('#acct-title').textContent='Crea tu cuenta ahora mismo'; $('#acct-sub').textContent='Completa tus datos para registrarte en Taply.'; }
+        if(name==='recover'){ $('#acct-title').textContent='Recuperar contraseña'; $('#acct-sub').textContent='Te enviaremos un enlace a tu correo para restablecerla.'; }
+      }
+      function openModal(tab='login'){ modal.classList.remove('acct-hidden'); setTab(tab); setTimeout(()=>$('#acct-login-email')?.focus(),40); }
+      function closeModal(){ modal.classList.add('acct-hidden'); Object.values(errs).forEach(e=>e&&(e.style.display='none')); okRecover?.style?.setProperty('display','none'); }
+      document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+      modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
+      document.querySelectorAll('#acct-modal .acct-tab').forEach(b=> b.addEventListener('click', ()=> setTab(b.dataset.tab)));
+      $('#link-forgot')?.addEventListener('click', ()=> setTab('recover'));
+      $('#recover-back')?.addEventListener('click', ()=> setTab('login'));
+      $$('.toggle-eye').forEach(btn=>btn.addEventListener('click', ()=>{ const sel=btn.getAttribute('data-toggle'); const input=document.querySelector(sel); if(!input) return; input.type = input.type==='password' ? 'text' : 'password'; }));
+
+      const meter = document.getElementById('pw-meter');
+      document.getElementById('acct-reg-pass')?.addEventListener('input', e=>{
+        const v=e.target.value||''; let score=0;
+        if(v.length>=6) score+=33; if(/[A-Z]/.test(v)&&/[a-z]/.test(v)) score+=33; if(/\d/.test(v)||/[^A-Za-z0-9]/.test(v)) score+=34;
+        if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; }
+      });
+
+      async function api(method,url,body){
+        const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:body?JSON.stringify(body):undefined});
+        let data=null; try{ data=await res.json(); }catch{}
         if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
       }
 
-      async function getSession(){
-        // pinta inmediato desde cache
-        const cached = readUser(); if(cached){ S.user=cached; paintAccountNav(); }
-        try{ const d=await api('GET','/api/session'); setUser(d?.user||null); }catch{ if(!cached) setUser(null); }
+      function setUser(u){
+        S.user = u || null;
+        try { localStorage.setItem('acct_user', u ? JSON.stringify(u) : ""); } catch(e){}
+        window.taplyAuth = window.taplyAuth || {};
+        window.taplyAuth.user = S.user;
+        paintNav();
       }
-      function setUser(u){ S.user=u; saveUser(u); paintAccountNav(); }
-      function initials(str){ const n=(str||'').trim().split(/\s+/).slice(0,2).map(s=>s[0]?.toUpperCase()||'').join(''); return n||'T'; }
-      function displayName(u){ return (u?.name || u?.email || 'Mi cuenta').split('@')[0]; }
 
-      function paintAccountNav(){
+      // Formularios
+      forms.recover?.addEventListener('submit', async e=>{
+        e.preventDefault(); errs.recover.style.display='none'; okRecover.style.display='none';
+        const email=$('#acct-recover-email').value.trim();
+        try{ await api('POST','/api/request-password-reset',{email}); okRecover.textContent='Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora).'; okRecover.style.display='block'; }
+        catch(err){ errs.recover.textContent=String(err); errs.recover.style.display='block'; }
+      });
+
+      forms.login?.addEventListener('submit', async e=>{
+        e.preventDefault(); errs.login.style.display='none';
+        const email=$('#acct-login-email').value.trim(); const password=$('#acct-login-pass').value;
+        try{
+          const data=await api('POST','/api/login',{email,password});
+          setUser(data?.user||null); await forceSessionRefresh(); closeModal();
+        }catch(err){
+          errs.login.textContent=(err==='account_not_found')?'No existe una cuenta con ese email.':
+                                 (err==='invalid_credentials')?'Contraseña incorrecta.':
+                                 (err==='password_not_set')?'Esta cuenta no tiene contraseña. Usa el enlace de recuperación.':String(err);
+          errs.login.style.display='block';
+        }
+      });
+
+      forms.register?.addEventListener('submit', async e=>{
+        e.preventDefault(); errs.register.style.display='none';
+        const name=$('#acct-reg-name').value.trim(); const email=$('#acct-reg-email').value.trim();
+        const p1=$('#acct-reg-pass').value; const p2=$('#acct-reg-pass2').value;
+        if(p1!==p2){ errs.register.textContent='Las contraseñas no coinciden.'; errs.register.style.display='block'; return; }
+        if(p1.length<6){ errs.register.textContent='La contraseña debe tener al menos 6 caracteres.'; errs.register.style.display='block'; return; }
+        if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
+        try{
+          const data=await api('POST','/api/register',{name,email,password:p1});
+          setUser(data?.user||null); await forceSessionRefresh(); closeModal();
+        }catch(err){
+          errs.register.textContent=(err==='email_in_use_google')?'Ese correo ya existe como cuenta Google. Inicia sesión con Google.':
+                                   (err==='email_in_use')?'Ese correo ya tiene una cuenta. Inicia sesión.':
+                                   (err==='weak_password')?'La contraseña debe tener al menos 6 caracteres.':
+                                   (err==='name_email_password_required')?'Nombre, email y contraseña son obligatorios.':String(err);
+          errs.register.style.display='block';
+        }
+      });
+
+      // Google en la misma pestaña + polling
+      function startGooglePolling(){
+        if(S.polling) clearInterval(S.polling);
+        let tries=0;
+        S.polling=setInterval(async ()=>{
+          tries++;
+          try{
+            const data=await api('GET','/api/session');
+            if(data?.user){
+              setUser(data.user);
+              closeModal();
+              clearInterval(S.polling); S.polling=null;
+            }
+          }catch{}
+          if(tries>30){ clearInterval(S.polling); S.polling=null; }
+        },2000);
+      }
+      function bindGoogle(id, from){
+        const el=document.getElementById(id);
+        if(!el) return;
+        el.removeAttribute('target');
+        const handler=(e)=>{
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          try{ startGooglePolling(); }catch{}
+          location.href = `/api/google?from=${encodeURIComponent(from)}`;
+          return false;
+        };
+        el.addEventListener('click', handler, true);
+        el.addEventListener('mousedown', (e)=>{ e.preventDefault(); }, true);
+      }
+      bindGoogle('btn-google-login','login');
+      bindGoogle('btn-google-register','register');
+
+      // Menú / sesión
+      function paintNav(){
         const slots = ['#acct-nav-slot','#acct-nav-slot-mobile'].map(s=>document.querySelector(s)).filter(Boolean);
         slots.forEach(slot=>{
           if(!S.user){
             slot.classList.remove('open');
-            slot.innerHTML = `<button id="acct-open-nav" class="ghost">Iniciar sesión</button>`;
-            slot.querySelector('#acct-open-nav')?.addEventListener('click', ()=> showModal());
+            slot.innerHTML = `<button id="acct-open-nav" class="ghost">Iniciar sesión</button>
+                              <div class="acct-menu"></div>`;
+            slot.querySelector('#acct-open-nav')?.addEventListener('click', ()=> openModal('login'));
             return;
           }
+          const name=(S.user?.name||S.user?.email||'Mi cuenta').split(' ')[0];
+          const initials=(name?.[0]||'T').toUpperCase();
           slot.innerHTML = `
             <div class="acct-chip" id="acct-chip" role="button" aria-haspopup="true" aria-expanded="false">
-              <span class="acct-avatar">${initials(S.user.name||S.user.email)}</span>
-              <strong>${displayName(S.user)}</strong>
+              <span class="acct-avatar">${initials}</span>
+              <strong>${name}</strong>
             </div>
             <div class="acct-menu" role="menu">
-              <a href="gestionar.html" role="menuitem" class="acct-guard">Gestionar suscripción</a>
+              <!-- Eliminado gestionar -->
               <button id="acct-logout-btn" role="menuitem">Cerrar sesión</button>
             </div>`;
           const dd=slot, chip=dd.querySelector('#acct-chip');
@@ -505,48 +634,61 @@
         });
       }
 
-      function passwordScore(p){ let s=0; if(!p) return 0; if(p.length>=6) s+=25; if(/[A-Z]/.test(p)) s+=20; if(/[a-z]/.test(p)) s+=20; if(/\d/.test(p)) s+=20; if(/[^\w\s]/.test(p)) s+=15; return Math.min(100,s); }
-      regPass?.addEventListener('input', ()=>{ const v=passwordScore(regPass.value); pwBar.style.width=v+'%'; });
-
-      formReg?.addEventListener('submit', async (e)=>{
-        e.preventDefault(); errReg.style.display='none';
-        if(!regName.value.trim() || regName.value.trim().length<2){ errReg.textContent='El nombre es obligatorio (mín. 2 caracteres).'; return void(errReg.style.display='block'); }
-        if(regPass.value.length<6){ errReg.textContent='La contraseña debe tener al menos 6 caracteres.'; return void(errReg.style.display='block'); }
-        if(regPass.value !== regPass2.value){ errReg.textContent='Las contraseñas no coinciden.'; return void(errReg.style.display='block'); }
-        try{ const data = await api('POST','/api/register',{ name: regName.value.trim(), email: regEmail.value.trim(), password: regPass.value }); setUser(data?.user||null); hideModal(); }
-        catch(err){ errReg.textContent = (err==='email_in_use') ? 'Ese correo ya tiene cuenta. Inicia sesión.' : String(err); errReg.style.display='block'; }
-      });
-
-      formLogin?.addEventListener('submit', async (e)=>{
-        e.preventDefault(); errLogin.style.display='none';
-        const email = $('#acct-login-email').value.trim(); const password = $('#acct-login-pass').value;
-        try{ const data = await api('POST','/api/login',{ email, password }); setUser(data?.user||null); hideModal(); }
-        catch(err){
-          errLogin.textContent = (err==='account_not_found') ? 'No existe una cuenta con ese email.' :
-                                 (err==='invalid_credentials') ? 'Contraseña incorrecta.' :
-                                 (err==='password_not_set') ? 'Esta cuenta no tiene contraseña. Usa “Recuperar”.' : String(err);
-          errLogin.style.display='block';
+      async function forceSessionRefresh(retries=4, delay=600){
+        for(let i=0;i<retries;i++){
+          try{
+            const data=await api('GET','/api/session');
+            if(data?.user){ setUser(data.user); break; }
+          }catch{}
+          await new Promise(r=>setTimeout(r,delay));
         }
-      });
+      }
 
-      formForgot?.addEventListener('submit', async (e)=>{
-        e.preventDefault(); errForgot.style.display='none';
-        const email = $('#acct-forgot-email').value.trim();
-        try{ await api('POST','/api/request-password-reset',{ email }); hideModal(); alert('Si el correo existe, te hemos enviado un email con instrucciones.'); }
-        catch(_){ hideModal(); alert('Si el correo existe, te hemos enviado un email con instrucciones.'); }
-      });
+      async function handleGoogleHash(){
+        const raw = (location.hash || '').replace(/^#/, '');
+        if(!raw) return;
+        const params = new URLSearchParams(raw.replace(/;/g,'&'));
+        const g = params.get('google');      // ok | err
+        const from = (params.get('from') || 'login').toLowerCase();
+        const code = params.get('code');
 
-      // Gating “gestionar” sin sesión
-      document.body.addEventListener('click',(e)=>{ const a=e.target.closest('a.acct-guard'); if(a && !S.user){ e.preventDefault(); showModal('Inicia sesión para gestionar tu suscripción.'); } });
+        if (g === 'ok') {
+          await forceSessionRefresh();
+          history.replaceState(null,'',location.pathname + location.search);
+          return;
+        }
+        if (g === 'err') {
+          openModal(from === 'register' ? 'register' : 'login');
+          const target = (from === 'register') ? errs.register : errs.login;
+          if (target){
+            target.textContent =
+              (code==='email_in_use_password') ? 'Ese correo ya tiene una cuenta con contraseña. Inicia sesión con tu contraseña.' :
+              (code==='email_in_use_google')   ? 'Ese correo ya está registrado con Google. Inicia sesión con Google.' :
+              (code==='use_password_login')    ? 'Esa cuenta no está vinculada a Google. Usa correo y contraseña (o “¿Olvidaste la contraseña?”).' :
+              (code==='not_registered')        ? 'No existe ninguna cuenta registrada con ese Google. Regístrate primero.' :
+              (code==='email_not_verified')    ? 'Tu correo de Google no está verificado.' :
+              (code==='state_error')           ? 'Error de seguridad (state). Inténtalo de nuevo.' :
+              (code==='google_auth_failed')    ? 'No se pudo completar con Google. Inténtalo otra vez.' :
+              (code==='server_error')          ? 'Error del servidor. Intenta de nuevo.' :
+                                                  'No se pudo completar con Google. Inténtalo otra vez.';
+            target.style.display = 'block';
+          }
+          history.replaceState(null,'',location.pathname + location.search);
+        }
+      }
 
-      // Sync entre pestañas
-      window.addEventListener('storage', (e)=>{
-        if(e.key===KEY){ try{ S.user = e.newValue ? JSON.parse(e.newValue) : null; }catch{ S.user=null; } paintAccountNav(); }
-      });
+      async function getSession(){
+        // cache
+        try{ const v=localStorage.getItem('acct_user')||''; setUser(v?JSON.parse(v):null); }catch{ setUser(null); }
+        try{ const data=await api('GET','/api/session'); setUser(data?.user||null); }catch{}
+        await handleGoogleHash();
+      }
 
       getSession();
-      window.TaplyOpenLogin = showModal;
+      window.TaplyOpenLogin = openModal;
     })();
+
+    // Importante: cookiebar eliminada por no disponer de política de cookies.
   </script>
 </body>
 </html>
