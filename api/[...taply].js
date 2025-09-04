@@ -129,6 +129,86 @@ async function sendEmail({to, subject, text, html}){
   }catch(e){ console.error('sendEmail error', e); }
 }
 
+/* ====== Plantillas SOLO para correos tras compra ====== */
+function _safeName(name){ return (name || '').trim() || null; }
+function _emailBaseCss(){
+  return `
+  :root { color-scheme: light dark; supported-color-schemes: light dark; }
+  body{margin:0;background:#0b0f1a;font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial,sans-serif}
+  .wrap{padding:24px}
+  .card{max-width:680px;margin:0 auto;background:#0e1424;border:1px solid rgba(255,255,255,.12);border-radius:16px;overflow:hidden}
+  .hdr{padding:22px 24px;display:flex;align-items:center;gap:12px;background:#0b1020}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(180deg,#7c3aed,#3b82f6)}
+  .brand{font-weight:600;color:#e9eefc;font-size:17px;letter-spacing:.2px}
+  .body{background:#0e1424;padding:28px 24px 20px;color:#dbe6ff}
+  h1{margin:0 0 8px;font-size:36px;line-height:1.1;color:#e9eefc}
+  .lead{font-size:18px;line-height:1.5;margin:14px 0 10px;color:#c9d6ff}
+  .p{font-size:16px;line-height:1.6;margin:10px 0;color:#c9d6ff}
+  .hr{margin:18px 0;border-top:1px solid rgba(255,255,255,.08)}
+  .cta{display:inline-block;margin:18px 0 8px;padding:12px 16px;border-radius:10px;background:#7c3aed;color:#fff;text-decoration:none;font-weight:600}
+  .foot{border-top:1px solid rgba(255,255,255,.08);padding:16px 24px;color:#a8b4d6;font-size:13px;background:#0b1020}
+  @media (max-width:520px){ h1{font-size:30px} .card{border-radius:14px} }
+  @media (prefers-color-scheme: light){
+    body{background:#f3f6ff}
+    .card{background:#ffffff;border:1px solid rgba(2,6,23,.08)}
+    .hdr{background:#f7f9ff}
+    .body{background:#fff;color:#26324d}
+    h1{color:#18213b}
+    .lead,.p{color:#394b76}
+    .foot{background:#f7f9ff;border-color:rgba(2,6,23,.06);color:#4d5f86}
+  }`;
+}
+function _shell({title, preheader, lead, blocks=[], cta, ctaUrl, brand='Taply'}){
+  const b = blocks.map(t=>`<p class="p">${t}</p>`).join('');
+  const pre = (preheader||'').replace(/\n/g,' ').slice(0,140);
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${title}</title><style>${_emailBaseCss()}</style></head><body>
+  <span style="display:none!important;opacity:0;max-height:0;overflow:hidden">${pre}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</span>
+  <div class="wrap"><div class="card">
+    <div class="hdr"><div class="logo"></div><div class="brand">${brand}</div></div>
+    <div class="body">
+      <h1>${title}</h1>
+      ${lead?`<div class="lead">${lead}</div>`:''}
+      ${b}
+      ${cta && ctaUrl ? `<a href="${ctaUrl}" class="cta">${cta}</a>`:''}
+      <div class="hr"></div>
+      <p class="p" style="font-size:14px;opacity:.85">Este correo se envió automáticamente tras tu compra. Si no reconoces esta acción, respóndenos.</p>
+    </div>
+  </div></div></body></html>`;
+}
+function makeSubscriptionEmailUI({name, tierLabel, panelUrl}){
+  const title = '¡Suscripción activa!';
+  const lead = `Hola${name?` ${name}`:''}, tu suscripción <strong>${tierLabel}</strong> está activa.`;
+  const html = _shell({
+    title,
+    preheader: `Tu suscripción ${tierLabel} ya está activa. Te enviaremos la guía rápida y dejaremos tu panel listo.`,
+    lead,
+    blocks: [
+      'Te enviaremos la guía rápida y dejaremos tu panel listo.',
+      '¿Dudas? Responde a este correo y te ayudamos.'
+    ],
+    cta: 'Abrir mi panel',
+    ctaUrl: panelUrl || 'https://taply.app/panel'
+  });
+  return { subject: 'Suscripción activa — Taply', html };
+}
+function makeNfcEmailUI({name, qty, trackingUrl}){
+  const title = '¡Pedido NFC recibido!';
+  const lead = `Gracias${name?` ${name}`:''}. Hemos recibido tu pedido correctamente.`;
+  const html = _shell({
+    title,
+    preheader: `Hemos recibido tu pedido de ${qty} NFC. Te contactaremos por WhatsApp con los siguientes pasos.`,
+    lead,
+    blocks: [
+      `Unidades NFC: <strong>${qty}</strong>`,
+      'Te contactaremos por WhatsApp con los siguientes pasos.'
+    ],
+    cta: trackingUrl ? 'Ver estado' : null,
+    ctaUrl: trackingUrl || null
+  });
+  return { subject: '¡Gracias! Hemos recibido tu pedido NFC — Taply', html };
+}
+
 /* ================== Auth handlers ================== */
 
 // POST /api/register
@@ -558,10 +638,11 @@ async function postPago(req, res){
   const sessionId = bodySession || qpSession || null;
 
   let buyerEmail = null, buyerPhone = null, lineSummary = '', amountText = '', customerId = null;
+  let cs = null;
 
   if(sessionId){
     try{
-      const cs = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['line_items','customer_details'] });
+      cs = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['line_items','customer_details'] });
       buyerEmail = cs.customer_details?.email || null;
       buyerPhone = cs.customer_details?.phone || null;
       customerId = typeof cs.customer === 'string' ? cs.customer : cs.customer?.id || null;
@@ -583,20 +664,42 @@ async function postPago(req, res){
   const sess = getSessionFromCookie(req);
   if(!buyerEmail && sess?.email) buyerEmail = sess.email;
 
+  // ===== NUEVO: emails con diseño como la captura =====
   if(buyerEmail){
-    const subj = '¡Gracias! Hemos recibido tu compra';
-    const html = `<h2>Gracias por tu compra en Taply</h2>
-      <p>Hemos recibido tu ${type || 'pedido'} correctamente.</p>
-      ${lineSummary ? `<p><strong>Productos:</strong> ${lineSummary}</p>` : ''}
-      ${amountText ? `<p><strong>Importe:</strong> ${amountText}</p>` : ''}
-      <p>Te contactaremos por WhatsApp con los siguientes pasos.</p>`;
-    await sendEmail({ to: buyerEmail, subject: subj, html });
+    try{
+      if (cs?.mode === 'subscription') {
+        const item = cs?.line_items?.data?.[0];
+        const tierNickname = item?.price?.nickname || item?.description || 'Taply';
+        const name = _safeName(cs?.customer_details?.name);
+        const tpl = makeSubscriptionEmailUI({
+          name,
+          tierLabel: tierNickname,
+          panelUrl: appBase(req) + '/panel.html'
+        });
+        await sendEmail({ to: buyerEmail, subject: tpl.subject, html: tpl.html });
+      } else {
+        const qtyNfc = (cs?.line_items?.data || []).reduce((acc,i)=> acc + (i.price?.id === PRICE_ID_NFC ? (i.quantity||0) : 0), 0) || 1;
+        const name = _safeName(cs?.customer_details?.name);
+        const tpl = makeNfcEmailUI({ name, qty: qtyNfc });
+        await sendEmail({ to: buyerEmail, subject: tpl.subject, html: tpl.html });
+      }
+    }catch(e){
+      // Fallback por si algo del HTML falla: mantiene tu mensaje anterior
+      console.error('send designed email failed, falling back', e?.message || e);
+      const subj = '¡Gracias! Hemos recibido tu compra';
+      const html = `<h2>Gracias por tu compra en Taply</h2>
+        <p>Hemos recibido tu ${type || 'pedido'} correctamente.</p>
+        ${lineSummary ? `<p><strong>Productos:</strong> ${lineSummary}</p>` : ''}
+        ${amountText ? `<p><strong>Importe:</strong> ${amountText}</p>` : ''}
+        <p>Te contactaremos por WhatsApp con los siguientes pasos.</p>`;
+      await sendEmail({ to: buyerEmail, subject: subj, html });
+    }
   }
 
   if(process.env.EMAIL_FROM){
     const subjAdm = 'Nueva compra recibida';
     const htmlAdm = `
-      <p>Compra recibida (${type || 'checkout'}).</p>
+      <p>Compra recibida (${type || cs?.mode || 'checkout'}).</p>
       ${buyerEmail ? `<p>Email cliente: ${buyerEmail}</p>` : ''}
       ${buyerPhone ? `<p>Teléfono cliente: ${buyerPhone}</p>` : ''}
       ${lineSummary ? `<p>Line items: ${lineSummary}</p>` : ''}
