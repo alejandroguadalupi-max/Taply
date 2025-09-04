@@ -6,8 +6,10 @@
   <title>Gestionar suscripción — Taply</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12);
-           --brand1:#00d4ff; --brand2:#7c3aed; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444 }
+    :root{
+      --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12);
+      --brand1:#00d4ff; --brand2:#7c3aed; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444
+    }
     *{box-sizing:border-box} html,body{height:100%} html{-webkit-text-size-adjust:100%}
     body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui}
     .wrap{width:min(900px,94%);margin:32px auto}
@@ -17,11 +19,24 @@
     .btn{padding:10px 14px;border:0;border-radius:999px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017}
     .ghost{padding:10px 14px;border:1px solid var(--b);border-radius:999px;background:transparent;color:inherit}
     .muted{color:var(--muted)}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    @media (max-width:780px){ .grid2{grid-template-columns:1fr} }
     input{font-size:16px}
-    .tag{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid var(--b);background:rgba(255,255,255,.04);font-weight:800}
+    .tag{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid var(--b);background:rgba(255,255,255,.06);font-weight:800}
     .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
+    /* Bloque llamativo de suscripción */
+    .sub-hero{
+      border:1px solid var(--b); border-radius:16px; padding:16px;
+      background:
+        linear-gradient(135deg, rgba(124,58,237,.22), rgba(0,212,255,.18)) border-box,
+        linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.02)) padding-box;
+    }
+    .sub-name{
+      font-size:clamp(1.2rem, 3.6vw, 1.6rem);
+      font-weight:800; letter-spacing:.2px; margin:0;
+      background:linear-gradient(135deg,var(--brand1),var(--brand2));
+      -webkit-background-clip:text; background-clip:text; color:transparent;
+    }
+    .sub-meta{margin:.25rem 0 0; font-size:.98rem; color:var(--muted)}
+    .divider{height:1px;background:var(--b);margin:18px 0}
   </style>
 </head>
 <body>
@@ -37,43 +52,38 @@
     <section class="card" id="acctBox">
       <h2 style="margin:0 0 6px">Tu cuenta</h2>
       <p class="muted" id="email">—</p>
-      <div class="grid2">
-        <div>
-          <h3>Suscripción</h3>
-          <p id="subLine" class="muted">Cargando…</p>
-          <p id="renewLine" class="muted"></p>
-          <div id="flags"></div>
-          <div class="row" style="margin-top:8px">
-            <button id="btnCancel" class="ghost">Cancelar al final del periodo</button>
-            <button id="btnResume" class="ghost" style="display:none">Reanudar</button>
-            <button id="btnPortal" class="btn">Abrir portal</button>
-          </div>
-          <p id="msg" class="muted" style="margin-top:8px"></p>
-        </div>
-        <div>
-          <h3>NFC</h3>
-          <p class="muted">Has comprado: <strong id="nfcQty">0</strong> dispositivos.</p>
-          <div class="row">
-            <input id="nfcCount" type="number" min="1" max="999" step="1" value="5" style="background:#0a0f16;border:1px solid var(--b);color:inherit;border-radius:12px;padding:10px;width:120px">
-            <button id="buyNfc" class="btn">Comprar más NFC</button>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <section class="card">
-      <h3 style="margin:0 0 6px">Acciones rápidas</h3>
-      <div class="row">
-        <button id="changePlan" class="ghost">Cambiar de plan</button>
-        <button id="updateCard" class="ghost">Actualizar tarjeta</button>
-        <button id="invoices" class="ghost">Ver facturas</button>
+      <!-- Bloque SUSCRIPCIÓN (llamativo) -->
+      <div class="sub-hero" id="subHero">
+        <p class="sub-name" id="subName">Cargando…</p>
+        <p class="sub-meta" id="renewLine"></p>
+        <div id="flags" style="margin-top:6px"></div>
       </div>
-      <p class="muted" style="margin-top:8px">Se abrirá el portal de Stripe (puedes cancelar <em>inmediatamente</em>, al <em>final del periodo</em> o en una <em>fecha personalizada</em> según tu configuración).</p>
+
+      <!-- Botones debajo del bloque de suscripción -->
+      <div class="row" style="margin-top:12px">
+        <button id="btnChangePlan" class="btn">Cambiar de plan</button>
+        <button id="btnCancel" class="ghost">Cancelar plan (al final del periodo)</button>
+        <button id="btnResume" class="ghost" style="display:none">Reanudar plan</button>
+      </div>
+      <p id="msg" class="muted" style="margin-top:6px"></p>
+
+      <div class="divider"></div>
+
+      <!-- NFC (debajo, tal cual) -->
+      <section id="nfcBlock">
+        <h3 style="margin:0 0 6px">NFC</h3>
+        <p class="muted">Has comprado: <strong id="nfcQty">0</strong> dispositivos.</p>
+        <div class="row">
+          <input id="nfcCount" type="number" min="1" max="999" step="1" value="5" style="background:#0a0f16;border:1px solid var(--b);color:inherit;border-radius:12px;padding:10px;width:120px">
+          <button id="buyNfc" class="btn">Comprar más NFC</button>
+        </div>
+      </section>
     </section>
   </main>
 
   <script>
-    // 👇 Fallback directo al login del portal (tu enlace):
+    // Fallback directo al portal (si tu API no devuelve una URL)
     const PORTAL_LOGIN_URL = "https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00";
 
     const $=s=>document.querySelector(s);
@@ -91,7 +101,7 @@
       return data;
     }
 
-    // Helpers de plan + fechas
+    // Helpers de plan + fechas (mostramos solo nombre "bonito", no "estado: active")
     function getInterval(u){
       return (u?.subscription?.price?.interval ||
               u?.subscription?.plan?.interval ||
@@ -115,40 +125,44 @@
     }
     const fmtDate = (d)=> new Intl.DateTimeFormat('es-ES',{dateStyle:'medium'}).format(d);
 
-    function prettySubLine(u){
-      const st=(u?.subscription?.status||'').toLowerCase();
-      if(!st) return 'Sin suscripción';
-      const flags=[];
-      if(u?.subscription?.cancel_at_period_end) flags.push('<span class="tag warn">Cancela al final de periodo</span>');
-      $('#flags').innerHTML = flags.join(' ');
-      return `${prettyPlan(u)} · estado: ${st}`;
-    }
-
     let USER=null;
+
+    function hasValidSub(u){
+      const st=(u?.subscription?.status||'').toLowerCase();
+      return ['active','trialing','past_due'].includes(st);
+    }
 
     async function refreshUser(paintOnly=false){
       const d = await api('GET','/api/session');
       const u = d?.user;
-      if(!u){ alert('Inicia sesión para gestionar tu suscripción.'); location.href='suscripciones.html#cuenta'; return; }
+      if(!u){ location.href='suscripciones.html#cuenta'; return; }
+
+      // Si NO tiene suscripción válida, fuera de esta página
+      if(!hasValidSub(u)){ location.href='suscripciones.html#planes'; return; }
+
       USER=u;
 
       $('#email').textContent=u.email||'—';
-      $('#subLine').innerHTML = prettySubLine(u);
-      $('#nfcQty').textContent = Number(u.nfc_qty||0);
 
+      // Nombre bonito de suscripción (llamativo, sin "estado: active")
+      $('#subName').textContent = prettyPlan(u);
+
+      // Chips/flags (solo si está marcada para cancelar al final)
+      const flags=[];
+      if(u?.subscription?.cancel_at_period_end) flags.push('<span class="tag warn">Cancela al final del periodo</span>');
+      $('#flags').innerHTML = flags.join(' ');
+
+      // Renovación / fin de periodo
       const next = computeNextRenewal30(u);
       $('#renewLine').textContent = next ? ('Renovación / fin de periodo: '+fmtDate(next)) : '';
 
-      const st=(u?.subscription?.status||'').toLowerCase();
-      const cancelAtEnd=!!u?.subscription?.cancel_at_period_end;
+      // NFC
+      $('#nfcQty').textContent = Number(u.nfc_qty||0);
 
-      if(st==='active' || st==='trialing' || st==='past_due'){
-        $('#btnCancel').style.display = cancelAtEnd ? 'none' : 'inline-flex';
-        $('#btnResume').style.display = cancelAtEnd ? 'inline-flex' : 'none';
-      }else{
-        $('#btnCancel').style.display='none';
-        $('#btnResume').style.display='none';
-      }
+      // Mostrar/ocultar botones Cancelar/Reanudar
+      const cancelAtEnd=!!u?.subscription?.cancel_at_period_end;
+      $('#btnCancel').style.display = cancelAtEnd ? 'none' : 'inline-flex';
+      $('#btnResume').style.display = cancelAtEnd ? 'inline-flex' : 'none';
 
       if(!paintOnly){ $('#msg').textContent=''; }
     }
@@ -170,17 +184,13 @@
       }catch{}
     }
 
-    // Abrir portal (preferimos backend; si falla, vamos al login fijo)
+    // Abrir portal (para cambiar de plan). Primero vía backend; si falla, fallback URL.
     async function openPortal(){
-      // 1) Backend (que ya devolverá PORTAL_LOGIN_URL si está en .env)
       try{
         const r=await api('POST','/api/create-portal-session',{});
         if(r?.url){ location.href=r.url; return; }
-      }catch(e){ /* seguimos al fallback */ }
-
-      // 2) Fallback directo
+      }catch(e){ /* fallback */ }
       let url = PORTAL_LOGIN_URL;
-      // (Stripe IGNORA parámetros extra, pero intentamos pre-rellenar por si en el futuro lo soportan)
       try{
         if(USER?.email){
           const u = new URL(url);
@@ -191,31 +201,28 @@
       location.href = url;
     }
 
-    // Acciones
-    $('#btnPortal').addEventListener('click', openPortal);
-    $('#changePlan').addEventListener('click', openPortal);
-    $('#updateCard').addEventListener('click', openPortal);
-    $('#invoices').addEventListener('click', openPortal);
+    // Eventos
+    $('#btnChangePlan').addEventListener('click', openPortal);
 
-    // Cancelar al final del periodo (desde tu API sin portal)
     $('#btnCancel').addEventListener('click', async ()=>{
       try{
         await api('POST','/api/subscription/cancel',{ at_period_end:true });
         $('#msg').innerHTML = '<span class="warn">Tu suscripción seguirá activa hasta fin de periodo.</span>';
         await refreshUser();
       }catch(e){
-        alert('No se pudo cancelar aquí. Te llevamos al portal para completarlo.'); openPortal();
+        alert('No se pudo cancelar aquí. Te llevamos al portal para completarlo.');
+        openPortal();
       }
     });
 
-    // Reanudar
     $('#btnResume').addEventListener('click', async ()=>{
       try{
         await api('POST','/api/subscription/resume',{});
         $('#msg').innerHTML = '<span class="ok">La suscripción seguirá renovándose.</span>';
         await refreshUser();
       }catch(e){
-        alert('No se pudo reanudar aquí. Te llevamos al portal.'); openPortal();
+        alert('No se pudo reanudar aquí. Te llevamos al portal.');
+        openPortal();
       }
     });
 
@@ -241,4 +248,3 @@
   </script>
 </body>
 </html>
-

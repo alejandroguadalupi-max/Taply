@@ -57,7 +57,6 @@ export default async function handler(req, res) {
       const email = cs.customer_details?.email || null;
       const title = cs.mode === 'subscription' ? 'Suscripción activada' : 'Pago recibido';
 
-      // Actualiza datos básicos del customer
       try{
         if (cs.customer) {
           const patch = {};
@@ -67,7 +66,6 @@ export default async function handler(req, res) {
         }
       }catch(e){ console.error('customer update err', e?.message || e); }
 
-      // Sumar NFC si procede
       if (cs.mode === 'payment' && cs.customer) {
         try{
           const addQty = await sumNfcFromSession(cs);
@@ -79,14 +77,12 @@ export default async function handler(req, res) {
         }catch(e){ console.error('sum NFC error', e?.message || e); }
       }
 
-      // Emails simples
       const amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '-';
       const html = `<h2>${title}</h2><p>Gracias por tu compra en Taply.</p><p>Importe: ${amountText}</p>`;
       if(email) await sendEmail({ to: email, subject: `Taply — ${title}`, html });
       if(process.env.EMAIL_FROM) await sendEmail({ to: process.env.EMAIL_FROM, subject: `Taply — ${title}`, html: `<p>${title}</p><p>Cliente: ${email || '—'}</p>` });
     }
 
-    // Persistir estado de suscripción en metadata (por si quieres consultarlo sin listar)
     if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
       const sub = event.data.object;
       const price = sub.items?.data?.[0]?.price || null;

@@ -112,7 +112,7 @@ async function hasValidSubscription(stripe, customerId){
 }
 function addDays(d, days){ return new Date(d.getTime() + days*24*60*60*1000); }
 
-/* ===== Email opcional (Sendgrid) ===== */
+/* ===== Email (Sendgrid) ===== */
 async function sendEmail({to, subject, text, html}){
   try{
     if(!process.env.SENDGRID_API_KEY || !process.env.EMAIL_FROM) return;
@@ -129,7 +129,7 @@ async function sendEmail({to, subject, text, html}){
   }catch(e){ console.error('sendEmail error', e); }
 }
 
-/* ====== Plantillas SOLO para correos tras compra ====== */
+/* ====== Plantillas email (tras compra) ====== */
 function _safeName(name){ return (name || '').trim() || null; }
 function _emailBaseCss(){
   return `
@@ -262,7 +262,7 @@ async function login(req, res){
   return res.status(200).json({ user:{ email, name: customer.name || null, customerId: customer.id }});
 }
 
-// (sigue existiendo si quisieras usar GIS con ID token)
+// (opcional: GIS con ID token)
 async function googleLogin(req, res){
   const { credential } = getBody(req);
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -302,7 +302,7 @@ async function googleLogin(req, res){
   }
 }
 
-// GET /api/google-oauth-begin  -> abre Google en nueva pestaña
+// GET /api/google-oauth-begin
 async function googleOAuthBegin(req, res){
   const cid = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const redirectUri = `${appBase(req)}/api/google-oauth-callback`;
@@ -328,7 +328,7 @@ async function googleOAuthBegin(req, res){
   res.end();
 }
 
-// GET /api/google-oauth-callback  -> intercambia code por tokens, crea sesión y cierra pestaña
+// GET /api/google-oauth-callback
 async function googleOAuthCallback(req, res){
   try{
     const url = new URL(req.url, 'http://x');
@@ -344,7 +344,6 @@ async function googleOAuthCallback(req, res){
     const redirectUri = `${appBase(req)}/api/google-oauth-callback`;
     if(!cid || !secret) { res.writeHead(302, { Location: '/suscripciones.html?google=cfg_error' }); return res.end(); }
 
-    // Intercambio del code
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -356,7 +355,6 @@ async function googleOAuthCallback(req, res){
     const idToken = tokenJson.id_token;
     if(!idToken) throw new Error('no_id_token');
 
-    // Verificamos id_token
     const { OAuth2Client } = await import('google-auth-library');
     const g = new OAuth2Client(cid);
     const ticket = await g.verifyIdToken({ idToken, audience: cid });
@@ -366,7 +364,6 @@ async function googleOAuthCallback(req, res){
     const name = payload?.name || payload?.given_name || null;
     if(!email || !emailVerified) throw new Error('email_not_verified');
 
-    // Stripe upsert
     const stripe = getStripe();
     const q = `email:'${escapeStripeQueryValue(email)}'`;
     const found = await stripe.customers.search({ query: q, limit: 1 });
@@ -382,7 +379,6 @@ async function googleOAuthCallback(req, res){
       customerId = created.id; finalName = created.name || name || null;
     }
 
-    // Sesión y “ping” a otras pestañas
     setSession(res, { email, name: finalName || null, customerId });
     const html = `<!doctype html><meta charset="utf-8">
       <title>Conectado con Google</title>
@@ -460,7 +456,6 @@ async function session(req, res){
 }
 
 /* ===== Recuperación contraseña ===== */
-// (igual que versión anterior: requestPasswordReset / resetPassword)
 async function requestPasswordReset(req, res){
   const email = normalizeEmail(getBody(req).email);
   if(!email) return res.status(400).json({ error:'email_required' });
@@ -514,13 +509,19 @@ async function resetPassword(req, res){
   return res.status(200).json({ ok:true });
 }
 
-/* ===== Portal + Subscriptions + Checkout (igual que antes) ===== */
+/* ===== Portal + Subscriptions + Checkout ===== */
 async function createPortalSession(req, res){
   const sess = getSessionFromCookie(req);
   if(!sess) return res.status(401).json({ error:'auth_required' });
   const stripe = getStripe();
   const customerId = await ensureCustomerId(stripe, sess);
   if(!customerId) return res.status(401).json({ error:'auth_required' });
+
+  // ⛔ No permitir portal si no hay suscripción válida
+  const best = await getBestSubscription(stripe, customerId);
+  if(!best || !['active','trialing','past_due'].includes(best.status)){
+    return res.status(400).json({ error:'no_active_subscription' });
+  }
 
   try{
     const portal = await stripe.billingPortal.sessions.create({
@@ -629,7 +630,7 @@ async function buyNfc(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-/* ===== post-pago / store-customer-from-session (igual que antes) ===== */
+/* ===== post-pago ===== */
 async function postPago(req, res){
   const stripe = getStripe();
   const url = new URL(req.url, 'http://x');
@@ -664,7 +665,6 @@ async function postPago(req, res){
   const sess = getSessionFromCookie(req);
   if(!buyerEmail && sess?.email) buyerEmail = sess.email;
 
-  // ===== NUEVO: emails con diseño como la captura =====
   if(buyerEmail){
     try{
       if (cs?.mode === 'subscription') {
@@ -684,7 +684,6 @@ async function postPago(req, res){
         await sendEmail({ to: buyerEmail, subject: tpl.subject, html: tpl.html });
       }
     }catch(e){
-      // Fallback por si algo del HTML falla: mantiene tu mensaje anterior
       console.error('send designed email failed, falling back', e?.message || e);
       const subj = '¡Gracias! Hemos recibido tu compra';
       const html = `<h2>Gracias por tu compra en Taply</h2>
@@ -755,7 +754,7 @@ export default async function handler(req, res){
     if (req.method === 'POST') {
       if (route === 'register') return register(req,res);
       if (route === 'login') return login(req,res);
-      if (route === 'google-login') return googleLogin(req,res); // opcional (ID token)
+      if (route === 'google-login') return googleLogin(req,res);
       if (route === 'logout') return logout(req,res);
       if (route === 'request-password-reset') return requestPasswordReset(req,res);
       if (route === 'reset-password') return resetPassword(req,res);
