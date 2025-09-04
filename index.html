@@ -17,7 +17,7 @@
       --brand-1:#00d4ff; --brand-2:#7c3aed;
       --blue-1:#38bdf8; --blue-2:#2563eb;
       --radius:20px; --shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
-      --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 36px); /* más margen para que no tape nada */
+      --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 36px); /* margen para que las flechas no tapen contenido */
     }
     *{box-sizing:border-box}
     html{-webkit-text-size-adjust:100%}
@@ -87,12 +87,11 @@
     /* Reviews / carrusel */
     .reviews{position:relative;margin:36px 0}
     .reviews h2{margin:0 0 14px}
-
-    .reviews-window{position:relative}
+    .reviews-window{position:relative; overflow:visible} /* para poder sacar las flechas un pelín fuera */
     .reviews-track{
       display:flex;gap:22px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
       padding:0 var(--edgePad);scroll-padding:0 var(--edgePad);scrollbar-width:none;
-      overscroll-behavior-x: contain; touch-action: pan-y;
+      overscroll-behavior-x: contain; touch-action: pan-x; /* <-- permitir swipe horizontal en móvil */
     }
     .reviews-track::-webkit-scrollbar{display:none}
 
@@ -127,7 +126,7 @@
     :focus-visible{outline:2px solid #7c3aed; outline-offset:2px; border-radius:8px}
 
     @media (max-width: 768px){
-      :root{ --arrowSize:44px; --edgePad:calc(var(--arrowSize) + 30px); }
+      :root{ --arrowSize:42px; --edgePad:calc(var(--arrowSize) + 44px); } /* más edge en móvil */
       section{padding:48px 0}
       header{background:#0a0f16}
       .grid-3{grid-template-columns:1fr}
@@ -138,11 +137,17 @@
       }
       .menu:hover{filter:brightness(1.08)}
       .menu:active{transform:translateY(1px)}
+      /* flechas un poco hacia fuera para no tapar */
+      .carousel-btn.left{ left:-6px; transform:translate(-8%, -50%); }
+      .carousel-btn.right{ right:-6px; transform:translate(8%, -50%); }
     }
     @media (max-width:480px){
-      /* en móviles muy pequeños, ocultamos flechas y dejamos swipe */
-      .carousel-btn{display:none}
-      .reviews-track{padding:0 18px}
+      :root{ --arrowSize:38px; --edgePad:calc(var(--arrowSize) + 48px); }
+      .carousel-btn span{ font-size:18px }
+      .reviews-track{ padding:0 var(--edgePad); }
+      /* mantén flechas visibles pero fuera del contenido */
+      .carousel-btn.left{ left:-8px; transform:translate(-10%, -50%); }
+      .carousel-btn.right{ right:-8px; transform:translate(10%, -50%); }
     }
     @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
@@ -328,7 +333,7 @@
 
           <div class="acct-actions">
             <button type="submit" class="btn">Iniciar sesión</button>
-            <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google" rel="nofollow">Continuar con Google</a>
+            <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google" rel="nofollow noopener noreferrer">Continuar con Google</a>
             <p id="acct-error-login" class="acct-err" style="display:none"></p>
           </div>
         </form>
@@ -356,7 +361,7 @@
           <div class="meter" aria-hidden="true"><i id="pw-meter" style="display:block;height:6px;border-radius:6px;background:#1f2937;width:0"></i></div>
           <div class="acct-actions">
             <button type="submit" class="btn">Crear cuenta</button>
-            <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google" rel="nofollow">Registrarme con Google</a>
+            <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google" rel="nofollow noopener noreferrer">Registrarme con Google</a>
             <p id="acct-error-register" class="acct-err" style="display:none"></p>
           </div>
         </form>
@@ -434,11 +439,9 @@
       }
       window.addEventListener('popstate', (e)=>{
         if(e.state && e.state.auth){
-          // cambiaron entre tabs con atrás/adelante
           setTab(e.state.tab);
           if(modal.classList.contains('acct-hidden')) modal.classList.remove('acct-hidden');
         }else{
-          // salimos del modal
           closeModal(true);
         }
       });
@@ -465,7 +468,7 @@
       function closeModal(fromHistory=false){
         modal.classList.add('acct-hidden');
         Object.values(errs).forEach(e=>e&&(e.style.display='none')); okRecover.style.display='none';
-        if(!fromHistory) cleanAuthHash(); // si cerramos nosotros, limpiamos hash
+        if(!fromHistory) cleanAuthHash();
       }
       document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
       modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
@@ -536,12 +539,40 @@
         }
       });
 
-      // ---- Google: dejar que el <a> navegue nativo (evita bloqueos "usar otra cuenta")
+      // ------- Google: nueva pestaña con fallback + polling (soluciona "usar otra cuenta no carga")
+      function startGooglePolling(){
+        if(S.polling) clearInterval(S.polling);
+        let tries=0;
+        S.polling = setInterval(async ()=>{
+          tries++;
+          try{
+            const data = await api('GET','/api/session');
+            if(data?.user){
+              setUser(data.user);
+              closeModal();
+              clearInterval(S.polling);
+              S.polling = null;
+            }
+          }catch{}
+          if(tries>60){ clearInterval(S.polling); S.polling=null; }
+        }, 2000);
+      }
       function bindGoogle(id, from){
         const el=document.getElementById(id); if(!el) return;
-        el.removeAttribute('target'); // misma pestaña
-        el.addEventListener('click', ()=>{ try{ sessionStorage.setItem('taply_from', from); }catch{} }, {capture:true});
-        // NO preventDefault; dejamos que siga el href
+        el.addEventListener('click', (e)=>{
+          try{ sessionStorage.setItem('taply_from', from); }catch{}
+          const url = `/api/google?from=${encodeURIComponent(from)}`;
+          const w = window.open(url, '_blank', 'noopener,noreferrer');
+          if(w){
+            // popup permitido -> seguimos en esta pestaña y actualizamos con polling
+            startGooglePolling();
+            e.preventDefault(); // evitamos navegar esta pestaña
+          }else{
+            // popup bloqueado -> navegar en esta pestaña
+            startGooglePolling();
+            // no preventDefault: que siga el href nativo
+          }
+        }, {capture:true});
       }
       bindGoogle('btn-google-login','login');
       bindGoogle('btn-google-register','register');
@@ -630,4 +661,5 @@
   </script>
 </body>
 </html>
+
 
