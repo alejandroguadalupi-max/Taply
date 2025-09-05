@@ -46,6 +46,13 @@ function baseFromReq(req) {
   const host    = String(req.headers["x-forwarded-host"]  || req.headers.host || "").split(",")[0];
   return envBase || (host ? `${proto}://${host}` : "");
 }
+function redirect(res, url) {
+  res.writeHead(302, { Location: url });
+  res.end();
+}
+function redirectErr(res, from, code = "server_error") {
+  redirect(res, `/suscripciones.html#google=err&code=${encodeURIComponent(code)}&from=${encodeURIComponent(from || "login")}`);
+}
 
 export default async function handler(req, res) {
   const base        = baseFromReq(req);
@@ -57,29 +64,30 @@ export default async function handler(req, res) {
   const stripeSecret = process.env.STRIPE_SECRET_KEY;
   const appSecret    = process.env.APP_SECRET;
 
-  // Debug
+  // Debug legible (ES)
   const url = new URL(req.url, base || "http://x");
+  const fromQ  = (url.searchParams.get("from") || "login").toLowerCase();
   if (url.searchParams.get("debug") === "1") {
     return res.status(200).json({
-      ok: true, base, redirectUri,
-      clientIdLooksOk: !!(clientId && clientId.endsWith(".apps.googleusercontent.com")),
-      hasClientSecret: !!clientSecret,
-      hasStripe: !!stripeSecret,
-      hasAppSecret: !!appSecret,
+      ok: true,
+      base, redirectUri,
+      clienteGoogleValido: !!(clientId && clientId.endsWith(".apps.googleusercontent.com")),
+      tieneSecretoGoogle: !!clientSecret,
+      tieneStripe: !!stripeSecret,
+      tieneAppSecret: !!appSecret,
+      nota: "Si algo falta, en navegación normal se redirige a /suscripciones.html con mensaje en español.",
     });
   }
 
-  // Validaciones
-  if (!base)         return res.status(500).json({ error: "missing_base_url" });
-  if (!clientId || !clientId.endsWith(".apps.googleusercontent.com"))
-    return res.status(500).json({ error: "misconfigured_google_client_id" });
-  if (!clientSecret) return res.status(500).json({ error: "missing_GOOGLE_CLIENT_SECRET" });
-  if (!stripeSecret) return res.status(500).json({ error: "missing_STRIPE_SECRET_KEY" });
-  if (!appSecret)    return res.status(500).json({ error: "missing_APP_SECRET" });
+  // Validaciones: en navegación normal → redirigir con mensaje español
+  if (!base)         return redirectErr(res, fromQ, "server_error");
+  if (!clientId || !clientId.endsWith(".apps.googleusercontent.com")) return redirectErr(res, fromQ, "server_error");
+  if (!clientSecret) return redirectErr(res, fromQ, "server_error");
+  if (!stripeSecret) return redirectErr(res, fromQ, "server_error");
+  if (!appSecret)    return redirectErr(res, fromQ, "server_error");
 
   const code   = url.searchParams.get("code");
   const stateQ = url.searchParams.get("state");
-  const fromQ  = (url.searchParams.get("from") || "login").toLowerCase();
 
   const stripe = new Stripe(stripeSecret, { apiVersion: "2024-06-20" });
 
@@ -97,8 +105,7 @@ export default async function handler(req, res) {
     auth.searchParams.set("prompt", "select_account");
     auth.searchParams.set("state", `${st}|${fromQ}`); // guardo login/register
 
-    res.writeHead(302, { Location: auth.toString() });
-    return res.end();
+    return redirect(res, auth.toString());
   }
 
   // 2) Callback
@@ -110,8 +117,7 @@ export default async function handler(req, res) {
 
     if (!expected || !stateVal || stateVal !== expected) {
       clearStateCookie(res, isHttps);
-      res.writeHead(302, { Location: `/suscripciones.html#google=err&code=state_error&from=${from}` });
-      return res.end();
+      return redirectErr(res, from, "state_error");
     }
 
     // Intercambio
@@ -126,8 +132,7 @@ export default async function handler(req, res) {
     const token = await tokenRes.json();
     if (!tokenRes.ok || !token?.id_token) {
       clearStateCookie(res, isHttps);
-      res.writeHead(302, { Location: `/suscripciones.html#google=err&code=google_auth_failed&from=${from}` });
-      return res.end();
+      return redirectErr(res, from, "google_auth_failed");
     }
 
     // Decodificar id_token
@@ -136,16 +141,14 @@ export default async function handler(req, res) {
       payload = JSON.parse(Buffer.from(token.id_token.split(".")[1], "base64").toString("utf8"));
     } catch {
       clearStateCookie(res, isHttps);
-      res.writeHead(302, { Location: `/suscripciones.html#google=err&code=google_auth_failed&from=${from}` });
-      return res.end();
+      return redirectErr(res, from, "google_auth_failed");
     }
     const email = normalizeEmail(payload?.email || "");
     const name  = payload?.name || payload?.given_name || email;
     const emailVerified = !!payload?.email_verified;
     if (!email || !emailVerified) {
       clearStateCookie(res, isHttps);
-      res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_not_verified&from=${from}` });
-      return res.end();
+      return redirectErr(res, from, "email_not_verified");
     }
 
     // Buscar/validar en Stripe
@@ -159,18 +162,15 @@ export default async function handler(req, res) {
     if (from === "login") {
       if (!exists) {
         clearStateCookie(res, isHttps);
-        res.writeHead(302, { Location: `/suscripciones.html#google=err&code=not_registered&from=login` });
-        return res.end();
+        return redirectErr(res, "login", "not_registered");
       }
       if (hasPass && !hasGoogle) {
         clearStateCookie(res, isHttps);
-        res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use_password&from=login` });
-        return res.end();
+        return redirectErr(res, "login", "email_in_use_password");
       }
       if (!hasPass && !hasGoogle) {
         clearStateCookie(res, isHttps);
-        res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use&from=login` });
-        return res.end();
+        return redirectErr(res, "login", "email_in_use");
       }
       try {
         await stripe.customers.update(exists.id, {
@@ -180,25 +180,21 @@ export default async function handler(req, res) {
       } catch {}
       setSession(res, { email, name: exists.name || name || null, customerId: exists.id }, isHttps);
       clearStateCookie(res, isHttps);
-      res.writeHead(302, { Location: `/suscripciones.html#google=ok&from=login` });
-      return res.end();
+      return redirect(res, `/suscripciones.html#google=ok&from=login`);
     }
 
     // from === 'register'
     if (exists) {
       if (hasGoogle) {
         clearStateCookie(res, isHttps);
-        res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use_google&from=register` });
-        return res.end();
+        return redirectErr(res, "register", "email_in_use_google");
       }
       if (hasPass) {
         clearStateCookie(res, isHttps);
-        res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use_password&from=register` });
-        return res.end();
+        return redirectErr(res, "register", "email_in_use_password");
       }
       clearStateCookie(res, isHttps);
-      res.writeHead(302, { Location: `/suscripciones.html#google=err&code=email_in_use&from=register` });
-      return res.end();
+      return redirectErr(res, "register", "email_in_use");
     }
 
     // Crear cuenta nueva con Google
@@ -207,14 +203,10 @@ export default async function handler(req, res) {
     });
     setSession(res, { email, name: created.name || name || null, customerId: created.id }, isHttps);
     clearStateCookie(res, isHttps);
-    res.writeHead(302, { Location: `/suscripciones.html#google=ok&from=register` });
-    return res.end();
+    return redirect(res, `/suscripciones.html#google=ok&from=register`);
   } catch (e) {
     console.error("google oauth error:", e);
     clearStateCookie(res, isHttps);
-    res.writeHead(302, { Location: `/suscripciones.html#google=err&code=server_error&from=login` });
-    return res.end();
+    return redirectErr(res, "login", "server_error");
   }
 }
-
-
