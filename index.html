@@ -17,7 +17,7 @@
       --brand-1:#00d4ff; --brand-2:#7c3aed;
       --blue-1:#38bdf8; --blue-2:#2563eb;
       --radius:20px; --shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
-      --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 36px); /* margen para que las flechas no tapen contenido */
+      --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 36px);
     }
     *{box-sizing:border-box}
     html{-webkit-text-size-adjust:100%}
@@ -87,11 +87,11 @@
     /* Reviews / carrusel */
     .reviews{position:relative;margin:36px 0}
     .reviews h2{margin:0 0 14px}
-    .reviews-window{position:relative; overflow:visible} /* para poder sacar las flechas un pelín fuera */
+    .reviews-window{position:relative; overflow:visible}
     .reviews-track{
       display:flex;gap:22px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
       padding:0 var(--edgePad);scroll-padding:0 var(--edgePad);scrollbar-width:none;
-      overscroll-behavior-x: contain; touch-action: pan-x; /* <-- permitir swipe horizontal en móvil */
+      overscroll-behavior-x: contain; touch-action: pan-x;
     }
     .reviews-track::-webkit-scrollbar{display:none}
 
@@ -126,7 +126,7 @@
     :focus-visible{outline:2px solid #7c3aed; outline-offset:2px; border-radius:8px}
 
     @media (max-width: 768px){
-      :root{ --arrowSize:42px; --edgePad:calc(var(--arrowSize) + 44px); } /* más edge en móvil */
+      :root{ --arrowSize:42px; --edgePad:calc(var(--arrowSize) + 44px); }
       section{padding:48px 0}
       header{background:#0a0f16}
       .grid-3{grid-template-columns:1fr}
@@ -137,7 +137,6 @@
       }
       .menu:hover{filter:brightness(1.08)}
       .menu:active{transform:translateY(1px)}
-      /* flechas un poco hacia fuera para no tapar */
       .carousel-btn.left{ left:-6px; transform:translate(-8%, -50%); }
       .carousel-btn.right{ right:-6px; transform:translate(8%, -50%); }
     }
@@ -145,7 +144,6 @@
       :root{ --arrowSize:38px; --edgePad:calc(var(--arrowSize) + 48px); }
       .carousel-btn span{ font-size:18px }
       .reviews-track{ padding:0 var(--edgePad); }
-      /* mantén flechas visibles pero fuera del contenido */
       .carousel-btn.left{ left:-8px; transform:translate(-10%, -50%); }
       .carousel-btn.right{ right:-8px; transform:translate(10%, -50%); }
     }
@@ -185,6 +183,7 @@
     .acct-actions{display:grid;gap:10px}
     .btn-google{background:#db4437;color:#fff}
     .btn-google:hover{filter:brightness(.95)}
+    .acct-small{color:var(--muted);margin:0}
   </style>
 </head>
 <body>
@@ -335,6 +334,7 @@
             <button type="submit" class="btn">Iniciar sesión</button>
             <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google" rel="nofollow noopener noreferrer">Continuar con Google</a>
             <p id="acct-error-login" class="acct-err" style="display:none"></p>
+            <button type="button" id="acct-resend-login" class="btn ghost" style="display:none">Reenviar verificación</button>
           </div>
         </form>
 
@@ -362,7 +362,9 @@
           <div class="acct-actions">
             <button type="submit" class="btn">Crear cuenta</button>
             <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google" rel="nofollow noopener noreferrer">Registrarme con Google</a>
+            <p id="acct-ok-register" class="acct-ok" style="display:none"></p>
             <p id="acct-error-register" class="acct-err" style="display:none"></p>
+            <button type="button" id="acct-resend-register" class="btn ghost" style="display:none">Reenviar verificación</button>
           </div>
         </form>
 
@@ -430,13 +432,13 @@
         recover: $('#acct-error-recover')
       };
       const okRecover = $('#acct-info-recover');
+      const okRegister = $('#acct-ok-register');
+      const resendLoginBtn = $('#acct-resend-login');
+      const resendRegisterBtn = $('#acct-resend-register');
 
-      // ---- Navegación / historial para cerrar con "Atrás"
+      // ---- Navegación / historial
       const AUTH_HASHES = ['#auth-login','#auth-register','#auth-recover'];
-      function pushAuthState(tab){
-        const h = '#auth-' + tab;
-        history.pushState({auth:true, tab}, '', h);
-      }
+      function pushAuthState(tab){ history.pushState({auth:true, tab}, '', '#auth-' + tab); }
       window.addEventListener('popstate', (e)=>{
         if(e.state && e.state.auth){
           setTab(e.state.tab);
@@ -467,7 +469,11 @@
       function openModal(tab='login'){ modal.classList.remove('acct-hidden'); setTab(tab); setTimeout(()=>$('#acct-login-email')?.focus(),40); }
       function closeModal(fromHistory=false){
         modal.classList.add('acct-hidden');
-        Object.values(errs).forEach(e=>e&&(e.style.display='none')); okRecover.style.display='none';
+        Object.values(errs).forEach(e=>e&&(e.style.display='none'));
+        okRecover.style.display='none';
+        okRegister.style.display='none';
+        resendLoginBtn.style.display='none';
+        resendRegisterBtn.style.display='none';
         if(!fromHistory) cleanAuthHash();
       }
       document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
@@ -477,9 +483,13 @@
       $('#link-forgot')?.addEventListener('click', ()=> setTab('recover'));
       $('#recover-back')?.addEventListener('click', ()=> setTab('login'));
 
-      $$('.toggle-eye').forEach(btn=>btn.addEventListener('click', ()=>{ const sel=btn.getAttribute('data-toggle'); const input=document.querySelector(sel); if(!input) return; input.type = input.type==='password' ? 'text' : 'password'; }));
+      // toggle ojos
+      $$('.toggle-eye').forEach(btn=>btn.addEventListener('click', ()=>{
+        const sel=btn.getAttribute('data-toggle'); const input=document.querySelector(sel);
+        if(!input) return; input.type = input.type==='password' ? 'text' : 'password';
+      }));
 
-      // Métrica de contraseña (registro)
+      // Métrica de contraseña
       const meter = document.getElementById('pw-meter');
       document.getElementById('acct-reg-pass')?.addEventListener('input', e=>{
         const v=e.target.value||''; let score=0;
@@ -487,10 +497,17 @@
         if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; }
       });
 
+      // ===== API helper: lanza Error con code/message/fieldErrors
       async function api(method,url,body){
         const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:body?JSON.stringify(body):undefined});
         let data=null; try{ data=await res.json(); }catch{}
-        if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
+        if(!res.ok){
+          const err = new Error(data?.message || `HTTP ${res.status}`);
+          err.code = data?.error || 'http_error';
+          err.fieldErrors = data?.fieldErrors || null;
+          throw err;
+        }
+        return data;
       }
 
       function setUser(u){
@@ -502,44 +519,110 @@
 
       // Recover
       forms.recover?.addEventListener('submit', async e=>{
-        e.preventDefault(); errs.recover.style.display='none'; okRecover.style.display='none';
+        e.preventDefault();
+        errs.recover.style.display='none'; okRecover.style.display='none';
         const email=$('#acct-recover-email').value.trim();
-        try{ await api('POST','/api/request-password-reset',{email}); okRecover.textContent='Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora).'; okRecover.style.display='block'; }
-        catch(err){ errs.recover.textContent=String(err); errs.recover.style.display='block'; }
+        try{
+          await api('POST','/api/request-password-reset',{email});
+          okRecover.textContent='Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora).';
+          okRecover.style.display='block';
+        }catch(err){
+          errs.recover.textContent = err.message || String(err.code||err);
+          errs.recover.style.display='block';
+        }
       });
 
       // Login
       forms.login?.addEventListener('submit', async e=>{
-        e.preventDefault(); errs.login.style.display='none';
+        e.preventDefault();
+        errs.login.style.display='none'; resendLoginBtn.style.display='none';
         const email=$('#acct-login-email').value.trim(); const password=$('#acct-login-pass').value;
-        try{ const data=await api('POST','/api/login',{email,password}); setUser(data?.user||null); await forceSessionRefresh(); closeModal(); }
-        catch(err){
-          errs.login.textContent=(err==='account_not_found')?'No existe una cuenta con ese email.':
-                                 (err==='invalid_credentials')?'Contraseña incorrecta.':
-                                 (err==='password_not_set')?'Esta cuenta no tiene contraseña. Usa “¿Olvidaste la contraseña?”':String(err);
+        try{
+          const data=await api('POST','/api/login',{email,password});
+          setUser(data?.user||null);
+          await forceSessionRefresh();
+          closeModal();
+        }catch(err){
+          const code = (err && err.code) ? err.code : String(err);
+          let msg = err.message || 'No se pudo iniciar sesión.';
+          switch(code){
+            case 'account_not_found': msg='No encontramos ninguna cuenta con ese correo.'; resendLoginBtn.style.display='inline-flex'; break;
+            case 'invalid_credentials': msg='Correo o contraseña incorrectos.'; break;
+            case 'password_not_set': msg='Esta cuenta no tiene contraseña. Usa “¿Olvidaste la contraseña?”.'; break;
+            case 'use_google_login': msg='Este correo está registrado con Google. Inicia sesión con Google.'; break;
+            case 'validation_error':
+              msg = (err.fieldErrors?.email || err.fieldErrors?.password || 'Revisa los campos obligatorios.');
+              break;
+          }
+          errs.login.textContent=msg;
           errs.login.style.display='block';
         }
       });
 
       // Registro
       forms.register?.addEventListener('submit', async e=>{
-        e.preventDefault(); errs.register.style.display='none';
+        e.preventDefault();
+        errs.register.style.display='none'; okRegister.style.display='none'; resendRegisterBtn.style.display='none';
         const name=$('#acct-reg-name').value.trim(); const email=$('#acct-reg-email').value.trim();
         const p1=$('#acct-reg-pass').value; const p2=$('#acct-reg-pass2').value;
-        if(p1!==p2){ errs.register.textContent='Las contraseñas no coinciden.'; return void(errs.register.style.display='block'); }
-        if(p1.length<6){ errs.register.textContent='La contraseña debe tener al menos 6 caracteres.'; return void(errs.register.style.display='block'); }
-        if(!name){ errs.register.textContent='El nombre es obligatorio.'; return void(errs.register.style.display='block'); }
-        try{ const data=await api('POST','/api/register',{name,email,password:p1}); setUser(data?.user||null); await forceSessionRefresh(); closeModal(); }
-        catch(err){
-          errs.register.textContent=(err==='email_in_use_google')?'Ese correo ya existe como cuenta Google. Inicia sesión con Google.':
-                                   (err==='email_in_use')?'Ese correo ya tiene una cuenta. Inicia sesión.':
-                                   (err==='weak_password')?'La contraseña debe tener al menos 6 caracteres.':
-                                   (err==='name_email_password_required')?'Nombre, email y contraseña son obligatorios.':String(err);
+        if(p1!==p2){ errs.register.textContent='Las contraseñas no coinciden.'; errs.register.style.display='block'; return; }
+        if(p1.length<6){ errs.register.textContent='La contraseña debe tener al menos 6 caracteres.'; errs.register.style.display='block'; return; }
+        if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
+        try{
+          const data=await api('POST','/api/register',{name,email,password:p1});
+          okRegister.textContent = data?.message || 'Te enviamos un correo de verificación. Revisa tu bandeja y el spam.';
+          okRegister.style.display='block';
+          resendRegisterBtn.style.display='inline-flex';
+          // Dejamos al usuario en la pestaña de registro para poder reenviar si hace falta
+        }catch(err){
+          const code = err.code || String(err);
+          let msg = err.message || 'No se pudo crear la cuenta.';
+          switch(code){
+            case 'email_in_use_google': msg='Ese correo ya existe como cuenta Google. Inicia sesión con Google.'; break;
+            case 'email_in_use': msg='Ese correo ya tiene una cuenta. Inicia sesión.'; break;
+            case 'weak_password': msg='La contraseña debe tener al menos 6 caracteres.'; break;
+            case 'validation_error':
+              msg = (err.fieldErrors?.name || err.fieldErrors?.email || err.fieldErrors?.password || 'Revisa los campos obligatorios.');
+              break;
+          }
+          errs.register.textContent=msg;
           errs.register.style.display='block';
         }
       });
 
-      // ------- Google: nueva pestaña con fallback + polling (soluciona "usar otra cuenta no carga")
+      // Reenviar verificación (desde LOGIN)
+      resendLoginBtn?.addEventListener('click', async ()=>{
+        const email = ($('#acct-login-email').value||'').trim();
+        errs.login.style.display='none';
+        if(!email){ errs.login.textContent='Escribe tu correo y vuelve a intentar.'; errs.login.style.display='block'; return; }
+        try{
+          const d = await api('POST','/api/resend-verification',{email});
+          errs.login.style.display='none';
+          okRegister.textContent = d?.message || 'Te enviamos un nuevo enlace de verificación.';
+          okRegister.style.display='block';
+          setTab('register', true); // mostrar mensaje en el panel con más espacio
+        }catch(err){
+          errs.login.textContent = err.message || 'No pudimos reenviar el correo.';
+          errs.login.style.display='block';
+        }
+      });
+
+      // Reenviar verificación (desde REGISTER)
+      resendRegisterBtn?.addEventListener('click', async ()=>{
+        const email = ($('#acct-reg-email').value||'').trim();
+        errs.register.style.display='none';
+        if(!email){ errs.register.textContent='Escribe tu correo y vuelve a intentar.'; errs.register.style.display='block'; return; }
+        try{
+          const d = await api('POST','/api/resend-verification',{email});
+          okRegister.textContent = d?.message || 'Te enviamos un nuevo enlace de verificación.';
+          okRegister.style.display='block';
+        }catch(err){
+          errs.register.textContent = err.message || 'No pudimos reenviar el correo.';
+          errs.register.style.display='block';
+        }
+      });
+
+      // ------- Google: popup + polling
       function startGooglePolling(){
         if(S.polling) clearInterval(S.polling);
         let tries=0;
@@ -564,13 +647,10 @@
           const url = `/api/google?from=${encodeURIComponent(from)}`;
           const w = window.open(url, '_blank', 'noopener,noreferrer');
           if(w){
-            // popup permitido -> seguimos en esta pestaña y actualizamos con polling
             startGooglePolling();
-            e.preventDefault(); // evitamos navegar esta pestaña
+            e.preventDefault();
           }else{
-            // popup bloqueado -> navegar en esta pestaña
             startGooglePolling();
-            // no preventDefault: que siga el href nativo
           }
         }, {capture:true});
       }
@@ -600,15 +680,25 @@
           const dd=slot, chip=dd.querySelector('#acct-chip');
           chip?.addEventListener('click', ()=>{ dd.classList.toggle('open'); chip.setAttribute('aria-expanded', dd.classList.contains('open')?'true':'false'); });
           document.addEventListener('click', (e)=>{ if(!dd.contains(e.target)) dd.classList.remove('open'); });
-          dd.querySelector('#acct-logout-btn')?.addEventListener('click', async ()=>{ try{ await api('POST','/api/logout',{});}catch{} setUser(null); alert('Sesión cerrada'); });
+          dd.querySelector('#acct-logout-btn')?.addEventListener('click', async ()=>{
+            try{ await api('POST','/api/logout',{});}catch{}
+            setUser(null);
+            alert('Sesión cerrada');
+          });
         });
       }
 
       async function forceSessionRefresh(retries=4, delay=600){
-        for(let i=0;i<retries;i++){ try{ const data=await api('GET','/api/session'); if(data?.user){ setUser(data.user); break; } }catch{} await new Promise(r=>setTimeout(r,delay)); }
+        for(let i=0;i<retries;i++){
+          try{
+            const data=await api('GET','/api/session');
+            if(data?.user){ setUser(data.user); break; }
+          }catch{}
+          await new Promise(r=>setTimeout(r,delay));
+        }
       }
 
-      // Mapeo errores Google + manejo del hash y sessionStorage 'from'
+      // Mapeo errores Google + hash
       function mapGoogleError(code){
         switch(String(code||'').toLowerCase()){
           case 'email_in_use_password': return 'Ese correo ya tiene una cuenta con contraseña. Inicia sesión con tu contraseña.';
@@ -627,7 +717,7 @@
         const raw = (location.hash || '').replace(/^#/, '');
         if(!raw) return;
         const params = new URLSearchParams(raw.replace(/;/g,'&'));
-        const g = params.get('google');      // ok | err
+        const g = params.get('google'); // ok | err
         let from = (params.get('from') || sessionStorage.getItem('taply_from') || 'login').toLowerCase();
         const code = params.get('code');
         try{ sessionStorage.removeItem('taply_from'); }catch{}
@@ -653,7 +743,6 @@
       getSession();
       window.TaplyOpenLogin = openModal;
 
-      // Si recargan con hash #auth-* (por compartir URL), abrir el modal correspondiente
       if(['#auth-login','#auth-register','#auth-recover'].includes(location.hash)){
         openModal(location.hash.replace('#auth-',''));
       }
@@ -661,5 +750,3 @@
   </script>
 </body>
 </html>
-
-

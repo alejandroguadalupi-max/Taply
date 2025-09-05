@@ -6,272 +6,61 @@
   <title>Gestionar suscripción — Taply</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    :root{
-      --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12);
-      --brand1:#00d4ff; --brand2:#7c3aed; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444
-    }
+    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12);
+           --brand1:#00d4ff; --brand2:#7c3aed; }
     *{box-sizing:border-box} html,body{height:100%} html{-webkit-text-size-adjust:100%}
-    body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui}
-    .wrap{width:min(900px,94%);margin:32px auto}
-    .card{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:22px;margin-bottom:16px}
-    h1{margin:0 0 10px}
-    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .btn{padding:10px 14px;border:0;border-radius:999px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017}
-    .ghost{padding:10px 14px;border:1px solid var(--b);border-radius:999px;background:transparent;color:inherit}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui;display:grid;place-items:center}
+    .card{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:22px;width:min(620px,94%)}
+    .btn{padding:12px 16px;border:0;border-radius:999px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017}
+    .ghost{padding:12px 16px;border:1px solid var(--b);border-radius:999px;background:transparent;color:inherit}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    a{color:#b3e1ff;text-decoration:none}
     .muted{color:var(--muted)}
-    input{font-size:16px}
-    .tag{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid var(--b);background:rgba(255,255,255,.06);font-weight:800}
-    .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
-    /* Bloque llamativo de suscripción */
-    .sub-hero{
-      border:1px solid var(--b); border-radius:16px; padding:16px; margin-top:4px;
-      background:
-        linear-gradient(135deg, rgba(124,58,237,.22), rgba(0,212,255,.18)) border-box,
-        linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.02)) padding-box;
-    }
-    .sub-name{
-      font-size:clamp(1.2rem, 3.6vw, 1.6rem);
-      font-weight:800; letter-spacing:.2px; margin:0;
-      background:linear-gradient(135deg,var(--brand1),var(--brand2));
-      -webkit-background-clip:text; background-clip:text; color:transparent;
-    }
-    .sub-meta{margin:.25rem 0 0; font-size:.98rem; color:var(--muted)}
-    .divider{height:1px;background:var(--b);margin:18px 0}
-    .hidden{display:none !important}
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <div class="row" style="justify-content:space-between">
-      <h1>Gestionar suscripción</h1>
-      <div class="row">
-        <a class="ghost" href="suscripciones.html">Volver a suscripciones</a>
-        <button id="logout" class="ghost">Cerrar sesión</button>
-      </div>
+  <main class="card">
+    <h1 style="margin:0 0 8px">Gestionar suscripción</h1>
+    <p id="state" class="muted">Abriendo portal seguro…</p>
+    <div class="row" style="margin-top:12px">
+      <a class="ghost" href="suscripciones.html">Volver a suscripciones</a>
+      <button id="retry" class="btn">Reintentar</button>
     </div>
-
-    <section class="card" id="acctBox">
-      <h2 style="margin:0 0 6px">Tu cuenta</h2>
-      <p class="muted" id="email">Cargando…</p>
-
-      <!-- Bloque SUSCRIPCIÓN (llamativo) -->
-      <div class="sub-hero" id="subHero">
-        <p class="sub-name" id="subName">Cargando…</p>
-        <!-- línea principal: próxima renovación o fin -->
-        <p class="sub-meta" id="renewLine"></p>
-        <!-- línea adicional: cancelación programada -->
-        <p class="sub-meta hidden" id="cancelLine"></p>
-        <!-- línea adicional: cambio de plan programado -->
-        <p class="sub-meta hidden" id="swapLine"></p>
-        <div id="flags" style="margin-top:6px"></div>
-      </div>
-
-      <!-- UNA sola acción para el plan -->
-      <div class="row" style="margin-top:12px">
-        <button id="btnPortal" class="btn">Hacer cambios en el plan</button>
-      </div>
-      <p id="msg" class="muted" style="margin-top:6px"></p>
-
-      <div class="divider"></div>
-
-      <!-- NFC -->
-      <section id="nfcBlock">
-        <h3 style="margin:0 0 6px">NFC</h3>
-        <p class="muted">Has comprado: <strong id="nfcQty">0</strong> dispositivos.</p>
-        <div class="row">
-          <input id="nfcCount" type="number" min="1" max="999" step="1" value="5" style="background:#0a0f16;border:1px solid var(--b);color:inherit;border-radius:12px;padding:10px;width:120px">
-          <button id="buyNfc" class="btn">Comprar más NFC</button>
-        </div>
-      </section>
-    </section>
   </main>
 
   <script>
-    // Portal de Stripe (fallback conocido si tu backend no devuelve URL)
-    const PORTAL_LOGIN_URL = "https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00";
-
-    const $ = s => document.querySelector(s);
-    const show  = el => el.classList.remove('hidden');
-    const hide  = el => el.classList.add('hidden');
-    const setTxt = (sel, txt) => { const el=$(sel); if(el) el.textContent = txt; };
-    const fmtTS = ts => new Intl.DateTimeFormat('es-ES',{dateStyle:'long'}).format(new Date(ts*1000));
-
-    async function api(method, url, body){
-      const res = await fetch(url,{
-        method,
-        headers:{'Content-Type':'application/json'},
-        credentials:'include',
-        cache:'no-store',
-        body: body?JSON.stringify(body):undefined
-      });
+    const $=s=>document.querySelector(s);
+    async function api(method,url,body){
+      const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:body?JSON.stringify(body):undefined});
       let data=null; try{ data=await res.json(); }catch{}
-      if(!res.ok) throw (data?.error||('HTTP_'+res.status));
+      if(!res.ok){ const e=new Error(data?.message||'error'); e.code=data?.error||'http_error'; throw e; }
       return data;
     }
 
-    function getInterval(u){
-      return (u?.subscription?.price?.interval ||
-              u?.subscription?.plan?.interval ||
-              u?.subscription_interval || 'month').toLowerCase();
-    }
-
-    // Nombre del plan: usa nickname si existe; si no, texto neutro (para no mostrar "Básico" por defecto ni IDs)
-    function prettyPlan(u){
-      const nickname = (u?.subscription?.price?.nickname || u?.subscription?.plan?.nickname || '').trim();
-      if(nickname) return nickname;
-      const freq = getInterval(u)==='year' ? 'Plan anual' : 'Plan mensual';
-      return freq;
-    }
-
-    function hasValidSub(u){
-      const st=(u?.subscription?.status||'').toLowerCase();
-      return ['active','trialing','past_due'].includes(st);
-    }
-
-    let USER=null;
-
-    function paintNoSubscription(){
-      $('#subName').textContent = 'No tienes suscripción activa';
-      setTxt('#renewLine','');
-      setTxt('#cancelLine',''); hide($('#cancelLine'));
-      setTxt('#swapLine','');   hide($('#swapLine'));
-      $('#flags').innerHTML = '';
-    }
-
-    async function refreshUser(paintOnly=false){
+    async function go(){
+      $('#state').textContent='Comprobando sesión…';
       try{
-        const d = await api('GET','/api/session');
-        const u = d?.user;
-        if(!u){
-          setTxt('#email','Debes iniciar sesión para gestionar tu cuenta.');
-          paintNoSubscription();
-          return;
-        }
-        USER=u;
-
-        setTxt('#email', u.email || '—');
-
-        if(hasValidSub(u)){
-          // Nombre del plan actual
-          $('#subName').textContent = prettyPlan(u);
-
-          // Insignias/estado
-          const flags=[];
-          if(u?.subscription?.status){ flags.push(`<span class="tag">Estado: ${u.subscription.status}</span>`); }
-          if(u?.subscription?.cancel_at_period_end){ flags.push('<span class="tag warn">Cancelación programada</span>'); }
-          $('#flags').innerHTML = flags.join(' ');
-
-          // Renovación / fin de periodo
-          const end = u.current_period_end || u.subscription?.current_period_end || null;
-          if(end){
-            if(u?.subscription?.cancel_at_period_end){
-              setTxt('#renewLine', `Activo hasta el ${fmtTS(end)} (se cancelará ese día).`);
-            }else{
-              setTxt('#renewLine', `Próxima renovación: ${fmtTS(end)}.`);
-            }
-          }else{
-            setTxt('#renewLine','');
-          }
-
-          // Línea de cancelación (explícita)
-          if(u?.subscription?.cancel_at_period_end && end){
-            setTxt('#cancelLine', `La suscripción se cancelará el ${fmtTS(end)}.`);
-            show($('#cancelLine'));
-          }else{
-            setTxt('#cancelLine',''); hide($('#cancelLine'));
-          }
-
-          // Cambio programado de plan (si el backend lo informa)
-          const upStart = u.upcoming_start_date || null;
-          const upName  = (u.upcoming_price_nickname || '').trim();
-          if(upStart || u?.subscription?.schedule_id){
-            const label = upName || 'nuevo plan';
-            const date  = upStart ? fmtTS(upStart) : (end ? fmtTS(end) : 'el próximo periodo');
-            setTxt('#swapLine', `Se cambiará a ${label} a partir del ${date}.`);
-            show($('#swapLine'));
-          }else{
-            setTxt('#swapLine',''); hide($('#swapLine'));
-          }
-        }else{
-          paintNoSubscription();
-        }
-
-        // NFC
-        setTxt('#nfcQty', String(Number(u.nfc_qty||0)));
-
-        if(!paintOnly){ setTxt('#msg',''); }
-      }catch(e){
-        setTxt('#email','No se pudo cargar la sesión.');
-        $('#subName').textContent = 'Intenta recargar la página';
-        setTxt('#renewLine','');
-        setTxt('#cancelLine',''); hide($('#cancelLine'));
-        setTxt('#swapLine','');   hide($('#swapLine'));
-        $('#flags').innerHTML = '';
-        console.error('refreshUser error', e);
-      }
-    }
-
-    // Si venimos de Stripe con ?session_id=..., guarda sesión y post-pago
-    async function runPostPagoIfNeeded(){
-      const qs = new URLSearchParams(location.search);
-      const sid = qs.get('session_id');
-      if(!sid) return;
-      try{
-        try{ await api('POST','/api/store-customer-from-session',{ session_id: sid }); }catch{}
-        try{ await api('POST','/api/post-pago',{ session_id: sid }); }catch{}
-        await refreshUser(true);
-      }catch(e){ /* silencioso */ }
-      try{
-        qs.delete('session_id');
-        const url = location.pathname + (qs.toString()?('?'+qs.toString()):'');
-        history.replaceState({}, '', url);
-      }catch{}
-    }
-
-    // Abrir portal (un solo botón)
-    async function openPortal(){
-      try{
-        const r=await api('POST','/api/create-portal-session',{}); // tu backend devuelve url
-        if(r?.url){ location.href=r.url; return; }
-      }catch(e){ /* si no hay sub válida, cae al fallback */ }
-      // Fallback → login del portal o pantalla de planes
-      if(!USER || !hasValidSub(USER)){
-        location.href = 'suscripciones.html#planes';
+        const s=await api('GET','/api/session');
+        if(!s?.user){ location.href='suscripciones.html#auth-login'; return; }
+      }catch{
+        location.href='suscripciones.html#auth-login';
         return;
       }
-      let url = PORTAL_LOGIN_URL;
+      $('#state').textContent='Creando sesión en el portal…';
       try{
-        if(USER?.email){
-          const u = new URL(url);
-          u.searchParams.set('prefilled_email', USER.email);
-          url = u.toString();
-        }
-      }catch{}
-      location.href = url;
+        const r=await fetch('/api/portal',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include'});
+        const d=await r.json().catch(()=>null);
+        if(r.ok && d?.url){ location.href=d.url; return; }
+        throw new Error(d?.message || d?.error || 'No se recibió URL del portal');
+      }catch(ex){
+        console.error(ex);
+        $('#state').textContent = 'No se pudo abrir el portal. Puedes intentarlo de nuevo.';
+      }
     }
 
-    // Eventos
-    $('#btnPortal').addEventListener('click', ()=> openPortal());
-
-    // NFC
-    $('#buyNfc').addEventListener('click', async ()=>{
-      const q = Math.max(1, Math.min(999, parseInt($('#nfcCount').value||'1',10)||1));
-      try{
-        const r = await api('POST','/api/buy-nfc',{quantity:q});
-        if(r?.url) location.href=r.url; else alert('No se pudo iniciar la compra.');
-      }catch{ alert('No se pudo iniciar la compra.'); }
-    });
-
-    // Logout
-    $('#logout').addEventListener('click', async ()=>{
-      try{ await api('POST','/api/logout',{});}catch{}
-      location.href='suscripciones.html#cuenta';
-    });
-
-    (async function init(){
-      await runPostPagoIfNeeded();
-      await refreshUser();
-    })();
+    $('#retry').addEventListener('click', go);
+    go();
   </script>
 </body>
 </html>
+

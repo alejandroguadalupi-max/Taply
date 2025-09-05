@@ -34,7 +34,7 @@
       <!-- LOGIN -->
       <section class="card">
         <h2 style="margin:0 0 8px">Iniciar sesión</h2>
-        <form id="form-login" autocomplete="on">
+        <form id="form-login" autocomplete="on" novalidate>
           <label>Email <input id="login-email" type="email" required autocomplete="email" inputmode="email" autofocus></label>
           <label>Contraseña
             <span class="in">
@@ -87,7 +87,7 @@
     function saveUser(u){ try{ localStorage.setItem(KEY, u ? JSON.stringify(u) : ''); }catch{} }
     function readUser(){ try{ const v=localStorage.getItem(KEY)||''; return v?JSON.parse(v):null; }catch{ return null; } }
 
-    // API helper con credenciales
+    // API helper
     async function api(method, url, body){
       const res = await fetch(url,{
         method,
@@ -97,47 +97,53 @@
         body: body?JSON.stringify(body):undefined
       });
       let data=null; try{ data=await res.json(); }catch{}
-      if(!res.ok) throw (data?.error||'error');
+      if(!res.ok){ const e=new Error(data?.message||'error'); e.code=data?.error||'http_error'; throw e; }
       return data;
     }
 
-    // Destino tras login/registro (?next=URL) o gestionar.html por defecto
+    // Destino tras login/registro (?next=URL) o suscripciones por defecto
     const qs = new URLSearchParams(location.search);
-    const NEXT = (qs.get('next') && decodeURIComponent(qs.get('next'))) || 'gestionar.html';
+    const NEXT = (qs.get('next') && decodeURIComponent(qs.get('next'))) || 'suscripciones.html#cuenta';
 
     // Si el cache dice que ya hay usuario, intentamos redirigir rápido
     const cached = readUser();
     if(cached){ location.replace(NEXT); }
 
     // Verificación con servidor
-    (async ()=>{
-      try{ const s=await api('GET','/api/session'); if(s?.user){ saveUser(s.user); location.replace(NEXT); } }catch{}
-    })();
+    (async ()=>{ try{ const s=await api('GET','/api/session'); if(s?.user){ saveUser(s.user); location.replace(NEXT); } }catch{} })();
 
     // LOGIN
     $('#form-login').addEventListener('submit', async (e)=>{
-      e.preventDefault(); $('#err-login').style.display='none';
+      e.preventDefault(); const err=$('#err-login'); err.style.display='none';
       const email=$('#login-email').value.trim(); const password=$('#login-pass').value;
       try{
         const data = await api('POST','/api/login',{email,password});
         saveUser(data?.user || null);
         location.href=NEXT;
-      }catch(err){
-        const s=String(err);
-        $('#err-login').textContent = s==='account_not_found'?'No existe esa cuenta.':
-                                       s==='invalid_credentials'?'Contraseña incorrecta.':
-                                       s==='password_not_set'?'Esa cuenta no tiene contraseña, usa recuperar.': s;
-        $('#err-login').style.display='block';
+      }catch(ex){
+        const map = {
+          account_not_found:'No existe esa cuenta.',
+          invalid_credentials:'Contraseña incorrecta.',
+          password_not_set:'Esa cuenta no tiene contraseña, usa recuperar.',
+          use_google_login:'Esa cuenta está vinculada a Google. Inicia sesión con Google.'
+        };
+        err.textContent = map[ex.code] || ex.message || 'No se pudo iniciar sesión.';
+        err.style.display='block';
       }
     });
 
-    // Forgot
+    // Forgot (solo éxito si existe)
     $('#forgotLink').addEventListener('click', async (e)=>{
       e.preventDefault();
       const email = ($('#login-email').value||'').trim();
       if(!email){ alert('Escribe tu email en el campo de arriba y pulsa “Recuperar acceso”.'); return; }
-      try{ await api('POST','/api/request-password-reset',{email}); alert('Si el correo existe, te hemos enviado instrucciones.'); }
-      catch{ alert('Si el correo existe, te hemos enviado instrucciones.'); }
+      try{
+        await api('POST','/api/request-password-reset',{email});
+        alert('Te hemos enviado un enlace para restablecer tu contraseña (caduca en 1 hora).');
+      }catch(ex){
+        if(ex.code==='account_not_found'){ alert('No existe ninguna cuenta con ese correo.'); }
+        else{ alert(ex.message || 'No se pudo enviar el enlace.'); }
+      }
     });
 
     // REGISTER
@@ -153,11 +159,16 @@
         saveUser(data?.user || null);
         location.href=NEXT;
       }catch(ex){
-        const s=String(ex);
-        err.textContent = s==='email_in_use'?'Ese correo ya tiene cuenta. Inicia sesión.': s;
+        const map = {
+          email_in_use:'Ese correo ya tiene cuenta. Inicia sesión.',
+          email_in_use_google:'Ese correo está registrado con Google. Inicia sesión con Google.',
+          weak_password:'La contraseña debe tener al menos 6 caracteres.'
+        };
+        err.textContent = map[ex.code] || ex.message || 'No se pudo crear la cuenta.';
         err.style.display='block';
       }
     });
   </script>
 </body>
 </html>
+

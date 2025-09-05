@@ -217,6 +217,12 @@
       <div class="actions"><a class="btn plan acct-guard" data-tier="pro">Elegir Pro</a></div>
     </article>
   </div>
+
+  <!-- CTA gestionar suscripción (Stripe Portal) DEBAJO de las tarjetas -->
+  <div class="container" style="text-align:center;margin-top:16px">
+    <button id="portalBtn" class="btn acct-guard">Gestionar suscripción</button>
+    <p class="acct-small">Cambia de plan, actualiza tarjeta o cancela desde el Portal seguro de Stripe.</p>
+  </div>
 </section>
 
 <!-- === RESUMEN DE CUENTA === -->
@@ -228,9 +234,7 @@
         <div id="acct-status" class="plan-badge">Sesión no iniciada</div>
         <div id="acct-nfc" class="nfc-chip">NFC comprados: 0</div>
       </div>
-      <div class="actions">
-        <a href="gestionar.html" id="acct-manage" class="btn acct-guard">Gestionar suscripción</a>
-      </div>
+      <!-- (Se eliminó el botón/link a gestionar.html) -->
     </div>
     <p id="acct-auth-cta" class="acct-small" style="margin-top:10px;display:none">
       ¿No tienes cuenta?
@@ -280,7 +284,6 @@
 
         <div class="acct-actions">
           <button type="submit" class="btn">Iniciar sesión</button>
-          <!-- IMPORTANTE: usamos tu endpoint unificado /api/google -->
           <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google">Continuar con Google</a>
           <p id="acct-error-login" class="acct-err" style="display:none"></p>
           <p id="acct-info-login" class="acct-ok" style="display:none"></p>
@@ -310,7 +313,6 @@
         <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
         <div class="acct-actions">
           <button type="submit" class="btn">Crear cuenta</button>
-          <!-- IMPORTANTE: usamos tu endpoint unificado /api/google -->
           <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google">Registrarme con Google</a>
           <p id="acct-error-register" class="acct-err" style="display:none"></p>
           <p id="acct-info-register" class="acct-ok" style="display:none"></p>
@@ -375,7 +377,6 @@
   (function(){
     const S = { user:null, polling:null };
 
-    const fmtDate = (d)=> new Intl.DateTimeFormat('es-ES',{dateStyle:'medium'}).format(d);
     const saveUser=u=>{ try{ localStorage.setItem('acct_user',u?JSON.stringify(u):""); }catch(e){} };
     const readUser=()=>{ try{ const v=localStorage.getItem('acct_user')||''; return v?JSON.parse(v):null; }catch(e){ return null; } };
 
@@ -441,7 +442,8 @@
     async function api(method,url,body){
       const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:body?JSON.stringify(body):undefined});
       let data=null; try{ data=await res.json(); }catch{}
-      if(!res.ok) throw (data?.error || `HTTP ${res.status}`); return data;
+      if(!res.ok){ const e=new Error(data?.message||`HTTP ${res.status}`); e.code=data?.error||'http_error'; e.fieldErrors=data?.fieldErrors||null; throw e; }
+      return data;
     }
 
     function setUser(u){
@@ -450,19 +452,28 @@
       window.taplyAuth = window.taplyAuth || {}; window.taplyAuth.user = S.user;
     }
 
-    // -------- Formularios --------
+    // Recover: mostrar error si el email no existe
     forms.recover?.addEventListener('submit', async e=>{
       e.preventDefault(); errs.recover.style.display='none'; oks.recover.style.display='none';
       const email=$('#acct-recover-email').value.trim();
-      try{ await api('POST','/api/request-password-reset',{email}); oks.recover.textContent='Si el correo está registrado, te hemos enviado un enlace (caduca en 1 hora).'; oks.recover.style.display='block'; }
-      catch(err){ errs.recover.textContent=String(err); errs.recover.style.display='block'; }
+      try{
+        const d=await api('POST','/api/request-password-reset',{email});
+        oks.recover.textContent = d?.message || 'Te hemos enviado un enlace (caduca en 1 hora).';
+        oks.recover.style.display='block';
+      }catch(err){
+        if(err.code==='account_not_found'){
+          errs.recover.textContent='No existe ninguna cuenta con ese correo.';
+        }else{
+          errs.recover.textContent=err.message||'No se pudo enviar el enlace.';
+        }
+        errs.recover.style.display='block';
+      }
     });
 
     async function resendVerification(email){
       if(!email) return;
       try{
         await api('POST','/api/resend-verification',{email});
-        // Muestra aviso tanto en login como en register
         oks.login.textContent='Te hemos reenviado el correo de verificación.'; oks.login.style.display='block';
         oks.register.textContent='Te hemos reenviado el correo de verificación.'; oks.register.style.display='block';
       }catch(e){}
@@ -475,15 +486,19 @@
         const data=await api('POST','/api/login',{email,password});
         setUser(data?.user||null); await forceSessionRefresh(); closeModal();
       }catch(err){
-        if(err==='email_not_verified'){
+        if(err.code==='email_not_verified'){
           errs.login.innerHTML = 'Tu correo no está verificado. <a id="resend-link" style="text-decoration:underline;cursor:pointer">Reenviar verificación</a>';
           errs.login.style.display='block';
           setTimeout(()=>{ document.getElementById('resend-link')?.addEventListener('click',()=>resendVerification(email)); },0);
           return;
         }
-        errs.login.textContent=(err==='account_not_found')?'No existe una cuenta con ese email.':
-                               (err==='invalid_credentials')?'Contraseña incorrecta.':
-                               (err==='password_not_set')?'Esta cuenta no tiene contraseña. Usa el enlace de recuperación.':String(err);
+        const map = {
+          account_not_found:'No existe una cuenta con ese email.',
+          invalid_credentials:'Correo o contraseña incorrectos.',
+          password_not_set:'Esta cuenta no tiene contraseña. Usa el enlace de recuperación.',
+          use_google_login:'Este correo está registrado con Google. Inicia sesión con Google.'
+        };
+        errs.login.textContent = map[err.code] || err.message || 'No se pudo iniciar sesión.';
         errs.login.style.display='block';
       }
     });
@@ -497,7 +512,6 @@
       if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
       try{
         await api('POST','/api/register',{name,email,password:p1});
-        // Aviso completo + accesos rápidos y reenvío
         oks.register.innerHTML = `
           Te hemos enviado un correo de verificación a <strong>${email}</strong>. Abre ese correo y pulsa “Confirmar”.
           <br><br>
@@ -508,15 +522,18 @@
         oks.register.style.display='block';
         setTimeout(()=>{ document.getElementById('resend-verif')?.addEventListener('click',()=>resendVerification(email)); },0);
       }catch(err){
-        errs.register.textContent=(err==='email_in_use_google')?'Ese correo ya existe como cuenta Google. Inicia sesión con Google.':
-                                 (err==='email_in_use')?'Ese correo ya tiene una cuenta. Inicia sesión.':
-                                 (err==='weak_password')?'La contraseña debe tener al menos 6 caracteres.':
-                                 (err==='name_email_password_required')?'Nombre, email y contraseña son obligatorios.':String(err);
+        const map = {
+          email_in_use_google:'Ese correo ya existe como cuenta Google. Inicia sesión con Google.',
+          email_in_use:'Ese correo ya tiene una cuenta. Inicia sesión.',
+          weak_password:'La contraseña debe tener al menos 6 caracteres.',
+          name_email_password_required:'Nombre, email y contraseña son obligatorios.'
+        };
+        errs.register.textContent = map[err.code] || err.message || 'No se pudo crear la cuenta.';
         errs.register.style.display='block';
       }
     });
 
-    // -------- Google OAuth en la misma pestaña (tu endpoint /api/google) --------
+    // Google OAuth en esta pestaña
     function startGooglePolling(){
       if(S.polling) clearInterval(S.polling);
       let tries=0;
@@ -539,8 +556,7 @@
       if(!el) return;
       el.removeAttribute('target');
       const handler=(e)=>{
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        e.preventDefault(); e.stopImmediatePropagation();
         try{ startGooglePolling(); }catch{}
         location.href = `/api/google?from=${encodeURIComponent(from)}`;
         return false;
@@ -551,7 +567,7 @@
     bindGoogle('btn-google-login','login');
     bindGoogle('btn-google-register','register');
 
-    // -------- Menú / sesión / gating --------
+    // Menú / sesión (sin enlace a gestionar.html)
     function paintNav(){
       const slot=document.querySelector('#acct-nav-slot');
       const htmlAnon = `<a class="btn ghost" id="acct-open-nav">Iniciar sesión</a>`;
@@ -562,7 +578,6 @@
           Hola, ${name}
         </span>
         <div id="acct-menu-pop" style="display:none;position:absolute;transform:translateY(6px);right:0;background:#0e1424;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px;box-shadow:0 12px 28px rgba(0,0,0,.45)">
-          <a class="ghost" href="gestionar.html" style="display:block;padding:8px 10px">Gestionar suscripción</a>
           <a class="ghost" id="acct-logout-nav" style="display:block;padding:8px 10px">Cerrar sesión</a>
         </div>`;
       slot.style.position='relative';
@@ -604,10 +619,9 @@
       }
     }
 
-    // ------- Señales (Google + verificación email) -------
     function readParams(){
       const h = new URLSearchParams((location.hash||'').replace(/^#/, '').replace(/;/g,'&'));
-      const q = new URLSearchParams(location.search.replace(/^\?/,''));
+      const q = new URLSearchParams(location.search.replace(/^\?/,'')); 
       return {
         google: h.get('google') || q.get('google') || null,
         from: (h.get('from') || q.get('from') || 'login').toLowerCase(),
@@ -628,43 +642,30 @@
       const isReg = from==='register';
       switch(code){
         case 'email_in_use_password':
-          return isReg
-            ? 'Ese correo ya está registrado con contraseña. Inicia sesión con correo y contraseña.'
-            : 'Esa cuenta no está vinculada a Google. Inicia con correo y contraseña.';
-        case 'email_in_use_google':
-          return 'Ese correo ya está registrado con Google. Inicia sesión con Google.';
-        case 'email_in_use':
-          return isReg ? 'Ese correo ya existe. Inicia sesión.' : 'Ese correo ya existe.';
-        case 'not_registered':
-          return 'No existe ninguna cuenta con ese correo. Regístrate primero.';
-        case 'email_not_verified':
-          return 'Tu correo de Google no está verificado.';
-        case 'google_auth_failed':
-          return 'No se pudo conectar con Google. Inténtalo de nuevo.';
-        case 'state_error':
-        case 'server_error':
-        default:
-          return 'No se pudo completar con Google. Inténtalo de nuevo.';
+          return isReg ? 'Ese correo ya está registrado con contraseña. Inicia sesión con correo y contraseña.' : 'Esa cuenta no está vinculada a Google. Inicia con correo y contraseña.';
+        case 'email_in_use_google': return 'Ese correo ya está registrado con Google. Inicia sesión con Google.';
+        case 'email_in_use': return isReg ? 'Ese correo ya existe. Inicia sesión.' : 'Ese correo ya existe.';
+        case 'not_registered': return 'No existe ninguna cuenta con ese correo. Regístrate primero.';
+        case 'email_not_verified': return 'Tu correo de Google no está verificado.';
+        case 'google_auth_failed': return 'No se pudo conectar con Google. Inténtalo de nuevo.';
+        default: return 'No se pudo completar con Google. Inténtalo de nuevo.';
       }
     }
 
     async function handleSignals(){
       const s = readParams();
 
-      // 1) Email verificado
       if(s.emailVerified){
         await forceSessionRefresh();
         showTopBanner('¡Correo verificado! Tu cuenta está activada. 🎉', 'ok');
         clearUrl();
       }
 
-      // 2) Google
       if(!s.google) return;
       if(s.google==='ok'){
         await forceSessionRefresh();
         showTopBanner('Sesión iniciada con Google.', 'ok');
       }else{
-        // Mostrar error contextual en el modal correcto
         openModal(s.from === 'register' ? 'register' : 'login');
         const target = (s.from === 'register') ? errs.register : errs.login;
         if(target){
@@ -680,7 +681,7 @@
       try{ const data=await api('GET','/api/session'); setUser(data?.user||null); }catch{ setUser(cached||null); }
       paintNav(); paintAccountSection();
 
-      // gating de botones de pago
+      // Gating: si no hay sesión, abrir modal al pulsar botones con .acct-guard
       document.body.addEventListener('click',(e)=>{
         const g=e.target.closest('.acct-guard'); if(g && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); }
       }, true);
@@ -696,6 +697,20 @@
       }
     });
 
+    // Abrir Portal de Stripe
+    async function openPortal(){
+      try{
+        const res = await fetch('/api/portal', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include' });
+        const data = await res.json();
+        if(!res.ok || !data?.url){ alert(data?.error || 'No se pudo abrir el portal.'); return; }
+        location.href = data.url;
+      }catch{ alert('Error de red abriendo el portal.'); }
+    }
+    document.getElementById('portalBtn')?.addEventListener('click', async (e)=>{
+      if(!S.user){ e.preventDefault(); openModal('login'); return; }
+      await openPortal();
+    });
+
     // Arranque
     getSession();
   })();
@@ -705,19 +720,27 @@
     const tier = btn.dataset.tier;
     const frequency = (document.querySelector('#btn-year')?.classList.contains('active')) ? 'annual' : 'monthly';
 
+    // Si ya tiene plan, sugerimos portal
     if (window.taplyAuth?.user && (window.taplyAuth.user.subscription || window.taplyAuth.user.isSubscribed)) {
-      const u = window.taplyAuth.user;
-      const planName = (u.subscription && (u.subscription.price?.nickname||u.subscription.plan?.nickname)) || 'actual';
-      if (confirm(`Ya tienes un plan ${planName} activo.\n\n¿Quieres ir a “Gestionar suscripción” para cambiarlo?`)) { location.href = 'gestionar.html'; return; }
+      if (confirm('Ya tienes una suscripción activa. ¿Quieres abrir el portal para gestionarla?')) {
+        try{
+          const r=await fetch('/api/portal',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include'});
+          const d=await r.json(); if(r.ok && d?.url){ location.href=d.url; return; }
+          alert(d?.error || 'No se pudo abrir el portal.');
+        }catch{ alert('Error de red al abrir el portal.'); }
+      }
+      return;
     }
 
     try {
-      const res = await fetch('/api/create-checkout-session', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ tier, frequency }) });
+      const res = await fetch('/api/create-checkout-session', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body: JSON.stringify({ tier, frequency })
+      });
       const data = await res.json();
-      if (!res.ok) {
-        if (data?.error === 'already_subscribed') { if (confirm('Ya tienes una suscripción activa. ¿Abrir la página de gestión?')) location.href='gestionar.html'; return; }
-        alert(data?.error || 'Error iniciando la suscripción'); return;
-      }
+      if (!res.ok) { alert(data?.error || 'Error iniciando la suscripción'); return; }
       if (data?.url) location.href = data.url; else alert('No se generó la URL de Stripe (no_session_url)');
     } catch { alert('Error de red al iniciar la suscripción'); }
   }));
@@ -734,4 +757,3 @@
 </script>
 </body>
 </html>
-

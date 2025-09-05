@@ -105,9 +105,10 @@
       $('#rId').textContent = c.id || '—';
       $('#rPhone').textContent = c.phone || '—';
 
+      const nickname = (s?.price?.nickname || s?.plan?.nickname || '').trim();
       $('#rSubState').textContent = s?.status || '—';
-      $('#rPlan').textContent = s?.plan?.nickname || '—';
-      $('#rInterval').textContent = s?.price?.interval || '—';
+      $('#rPlan').textContent = nickname || '—';
+      $('#rInterval').textContent = s?.price?.interval || s?.plan?.interval || '—';
       $('#rStart').textContent = s?.current_period_start ? fmtDate(s.current_period_start) : '—';
       $('#rEnd').textContent = s?.current_period_end ? fmtDate(s.current_period_end) : '—';
 
@@ -115,7 +116,8 @@
 
       // actions
       $('#openPortal').onclick = async ()=>{
-        try{ const r=await apiAdmin('admin/create-portal',{ customerId:c.id }); if(r?.url) location.href=r.url; }catch(e){ alert('No se pudo abrir el portal: '+e); }
+        try{ const r=await apiAdmin('admin/create-portal',{ customerId:c.id }); if(r?.url) location.href=r.url; else alert('No se recibió URL'); }
+        catch(e){ alert('No se pudo abrir el portal: '+e); }
       };
       $('#btnAddNfc').onclick = async ()=>{
         const delta = parseInt($('#delta').value||'0',10)||0;
@@ -126,22 +128,32 @@
         try{ const r=await apiAdmin('admin/set-nfc',{ customerId:c.id, qty }); $('#rNfc').textContent = r.nfc_qty; alert('Guardado'); }catch(e){ alert('Error al establecer: '+e); }
       };
       $('#sendReset').onclick = async ()=>{
-        try{ await fetch('/api/request-password-reset',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: c.email }) }); alert('Enviado (si existe)'); }catch{ alert('Intento de envío realizado'); }
+        try{
+          const res = await fetch('/api/request-password-reset',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: c.email }) });
+          const d = await res.json().catch(()=>null);
+          if(!res.ok){
+            if(d?.error==='account_not_found'){ alert('El correo no está registrado. No se envió ningún email.'); }
+            else{ alert(d?.message || 'No se pudo enviar el email.'); }
+            return;
+          }
+          alert('Enlace de restablecimiento enviado.');
+        }catch{ alert('No se pudo enviar el email.'); }
       };
     }
 
     $('#find').addEventListener('click', async ()=>{
-      $('#findErr').style.display='none';
+      const errEl = $('#findErr');
+      errEl.style.display='none';
       try{
         const email = $('#email').value.trim();
         const customerId = $('#custId').value.trim();
+        if(!email && !customerId){ errEl.textContent='Escribe email o customerId.'; errEl.style.display='block'; return; }
         const r = await apiAdmin('admin/find', email ? { email } : { customerId });
         paint(r);
       }catch(e){
         $('#result').style.display='none';
-        const err = (''+e) || 'error';
-        $('#findErr').textContent = err;
-        $('#findErr').style.display='block';
+        errEl.textContent = (''+e) || 'error';
+        errEl.style.display='block';
       }
     });
   </script>
