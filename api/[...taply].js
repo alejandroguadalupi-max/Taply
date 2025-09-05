@@ -135,13 +135,15 @@ async function sendEmail({to, subject, text, html}){
     const { default: sgMail } = await import('@sendgrid/mail');
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+    const isVerify = /Confirma tu correo/i.test(subject) || /\/api\/verify-email/i.test(String(html||''));
     const payload = {
       to,
       from: process.env.EMAIL_FROM,
       replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM,
       subject,
       text: text || (html ? html.replace(/<[^>]+>/g,' ') : ''),
-      html: html || `<p>${text || ''}</p>`
+      html: html || `<p>${text || ''}</p>`,
+      ...(isVerify ? { trackingSettings: { clickTracking: { enable: false, enableText: false } } } : {})
     };
 
     const attempts = 3;
@@ -344,6 +346,16 @@ async function login(req, res){
   const customer = found.data[0];
   const meta = customer.metadata || {};
 
+  // Si está registrada con Google y no tiene contraseña → mensaje claro
+  const usedByGoogle = (meta.taply_google === '1' || meta.taply_google === 'true');
+  const hasPass = !!meta.taply_pass_hash;
+  if (usedByGoogle && !hasPass) {
+    return res.status(409).json({
+      error: 'use_google_login',
+      message: 'Este correo está registrado con Google. Inicia sesión con Google.'
+    });
+  }
+
   // Si NO está verificado, actúa como si no existiera
   if (meta.taply_email_verified !== '1') {
     return res.status(404).json({ error:'account_not_found', message:'No encontramos ninguna cuenta con ese correo.' });
@@ -359,7 +371,7 @@ async function login(req, res){
   return res.status(200).json({ user:{ email, name: customer.name || null, customerId: customer.id }});
 }
 
-/* ===== Google One-tap opcional (no cambia) ===== */
+/* ===== Google One-tap opcional ===== */
 async function googleLogin(req, res){
   const { credential } = getBody(req);
   const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -500,7 +512,7 @@ async function googleOAuthCallback(req, res){
   }
 }
 
-/* ===== Verificación de email (acepta token+email o sólo token) ===== */
+/* ===== Verificación de email (acepta token+email o sólo token; GET y POST) ===== */
 async function findCustomerByVerifyToken(stripe, token){
   try{
     const q = `metadata['taply_email_token']:'${escapeStripeQueryValue(token)}'`;
@@ -512,14 +524,17 @@ async function findCustomerByVerifyToken(stripe, token){
   }
 }
 
-// GET /api/verify-email  y también /api/google?__verify=1
 async function verifyEmail(req, res){
   try{
     const url = new URL(req.url, 'http://x');
-    const token = url.searchParams.get('token') || url.searchParams.get('t') || '';
-    let email   = normalizeEmail(url.searchParams.get('email') || url.searchParams.get('e') || '');
+    const body = getBody(req) || {};
+    const token = (url.searchParams.get('token') || url.searchParams.get('t') || body.token || '').trim();
+    let email   = normalizeEmail(url.searchParams.get('email') || url.searchParams.get('e') || body.email || '');
 
-    if(!token && !email) { res.statusCode=400; return res.end('Parámetros inválidos.'); }
+    if(!token && !email) {
+      res.statusCode=400;
+      return res.end('Parámetros inválidos.');
+    }
 
     const stripe = getStripe();
     let customer = null;
@@ -528,7 +543,6 @@ async function verifyEmail(req, res){
     if (email) {
       const found = await stripe.customers.search({ query: `email:'${escapeStripeQueryValue(email)}'`, limit:1 });
       customer = found.data[0] || null;
-      if (!customer && !token) { res.statusCode=400; return res.end('Token inválido.'); }
     }
 
     // Si falta email o no encontré, pruebo por token
@@ -537,12 +551,16 @@ async function verifyEmail(req, res){
       if (customer && !email) email = normalizeEmail(customer.email || '');
     }
 
-    if(!customer){ res.statusCode=400; return res.end('Token inválido.'); }
+    // Si no encuentro cliente
+    if(!customer){
+      return invalidOrExpiredHtml(res, email);
+    }
 
     const exp = Number(customer.metadata?.taply_email_exp || '0');
     const saved = customer.metadata?.taply_email_token || '';
+
     if (!token || saved !== token || exp < Math.floor(Date.now()/1000)) {
-      res.statusCode=400; return res.end('Token inválido o caducado.');
+      return invalidOrExpiredHtml(res, email);
     }
 
     await stripe.customers.update(customer.id, { metadata: { ...(customer.metadata||{}), taply_email_verified:'1', taply_email_token:'', taply_email_exp:'' }});
@@ -575,6 +593,28 @@ async function verifyEmail(req, res){
     console.error('verifyEmail error', e?.message||e);
     res.status(500).end('Error verificando el correo.');
   }
+}
+
+function invalidOrExpiredHtml(res, email){
+  res.setHeader('Content-Type','text/html; charset=utf-8');
+  return res.end(`<!doctype html><meta charset="utf-8">
+  <title>Enlace inválido</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#0b0f1a;color:#e9eefc;display:grid;place-items:center;height:100vh;margin:0}
+    .card{background:#0e1424;border:1px solid rgba(255,255,255,.12);padding:22px;border-radius:14px;max-width:520px;text-align:center}
+    button{padding:10px 14px;border-radius:10px;background:#7c3aed;color:#fff;border:0;cursor:pointer}
+    input{width:100%;padding:8px;border-radius:8px;border:1px solid #334;background:#0b1020;color:#e9eefc}
+  </style>
+  <div class="card">
+    <h2>Enlace inválido o caducado</h2>
+    <p>Vuelve a solicitar el correo de verificación.</p>
+    <div style="margin-top:12px">
+      <input id="em" placeholder="tu@email.com" value="${email||''}" />
+    </div>
+    <div style="margin-top:12px">
+      <button onclick="(async()=>{const r=await fetch('/api/resend-verification',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('em').value})});const d=await r.json();alert(d.message||'Listo');})()">Reenviar verificación</button>
+    </div>
+  </div>`);
 }
 
 /* ===== Reenviar verificación ===== */
@@ -983,6 +1023,7 @@ export default async function handler(req, res){
       if (route === 'store-customer-from-session') return storeCustomerFromSession(req,res);
 
       if (route === 'resend-verification') return resendVerification(req,res);
+      if (route === 'verify-email') return verifyEmail(req,res); // <-- permite POST también
     }
 
     return res.status(404).json({ error:'not_found', message:'Ruta no encontrada.', route, method:req.method });

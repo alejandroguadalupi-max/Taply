@@ -4,7 +4,7 @@ import getRawBody from 'raw-body';
 
 export const config = { api: { bodyParser: false }, runtime: 'nodejs' };
 
-// envío básico por SendGrid (opcional)
+// Envío básico por SendGrid (opcional). Se recomienda dejar los emails de cliente al flujo "post-pago" para evitar duplicados.
 async function sendEmail({to, subject, html}) {
   if(!process.env.SENDGRID_API_KEY || !process.env.EMAIL_FROM || !to) return;
   const { default: sgMail } = await import('@sendgrid/mail');
@@ -42,7 +42,13 @@ export default async function handler(req, res) {
     const stripe = stripeClient();
     const sig  = req.headers['stripe-signature'];
     const raw  = await getRawBody(req);
-    const event = stripe.webhooks.constructEvent(raw, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    let event;
+    try{
+      event = stripe.webhooks.constructEvent(raw, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    }catch(err){
+      console.error('Invalid signature', err?.message || err);
+      return res.status(400).send(`Webhook Error: ${err?.message || 'invalid_signature'}`);
+    }
 
     async function upsertCustomerMeta(customerId, patch){
       try{
@@ -90,12 +96,12 @@ export default async function handler(req, res) {
           }
         }
 
-        // email simple de confirmación
-        const amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '-';
-        const title = cs.mode === 'subscription' ? 'Suscripción activada' : 'Pago recibido';
-        const html = `<h2>${title}</h2><p>Gracias por tu compra en Taply.</p><p>Importe: ${amountText}</p>`;
-        if(email) await sendEmail({ to: email, subject: `Taply — ${title}`, html });
-        if(process.env.EMAIL_FROM) await sendEmail({ to: process.env.EMAIL_FROM, subject: `Taply — ${title}`, html: `<p>${title}</p><p>Cliente: ${email || '—'}</p>` });
+        // Email de administración (el de cliente se envía desde /api/post-pago para evitar duplicados)
+        if(process.env.EMAIL_FROM){
+          const amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '-';
+          const title = cs.mode === 'subscription' ? 'Suscripción activada' : 'Pago recibido';
+          await sendEmail({ to: process.env.EMAIL_FROM, subject: `Taply — ${title}`, html: `<p>${title}</p><p>Cliente: ${email || '—'}</p><p>Importe: ${amountText}</p>` });
+        }
         break;
       }
 
@@ -129,5 +135,3 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err?.message || 'unknown'}`);
   }
 }
-
-

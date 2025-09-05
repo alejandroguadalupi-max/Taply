@@ -51,33 +51,68 @@ function redirect(res, url) {
 function redirectErr(res, from, code = "server_error") {
   redirect(res, `/suscripciones.html#google=err&code=${encodeURIComponent(code)}&from=${encodeURIComponent(from || "login")}`);
 }
+function escapeStripeQueryValue(v=''){ return String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
 
-async function verifyEmailFlow(req, res, stripe, base) {
-  const isHttps = base.startsWith("https://");
-  const url = new URL(req.url, base || "http://x");
-  const token = url.searchParams.get("token") || "";
-  const email = normalizeEmail(url.searchParams.get("email") || "");
-  if (!token || !email) {
+function invalidOrExpiredHtml(res, email=''){
+  res.setHeader('Content-Type','text/html; charset=utf-8');
+  return res.end(`<!doctype html><meta charset="utf-8">
+  <title>Enlace inválido</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#0b0f1a;color:#e9eefc;display:grid;place-items:center;height:100vh;margin:0}
+    .card{background:#0e1424;border:1px solid rgba(255,255,255,.12);padding:22px;border-radius:14px;max-width:520px;text-align:center}
+    button{padding:10px 14px;border-radius:10px;background:#7c3aed;color:#fff;border:0;cursor:pointer}
+    input{width:100%;padding:8px;border-radius:8px;border:1px solid #334;background:#0b1020;color:#e9eefc}
+  </style>
+  <div class="card">
+    <h2>Enlace inválido o caducado</h2>
+    <p>Vuelve a solicitar el correo de verificación.</p>
+    <div style="margin-top:12px">
+      <input id="em" placeholder="tu@email.com" value="${email||''}" />
+    </div>
+    <div style="margin-top:12px">
+      <button onclick="(async()=>{const r=await fetch('/api/resend-verification',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('em').value})});const d=await r.json();alert(d.message||'Listo');})()">Reenviar verificación</button>
+    </div>
+  </div>`);
+}
+
+async function verifyEmailFlow(req, res, stripe) {
+  const url = new URL(req.url, 'http://x');
+  const token = (url.searchParams.get('token') || url.searchParams.get('t') || '').trim();
+  let email   = normalizeEmail(url.searchParams.get('email') || url.searchParams.get('e') || '');
+
+  if(!token && !email){
     res.statusCode = 400;
     res.setHeader("Content-Type","text/plain; charset=utf-8");
     return res.end("Parámetros inválidos.");
   }
 
   try{
-    const safeEmail = email.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-    const found = await stripe.customers.search({ query: `email:'${safeEmail}'`, limit: 1 });
-    if(!found.data.length){ res.statusCode=400; return res.end("Token inválido."); }
+    let customer = null;
 
-    const c = found.data[0];
-    const exp = Number(c.metadata?.taply_email_exp || "0");
-    const saved = c.metadata?.taply_email_token || "";
-    if (saved !== token || exp < Math.floor(Date.now()/1000)) {
-      res.statusCode=400; return res.end("Token inválido o caducado.");
+    // 1) Si tengo email, busco por email
+    if(email){
+      const qEmail = `email:'${escapeStripeQueryValue(email)}'`;
+      const found = await stripe.customers.search({ query: qEmail, limit: 1 });
+      customer = found.data[0] || null;
     }
 
-    await stripe.customers.update(c.id, { metadata: { ...(c.metadata||{}), taply_email_verified:"1", taply_email_token:"", taply_email_exp:"" }});
+    // 2) Si no encontré por email, o no venía email, intento por token
+    if(!customer && token){
+      const qTok = `metadata['taply_email_token']:'${escapeStripeQueryValue(token)}'`;
+      const foundTok = await stripe.customers.search({ query: qTok, limit: 1 });
+      customer = foundTok.data[0] || null;
+      if(customer && !email) email = normalizeEmail(customer.email || '');
+    }
 
-    setSession(res, { email, name: c.name || null, customerId: c.id }, isHttps);
+    if(!customer) return invalidOrExpiredHtml(res, email);
+
+    const exp = Number(customer.metadata?.taply_email_exp || '0');
+    const saved = customer.metadata?.taply_email_token || '';
+    if (!token || saved !== token || exp < Math.floor(Date.now()/1000)) {
+      return invalidOrExpiredHtml(res, email);
+    }
+
+    await stripe.customers.update(customer.id, { metadata: { ...(customer.metadata||{}), taply_email_verified:'1', taply_email_token:'', taply_email_exp:'' }});
 
     const html = `<!doctype html><meta charset="utf-8">
     <title>Correo verificado</title>
@@ -122,11 +157,11 @@ export default async function handler(req, res) {
   const url = new URL(req.url, base || "http://x");
   const fromQ  = (url.searchParams.get("from") || "login").toLowerCase();
 
-  // Procesar verificación desde el correo
+  // Verificación de email (enlace desde el correo)
   if (url.searchParams.get("__verify") === "1") {
     if (!stripeSecret) { res.statusCode=500; return res.end("Config Stripe ausente."); }
     const stripe = new Stripe(stripeSecret, { apiVersion: "2024-06-20" });
-    return verifyEmailFlow(req, res, stripe, base);
+    return verifyEmailFlow(req, res, stripe);
   }
 
   // Debug
@@ -209,7 +244,7 @@ export default async function handler(req, res) {
       return redirectErr(res, from, "email_not_verified");
     }
 
-    const safeEmail = email.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const safeEmail = escapeStripeQueryValue(email);
     const found = await stripe.customers.search({ query: `email:'${safeEmail}'`, limit: 1 });
     const exists    = found.data.length ? found.data[0] : null;
     const meta      = exists?.metadata || {};
