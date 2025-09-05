@@ -347,7 +347,7 @@ async function login(req, res){
 // One-tap opcional (/api/google-login)
 async function googleLogin(req, res){
   const { credential } = getBody(req);
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   if(!credential) return res.status(400).json({ error:'missing_params' });
   if(!clientId)  return res.status(500).json({ error:'missing_google_client_id' });
 
@@ -386,17 +386,23 @@ async function googleLogin(req, res){
 
 /* ===== Google OAuth con fallbacks ===== */
 
-// GET /api/google-oauth-begin
+// GET /api/google-oauth-begin  -> redirige a Google usando callback /api/google
 async function googleOAuthBegin(req, res){
-  const cid = (process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '').trim();
-  const redirectUri = `${appBase(req)}/api/google-oauth-callback`;
+  const cid = (process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '').trim();
   if(!cid) return res.status(500).json({ error:'missing_google_client_id' });
 
-  const state = crypto.randomBytes(16).toString('hex');
+  const urlObj = new URL(req.url, 'http://x');
+  const from = (urlObj.searchParams.get('from') || 'login').toLowerCase();
+
+  // Cookie que espera tu api/google.js
+  const stateId = crypto.randomBytes(16).toString('hex');
   const isProd = process.env.NODE_ENV === 'production';
-  res.setHeader('Set-Cookie', cookie.serialize('taply_g_state', state, {
+  res.setHeader('Set-Cookie', cookie.serialize('g_state', stateId, {
     httpOnly:true, secure:isProd, sameSite:'lax', path:'/', maxAge:600
   }));
+
+  const redirectUri = `${appBase(req)}/api/google`;
+  const state = `${stateId}|${from}`;
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -412,21 +418,28 @@ async function googleOAuthBegin(req, res){
   res.end();
 }
 
-// GET /api/google-oauth-callback
+// GET /api/google-oauth-callback  (soporte si usas este callback)
 async function googleOAuthCallback(req, res){
   try{
     const url = new URL(req.url, 'http://x');
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
-    const cookieState = getCookies(req)['taply_g_state'] || '';
-    if(!code || !state || !cookieState || state !== cookieState) {
+
+    // Acepta g_state (preferida) y taply_g_state (si quedó viejo)
+    const cookies = getCookies(req);
+    const cookieState = cookies['g_state'] || cookies['taply_g_state'] || '';
+    if(!code || !state || !cookieState || !state.startsWith(cookieState)) {
       res.writeHead(302, { Location: '/suscripciones.html#google=err&code=state_error' }); return res.end();
     }
 
-    const cid = (process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '').trim();
-    const secret = (process.env.GOOGLE_OAUTH_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || '').trim();
+    const cid = (process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '').trim();
+    const secret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+    if(!cid || !secret){
+      res.writeHead(302, { Location: '/suscripciones.html#google=err&code=cfg_error' }); return res.end();
+    }
+
+    // Si por algún motivo entran aquí, este endpoint se autogestiona
     const redirectUri = `${appBase(req)}/api/google-oauth-callback`;
-    if(!cid || !secret) { res.writeHead(302, { Location: '/suscripciones.html#google=err&code=cfg_error' }); return res.end(); }
 
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -462,28 +475,9 @@ async function googleOAuthCallback(req, res){
     }
 
     setSession(res, { email, name: finalName || null, customerId });
-    const html = `<!doctype html><meta charset="utf-8">
-      <title>Conectado con Google</title>
-      <style>body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#0b0f1a;color:#e9eefc;display:grid;place-items:center;height:100vh;margin:0}
-      .card{background:#0e1424;border:1px solid rgba(255,255,255,.12);padding:22px;border-radius:14px;max-width:460px;text-align:center}
-      a{color:#9ad2ff}</style>
-      <div class="card">
-        <h2>Sesión iniciada correctamente</h2>
-        <p>Ya puedes volver a la pestaña anterior.</p>
-        <p><a href="/suscripciones.html">Ir a suscripciones</a></p>
-      </div>
-      <script>
-        (async ()=>{
-          try{
-            const r = await fetch('/api/session'); const d = await r.json();
-            localStorage.setItem('acct_user', JSON.stringify(d.user||null));
-            if(window.opener){ try{ window.opener.postMessage({type:'taply_auth_success'}, '*'); }catch{} }
-            setTimeout(()=>{ window.close(); }, 1200);
-          }catch{}
-        })();
-      </script>`;
-    res.setHeader('Content-Type','text/html; charset=utf-8');
-    res.end(html);
+    // Redirige a la página para que el JS actualice la UI
+    res.writeHead(302, { Location: '/suscripciones.html#google=ok' });
+    res.end();
   }catch(e){
     console.error('google-oauth-callback error', e?.message||e);
     res.writeHead(302, { Location: '/suscripciones.html#google=err&code=server_error' }); res.end();
@@ -622,7 +616,8 @@ async function subscriptionCancel(req, res){
   if(!sub) return res.status(400).json({ error:'no_active_subscription' });
   const atPeriodEnd = (getBody(req).at_period_end !== false);
   const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: !!atPeriodEnd });
-  return res.status(200).json({ subscription: normalizeSub(updated) });
+  const normalized = normalizeSub(updated);
+  return res.status(200).json({ subscription: normalized, cancel_effective_date: normalized.current_period_end || null });
 }
 async function subscriptionResume(req, res){
   const sess = getSessionFromCookie(req);
@@ -633,7 +628,6 @@ async function subscriptionResume(req, res){
   const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: false });
   return res.status(200).json({ subscription: normalizeSub(updated) });
 }
-
 
 // SWAP diferido (programa el cambio al final del ciclo)
 async function subscriptionSwap(req, res){
@@ -888,6 +882,14 @@ async function session(req, res){
       current_period_start: sub?.current_period_start || null,
       nfc_qty: nfcQty,
       next_period_anchor_guess: nextGuess,
+      cancel_effective_date: sub?.cancel_at_period_end ? (sub?.current_period_end || nextGuess || null) : null,
+      // datos para UI de “cambiará a…”
+      scheduled_change: upcoming ? {
+        upcoming_price_id: upcoming.upcoming_price_id || null,
+        upcoming_price_nickname: upcoming.upcoming_price_nickname || null,
+        upcoming_start_date: upcoming.upcoming_start_date || null
+      } : null,
+      // campos legacy por compatibilidad con el HTML anterior
       upcoming_price_id: upcoming?.upcoming_price_id || null,
       upcoming_price_nickname: upcoming?.upcoming_price_nickname || null,
       upcoming_start_date: upcoming?.upcoming_start_date || null
@@ -911,6 +913,7 @@ export default async function handler(req, res){
       if (route === 'session') return session(req,res);
       if (route === 'google-oauth-begin') return googleOAuthBegin(req,res);
       if (route === 'google-oauth-callback') return googleOAuthCallback(req,res);
+      if (route === 'google') return googleOAuthCallback(req,res); // compat si no usas api/google.js
       if (route === 'verify-email') return verifyEmail(req,res);
     }
 
