@@ -26,7 +26,6 @@
     .brand{font-weight:800;display:flex;align-items:center;gap:8px;justify-content:space-between}
     .logo-img{width:34px;height:34px;border-radius:10px;object-fit:cover;display:block}
 
-    /* ===== Banner superior ===== */
     .banner{display:none}
     .banner.show{display:block}
     .banner .box{
@@ -112,7 +111,6 @@
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .acct-actions{display:grid;gap:10px}
 
-    /* ——— plan + NFC ——— */
     .plan-badge{
       display:inline-flex;align-items:center;gap:8px;padding:12px 16px;border-radius:999px;
       background:linear-gradient(135deg,#22c55e,#00d4ff);color:#061017;font-weight:900;
@@ -138,7 +136,6 @@
       <span id="acct-nav-slot" style="position:relative"></span>
     </nav>
   </div>
-  <!-- Banner superior -->
   <div id="top-banner" class="banner"><div class="box" id="top-banner-text"></div></div>
 </header>
 
@@ -218,7 +215,7 @@
     </article>
   </div>
 
-  <!-- CTA gestionar suscripción (Stripe Portal) DEBAJO de las tarjetas -->
+  <!-- CTA gestionar suscripción (Stripe Portal) bajo las tarjetas -->
   <div class="container" style="text-align:center;margin-top:16px">
     <button id="portalBtn" class="btn acct-guard">Gestionar suscripción</button>
     <p class="acct-small">Cambia de plan, actualiza tarjeta o cancela desde el Portal seguro de Stripe.</p>
@@ -234,8 +231,14 @@
         <div id="acct-status" class="plan-badge">Sesión no iniciada</div>
         <div id="acct-nfc" class="nfc-chip">NFC comprados: 0</div>
       </div>
-      <!-- (Se eliminó el botón/link a gestionar.html) -->
     </div>
+
+    <!-- CTA solo si hay sesión + suscripción activa -->
+    <div id="acct-portal-row" style="display:none; margin-top:14px; text-align:left">
+      <button id="portalBtnAccount" class="btn">Gestionar suscripción</button>
+      <p class="acct-small">Abre el Portal de Stripe para cambiar plan, tarjeta o cancelar.</p>
+    </div>
+
     <p id="acct-auth-cta" class="acct-small" style="margin-top:10px;display:none">
       ¿No tienes cuenta?
       <a id="acct-open-from-section" class="badge" style="cursor:pointer">Inicia sesión o regístrate</a>
@@ -336,9 +339,8 @@
   </div>
 </div>
 
-<!-- === PÁGINA (precios + auth + google flow) === -->
 <script>
-  // ----------- UI precios / NFC -----------
+  // ----------- Utilidades UI ----------- 
   const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
   const fmt = v => new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(v);
   window.addEventListener('load',()=>document.body.classList.add('is-loaded'));
@@ -373,27 +375,23 @@
   $('#btn-year').addEventListener('click',()=>{yearly=true;$('#btn-year').classList.add('active');$('#btn-month').classList.remove('active');$('#btn-year').setAttribute('aria-selected','true');$('#btn-month').setAttribute('aria-selected','false');paintPrices()});
   paintPrices();
 
-  // ----------- AUTH + Google flow -----------
+  // ----------- AUTH + session ----------- 
   (function(){
     const S = { user:null, polling:null };
-
-    const saveUser=u=>{ try{ localStorage.setItem('acct_user',u?JSON.stringify(u):""); }catch(e){} };
-    const readUser=()=>{ try{ const v=localStorage.getItem('acct_user')||''; return v?JSON.parse(v):null; }catch(e){ return null; } };
-
     const modal = $('#acct-modal'), title = $('#acct-title'), sub = $('#acct-sub');
     const forms = { login:$('#acct-form-login'), register:$('#acct-form-register'), recover:$('#acct-form-recover') };
     const errs  = { login:$('#acct-error-login'), register:$('#acct-error-register'), recover:$('#acct-error-recover') };
     const oks   = { login:$('#acct-info-login'), register:$('#acct-info-register'), recover:$('#acct-info-recover') };
 
-    function getInterval(u){ return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase(); }
-    function addDays(date, days){ const x=new Date(date); x.setDate(x.getDate()+days); return x; }
-    function computeNextRenewal30(u){
-      const start = u?.subscription?.current_period_start || u?.subscription_start || u?.subscription_created;
-      if(!start) return null;
-      const startDate = typeof start==='number' ? new Date(start*1000) : new Date(start);
-      return getInterval(u)==='year' ? addDays(startDate,365) : addDays(startDate,30);
+    const readUser=()=>{ try{ const v=localStorage.getItem('acct_user')||''; return v?JSON.parse(v):null; }catch(e){ return null; } };
+    function setUser(u){
+      S.user = u || null;
+      try { localStorage.setItem('acct_user', u ? JSON.stringify(u) : ""); } catch(e){}
+      window.taplyAuth = window.taplyAuth || {}; window.taplyAuth.user = S.user;
     }
 
+    function getInterval(u){ return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase(); }
+    function addDays(date, days){ const x=new Date(date); x.setDate(x.getDate()+days); return x; }
     function prettyPlan(u){
       const nick = (u?.subscription?.price?.nickname || u?.subscription?.plan?.nickname || '').trim();
       if(nick) return nick;
@@ -422,10 +420,10 @@
       Object.values(errs).forEach(x=>x&&(x.style.display='none'));
       Object.values(oks).forEach(x=>x&&(x.style.display='none'));
     }
-    function openModal(tab='login'){ modal.classList.remove('acct-hidden'); setTab(tab); setTimeout(()=>$('#acct-login-email')?.focus(),40); }
-    function closeModal(){ modal.classList.add('acct-hidden'); Object.values(errs).forEach(e=>e&&(e.style.display='none')); Object.values(oks).forEach(e=>e&&(e.style.display='none')); }
+    function openModal(tab='login'){ $('#acct-modal').classList.remove('acct-hidden'); setTab(tab); setTimeout(()=>$('#acct-login-email')?.focus(),40); }
+    function closeModal(){ $('#acct-modal').classList.add('acct-hidden'); Object.values(errs).forEach(e=>e&&(e.style.display='none')); Object.values(oks).forEach(e=>e&&(e.style.display='none')); }
     document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
-    modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
+    $('#acct-modal').addEventListener('click', e=>{ if(e.target===$('#acct-modal')) closeModal(); });
     $('#acct-open-from-section')?.addEventListener('click', ()=> openModal('login'));
     document.querySelectorAll('#acct-modal .acct-tab').forEach(b=> b.addEventListener('click', ()=> setTab(b.dataset.tab)));
     $('#link-forgot')?.addEventListener('click', ()=> setTab('recover'));
@@ -446,13 +444,6 @@
       return data;
     }
 
-    function setUser(u){
-      S.user = u || null;
-      try { localStorage.setItem('acct_user', u ? JSON.stringify(u) : ""); } catch(e){}
-      window.taplyAuth = window.taplyAuth || {}; window.taplyAuth.user = S.user;
-    }
-
-    // Recover: mostrar error si el email no existe
     forms.recover?.addEventListener('submit', async e=>{
       e.preventDefault(); errs.recover.style.display='none'; oks.recover.style.display='none';
       const email=$('#acct-recover-email').value.trim();
@@ -461,11 +452,8 @@
         oks.recover.textContent = d?.message || 'Te hemos enviado un enlace (caduca en 1 hora).';
         oks.recover.style.display='block';
       }catch(err){
-        if(err.code==='account_not_found'){
-          errs.recover.textContent='No existe ninguna cuenta con ese correo.';
-        }else{
-          errs.recover.textContent=err.message||'No se pudo enviar el enlace.';
-        }
+        if(err.code==='account_not_found'){ errs.recover.textContent='No existe ninguna cuenta con ese correo.'; }
+        else { errs.recover.textContent=err.message||'No se pudo enviar el enlace.'; }
         errs.recover.style.display='block';
       }
     });
@@ -533,7 +521,6 @@
       }
     });
 
-    // Google OAuth en esta pestaña
     function startGooglePolling(){
       if(S.polling) clearInterval(S.polling);
       let tries=0;
@@ -567,7 +554,6 @@
     bindGoogle('btn-google-login','login');
     bindGoogle('btn-google-register','register');
 
-    // Menú / sesión (sin enlace a gestionar.html)
     function paintNav(){
       const slot=document.querySelector('#acct-nav-slot');
       const htmlAnon = `<a class="btn ghost" id="acct-open-nav">Iniciar sesión</a>`;
@@ -594,15 +580,19 @@
 
     function paintAccountSection(){
       const statusEl = $('#acct-status'), nfcEl = $('#acct-nfc'), authCta = $('#acct-auth-cta');
+      const portalRow = $('#acct-portal-row');
       if(!S.user){
         statusEl.textContent='Sesión no iniciada';
         nfcEl.textContent='NFC comprados: 0';
         if(authCta) authCta.style.display='block';
+        if(portalRow) portalRow.style.display='none';
         return;
       }
       if(authCta) authCta.style.display='none';
       statusEl.textContent = isSubActive(S.user) ? prettyPlan(S.user) : 'Sin plan activo';
       const qty = Number(S.user.nfc_qty || 0); nfcEl.textContent = `NFC comprados: ${qty}`;
+      // Mostrar botón de portal SOLO si hay suscripción activa
+      if(portalRow) portalRow.style.display = isSubActive(S.user) ? 'block' : 'none';
     }
 
     async function forceSessionRefresh(retries=4, delay=600){
@@ -641,8 +631,7 @@
     function msgFromGoogleCode(code, from){
       const isReg = from==='register';
       switch(code){
-        case 'email_in_use_password':
-          return isReg ? 'Ese correo ya está registrado con contraseña. Inicia sesión con correo y contraseña.' : 'Esa cuenta no está vinculada a Google. Inicia con correo y contraseña.';
+        case 'email_in_use_password': return isReg ? 'Ese correo ya está registrado con contraseña. Inicia sesión con correo y contraseña.' : 'Esa cuenta no está vinculada a Google. Inicia con correo y contraseña.';
         case 'email_in_use_google': return 'Ese correo ya está registrado con Google. Inicia sesión con Google.';
         case 'email_in_use': return isReg ? 'Ese correo ya existe. Inicia sesión.' : 'Ese correo ya existe.';
         case 'not_registered': return 'No existe ninguna cuenta con ese correo. Regístrate primero.';
@@ -681,7 +670,6 @@
       try{ const data=await api('GET','/api/session'); setUser(data?.user||null); }catch{ setUser(cached||null); }
       paintNav(); paintAccountSection();
 
-      // Gating: si no hay sesión, abrir modal al pulsar botones con .acct-guard
       document.body.addEventListener('click',(e)=>{
         const g=e.target.closest('.acct-guard'); if(g && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); }
       }, true);
@@ -689,7 +677,6 @@
       await handleSignals();
     }
 
-    // Sync entre pestañas
     window.addEventListener('storage', e=>{
       if(e.key==='acct_user'){
         try{ setUser(e.newValue ? JSON.parse(e.newValue) : null); }catch{ setUser(null); }
@@ -697,37 +684,45 @@
       }
     });
 
-    // Abrir Portal de Stripe
+    // --- Abrir Portal de Stripe (con fallback a tu URL pública de Stripe) ---
     async function openPortal(){
       try{
         const res = await fetch('/api/portal', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include' });
         const data = await res.json();
-        if(!res.ok || !data?.url){ alert(data?.error || 'No se pudo abrir el portal.'); return; }
-        location.href = data.url;
-      }catch{ alert('Error de red abriendo el portal.'); }
+        if(res.ok && data?.url){ location.href = data.url; return; }
+      }catch{}
+      // Fallback directo al portal de Stripe que pasaste
+      location.href = 'https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00';
     }
+    // Botón del panel de planes
     document.getElementById('portalBtn')?.addEventListener('click', async (e)=>{
       if(!S.user){ e.preventDefault(); openModal('login'); return; }
       await openPortal();
     });
+    // Botón dentro de la card "Mi suscripción"
+    document.getElementById('portalBtnAccount')?.addEventListener('click', async (e)=>{
+      if(!S.user){ e.preventDefault(); openModal('login'); return; }
+      await openPortal();
+    });
 
-    // Arranque
     getSession();
   })();
 
-  // -------- Pago suscripciones (requiere sesión) -----------
+  // -------- Pago suscripciones --------
   $$('.btn.plan').forEach(btn => btn.addEventListener('click', async () => {
     const tier = btn.dataset.tier;
     const frequency = (document.querySelector('#btn-year')?.classList.contains('active')) ? 'annual' : 'monthly';
 
-    // Si ya tiene plan, sugerimos portal
     if (window.taplyAuth?.user && (window.taplyAuth.user.subscription || window.taplyAuth.user.isSubscribed)) {
       if (confirm('Ya tienes una suscripción activa. ¿Quieres abrir el portal para gestionarla?')) {
         try{
           const r=await fetch('/api/portal',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include'});
           const d=await r.json(); if(r.ok && d?.url){ location.href=d.url; return; }
-          alert(d?.error || 'No se pudo abrir el portal.');
-        }catch{ alert('Error de red al abrir el portal.'); }
+          // Fallback
+          location.href='https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00';
+        }catch{
+          location.href='https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00';
+        }
       }
       return;
     }
@@ -745,7 +740,7 @@
     } catch { alert('Error de red al iniciar la suscripción'); }
   }));
 
-  // Pago NFC (requiere sesión)
+  // -------- Pago NFC --------
   document.getElementById('buyNfcBtn').addEventListener('click', async () => {
     try {
       const res = await fetch('/api/buy-nfc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ quantity: qty }) });
