@@ -26,6 +26,18 @@
     .brand{font-weight:800;display:flex;align-items:center;gap:8px;justify-content:space-between}
     .logo-img{width:34px;height:34px;border-radius:10px;object-fit:cover;display:block}
 
+    /* ===== Banner superior ===== */
+    .banner{display:none}
+    .banner.show{display:block}
+    .banner .box{
+      margin:10px auto 0; width:92%; max-width:1100px;
+      background:linear-gradient(135deg, rgba(34,197,94,.15), rgba(0,212,255,.12));
+      border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:12px 14px;
+      box-shadow:var(--shadow); color:#d9ffe6; font-weight:700; text-align:center
+    }
+    .banner.err .box{ background:linear-gradient(135deg, rgba(239,68,68,.18), rgba(124,58,237,.12)); color:#ffe0e0 }
+    .banner.warn .box{ background:linear-gradient(135deg, rgba(245,158,11,.18), rgba(124,58,237,.10)); color:#fff5d6 }
+
     .hero{text-align:center;padding:40px 0 24px}
     .h1{font-size:clamp(2rem,5.5vw,3.2rem);margin:0;font-weight:800}
     .lead{color:var(--muted);max-width:860px;margin:12px auto 0}
@@ -126,6 +138,8 @@
       <span id="acct-nav-slot" style="position:relative"></span>
     </nav>
   </div>
+  <!-- Banner superior -->
+  <div id="top-banner" class="banner"><div class="box" id="top-banner-text"></div></div>
 </header>
 
 <section class="hero">
@@ -266,7 +280,8 @@
 
         <div class="acct-actions">
           <button type="submit" class="btn">Iniciar sesión</button>
-          <a id="btn-google-login" href="/api/google-oauth-begin?from=login" class="btn btn-google">Continuar con Google</a>
+          <!-- IMPORTANTE: usamos tu endpoint unificado /api/google -->
+          <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google">Continuar con Google</a>
           <p id="acct-error-login" class="acct-err" style="display:none"></p>
           <p id="acct-info-login" class="acct-ok" style="display:none"></p>
         </div>
@@ -295,7 +310,8 @@
         <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
         <div class="acct-actions">
           <button type="submit" class="btn">Crear cuenta</button>
-          <a id="btn-google-register" href="/api/google-oauth-begin?from=register" class="btn btn-google">Registrarme con Google</a>
+          <!-- IMPORTANTE: usamos tu endpoint unificado /api/google -->
+          <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google">Registrarme con Google</a>
           <p id="acct-error-register" class="acct-err" style="display:none"></p>
           <p id="acct-info-register" class="acct-ok" style="display:none"></p>
         </div>
@@ -360,9 +376,8 @@
     const S = { user:null, polling:null };
 
     const fmtDate = (d)=> new Intl.DateTimeFormat('es-ES',{dateStyle:'medium'}).format(d);
-    const KEY='acct_user';
-    const saveUser=u=>{ try{ localStorage.setItem(KEY,u?JSON.stringify(u):""); }catch(e){} };
-    const readUser=()=>{ try{ const v=localStorage.getItem(KEY)||''; return v?JSON.parse(v):null; }catch(e){ return null; } };
+    const saveUser=u=>{ try{ localStorage.setItem('acct_user',u?JSON.stringify(u):""); }catch(e){} };
+    const readUser=()=>{ try{ const v=localStorage.getItem('acct_user')||''; return v?JSON.parse(v):null; }catch(e){ return null; } };
 
     const modal = $('#acct-modal'), title = $('#acct-title'), sub = $('#acct-sub');
     const forms = { login:$('#acct-form-login'), register:$('#acct-form-register'), recover:$('#acct-form-recover') };
@@ -378,7 +393,6 @@
       return getInterval(u)==='year' ? addDays(startDate,365) : addDays(startDate,30);
     }
 
-    // === Mostrar nombre de plan si Stripe trae nickname ===
     function prettyPlan(u){
       const nick = (u?.subscription?.price?.nickname || u?.subscription?.plan?.nickname || '').trim();
       if(nick) return nick;
@@ -448,7 +462,9 @@
       if(!email) return;
       try{
         await api('POST','/api/resend-verification',{email});
+        // Muestra aviso tanto en login como en register
         oks.login.textContent='Te hemos reenviado el correo de verificación.'; oks.login.style.display='block';
+        oks.register.textContent='Te hemos reenviado el correo de verificación.'; oks.register.style.display='block';
       }catch(e){}
     }
 
@@ -480,9 +496,17 @@
       if(p1.length<6){ errs.register.textContent='La contraseña debe tener al menos 6 caracteres.'; errs.register.style.display='block'; return; }
       if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
       try{
-        const data=await api('POST','/api/register',{name,email,password:p1});
-        oks.register.textContent = `Te hemos enviado un correo de verificación a ${email}. Sigue el enlace para activar tu cuenta.`;
+        await api('POST','/api/register',{name,email,password:p1});
+        // Aviso completo + accesos rápidos y reenvío
+        oks.register.innerHTML = `
+          Te hemos enviado un correo de verificación a <strong>${email}</strong>. Abre ese correo y pulsa “Confirmar”.
+          <br><br>
+          <a href="https://mail.google.com/" target="_blank" rel="noopener" class="badge">Abrir Gmail</a>
+          <a href="https://outlook.live.com/mail/0/inbox" target="_blank" rel="noopener" class="badge">Abrir Outlook</a>
+          <a id="resend-verif" class="badge" style="cursor:pointer">Reenviar verificación</a>
+        `;
         oks.register.style.display='block';
+        setTimeout(()=>{ document.getElementById('resend-verif')?.addEventListener('click',()=>resendVerification(email)); },0);
       }catch(err){
         errs.register.textContent=(err==='email_in_use_google')?'Ese correo ya existe como cuenta Google. Inicia sesión con Google.':
                                  (err==='email_in_use')?'Ese correo ya tiene una cuenta. Inicia sesión.':
@@ -492,7 +516,7 @@
       }
     });
 
-    // -------- Google OAuth en la misma pestaña (sin GIS) --------
+    // -------- Google OAuth en la misma pestaña (tu endpoint /api/google) --------
     function startGooglePolling(){
       if(S.polling) clearInterval(S.polling);
       let tries=0;
@@ -518,7 +542,7 @@
         e.preventDefault();
         e.stopImmediatePropagation();
         try{ startGooglePolling(); }catch{}
-        location.href = `/api/google-oauth-begin?from=${encodeURIComponent(from)}`;
+        location.href = `/api/google?from=${encodeURIComponent(from)}`;
         return false;
       };
       el.addEventListener('click', handler, true);
@@ -580,29 +604,75 @@
       }
     }
 
-    // Señales de Google si vuelves con ?google=...
-    function parseSignal(){
-      const params = new URLSearchParams(location.search.replace(/^\?/,'')); 
-      const hashParams = new URLSearchParams((location.hash||'').replace(/^#/, '').replace(/;/g,'&'));
+    // ------- Señales (Google + verificación email) -------
+    function readParams(){
+      const h = new URLSearchParams((location.hash||'').replace(/^#/, '').replace(/;/g,'&'));
+      const q = new URLSearchParams(location.search.replace(/^\?/,''));
       return {
-        google: params.get('google') || hashParams.get('google'),
-        from: (params.get('from') || hashParams.get('from') || 'login').toLowerCase(),
+        google: h.get('google') || q.get('google') || null,
+        from: (h.get('from') || q.get('from') || 'login').toLowerCase(),
+        code: h.get('code') || q.get('code') || null,
+        emailVerified: (h.get('email') === 'verified') || (q.get('email') === 'verified')
       };
     }
-    async function handleGoogleSignal(){
-      const sig = parseSignal();
-      if(!sig.google) return;
-      if (sig.google === 'ok') {
+    function showTopBanner(text, type='ok'){
+      const b = document.getElementById('top-banner');
+      const t = document.getElementById('top-banner-text');
+      if(!b||!t) return;
+      b.classList.remove('err','warn'); if(type!=='ok') b.classList.add(type);
+      t.innerHTML = text; b.classList.add('show');
+    }
+    function clearUrl(){ try{ history.replaceState(null,'',location.pathname); }catch{} }
+
+    function msgFromGoogleCode(code, from){
+      const isReg = from==='register';
+      switch(code){
+        case 'email_in_use_password':
+          return isReg
+            ? 'Ese correo ya está registrado con contraseña. Inicia sesión con correo y contraseña.'
+            : 'Esa cuenta no está vinculada a Google. Inicia con correo y contraseña.';
+        case 'email_in_use_google':
+          return 'Ese correo ya está registrado con Google. Inicia sesión con Google.';
+        case 'email_in_use':
+          return isReg ? 'Ese correo ya existe. Inicia sesión.' : 'Ese correo ya existe.';
+        case 'not_registered':
+          return 'No existe ninguna cuenta con ese correo. Regístrate primero.';
+        case 'email_not_verified':
+          return 'Tu correo de Google no está verificado.';
+        case 'google_auth_failed':
+          return 'No se pudo conectar con Google. Inténtalo de nuevo.';
+        case 'state_error':
+        case 'server_error':
+        default:
+          return 'No se pudo completar con Google. Inténtalo de nuevo.';
+      }
+    }
+
+    async function handleSignals(){
+      const s = readParams();
+
+      // 1) Email verificado
+      if(s.emailVerified){
         await forceSessionRefresh();
-      } else if (sig.google === 'err') {
-        openModal(sig.from === 'register' ? 'register' : 'login');
-        const target = (sig.from === 'register') ? errs.register : errs.login;
-        if (target){
-          target.textContent = 'No se pudo completar con Google. Inténtalo de nuevo.';
+        showTopBanner('¡Correo verificado! Tu cuenta está activada. 🎉', 'ok');
+        clearUrl();
+      }
+
+      // 2) Google
+      if(!s.google) return;
+      if(s.google==='ok'){
+        await forceSessionRefresh();
+        showTopBanner('Sesión iniciada con Google.', 'ok');
+      }else{
+        // Mostrar error contextual en el modal correcto
+        openModal(s.from === 'register' ? 'register' : 'login');
+        const target = (s.from === 'register') ? errs.register : errs.login;
+        if(target){
+          target.textContent = msgFromGoogleCode(s.code, s.from);
           target.style.display = 'block';
         }
       }
-      history.replaceState(null,'',location.pathname);
+      clearUrl();
     }
 
     async function getSession(){
@@ -615,7 +685,7 @@
         const g=e.target.closest('.acct-guard'); if(g && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); }
       }, true);
 
-      await handleGoogleSignal();
+      await handleSignals();
     }
 
     // Sync entre pestañas
@@ -664,3 +734,4 @@
 </script>
 </body>
 </html>
+
