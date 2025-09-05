@@ -264,7 +264,7 @@ async function register(req, res){
   const email = normalizeEmail(rawEmail);
   const { password, name } = getBody(req);
   if(!email || !password || !name) return res.status(400).json({ error:'name_email_password_required' });
-  if(password.length < 6) return res.status(400).json({ error:'weak_password' });
+  if(password.length < 6) return res.status(400).json({ error:'contraseña vulnerable' });
 
   const stripe = getStripe();
   const q = `email:'${escapeStripeQueryValue(email)}'`;
@@ -324,7 +324,7 @@ async function login(req, res){
   const rawEmail = getBody(req).email;
   const email = normalizeEmail(rawEmail);
   const { password } = getBody(req);
-  if(!email || !password) return res.status(400).json({ error:'email_and_password_required' });
+  if(!email || !password) return res.status(400).json({ error:'Ponga su email y contraseña' });
   const stripe = getStripe();
   const q = `email:'${escapeStripeQueryValue(email)}'`;
   const found = await stripe.customers.search({ query: q, limit: 1 });
@@ -953,7 +953,7 @@ export default async function handler(req, res){
 /* ===== Recuperación contraseña (helpers) ===== */
 async function requestPasswordReset(req, res){
   const email = normalizeEmail(getBody(req).email);
-  if(!email) return res.status(400).json({ error:'email_required' });
+  if(!email) return res.status(400).json({ error:'ponga el email' });
 
   const stripe = getStripe();
   const q = `email:'${escapeStripeQueryValue(email)}'`;
