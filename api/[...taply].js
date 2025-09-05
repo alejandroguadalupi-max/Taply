@@ -1003,3 +1003,4 @@ async function resetPassword(req, res){
   await stripe.customers.update(customer.id, { metadata: { ...meta, taply_pass_hash: hash, taply_reset_token: '', taply_reset_exp: '' }});
   return res.status(200).json({ ok:true });
 }
+
