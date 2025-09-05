@@ -254,6 +254,7 @@ async function register(req, res){
   const { email:rawEmail, password, name } = getBody(req);
   const email = normalizeEmail(rawEmail);
 
+  // Validación de presencia (primero)
   const fieldErrors = {};
   if(!name) fieldErrors.name = 'El nombre es obligatorio.';
   if(!email) fieldErrors.email = 'El correo es obligatorio.';
@@ -262,6 +263,7 @@ async function register(req, res){
     return res.status(422).json({ error:'validation_error', message:'Revisa los campos obligatorios.', fieldErrors });
   }
 
+  // Buscar email (prioridad errores graves)
   const stripe = getStripe();
   const found = await stripe.customers.search({ query: `email:'${escapeStripeQueryValue(email)}'`, limit: 1 });
   const exists = found.data[0];
@@ -276,8 +278,10 @@ async function register(req, res){
     if(isVerified){
       return res.status(409).json({ error:'email_in_use', message:'Este correo ya está registrado y verificado.' });
     }
+    // si existe pero NO verificado -> continuamos (se “resetea”)
   }
 
+  // Fuerza mínima de contraseña (después de comprobar email en uso)
   if(String(password).length < 6){
     return res.status(422).json({ error:'weak_password', message:'La contraseña es demasiado corta (mínimo 6 caracteres).' });
   }
@@ -312,7 +316,8 @@ async function register(req, res){
     });
   }
 
-  const verifyUrl = `${appBase(req)}/api/google?__verify=1&token=${encodeURIComponent(verifyToken)}&email=${encodeURIComponent(email)}`;
+  // Enlace de verificación robusto (con token+email)
+  const verifyUrl = `${appBase(req)}/api/verify-email?token=${encodeURIComponent(verifyToken)}&email=${encodeURIComponent(email)}`;
   const tpl = makeVerifyEmailUI({ name, verifyUrl });
   await sendEmail({ to: email, subject: tpl.subject, html: tpl.html });
 
@@ -339,6 +344,7 @@ async function login(req, res){
   const customer = found.data[0];
   const meta = customer.metadata || {};
 
+  // Si NO está verificado, actúa como si no existiera
   if (meta.taply_email_verified !== '1') {
     return res.status(404).json({ error:'account_not_found', message:'No encontramos ninguna cuenta con ese correo.' });
   }
@@ -353,7 +359,7 @@ async function login(req, res){
   return res.status(200).json({ user:{ email, name: customer.name || null, customerId: customer.id }});
 }
 
-/* ===== Google One-tap opcional ===== */
+/* ===== Google One-tap opcional (no cambia) ===== */
 async function googleLogin(req, res){
   const { credential } = getBody(req);
   const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -397,7 +403,7 @@ async function googleLogin(req, res){
   }
 }
 
-/* ===== Google OAuth + compat ===== */
+/* ===== Google OAuth begin/callback (compat) ===== */
 async function googleOAuthBegin(req, res){
   const cid = (process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '').trim();
   if(!cid) return res.status(500).json({ error:'missing_google_client_id', message:'Falta la configuración de Google.' });
@@ -494,27 +500,53 @@ async function googleOAuthCallback(req, res){
   }
 }
 
-/* ===== Verificación de email (token + email) ===== */
+/* ===== Verificación de email (acepta token+email o sólo token) ===== */
+async function findCustomerByVerifyToken(stripe, token){
+  try{
+    const q = `metadata['taply_email_token']:'${escapeStripeQueryValue(token)}'`;
+    const found = await stripe.customers.search({ query: q, limit: 1 });
+    return found.data[0] || null;
+  }catch(e){
+    console.error('findCustomerByVerifyToken error', e?.message||e);
+    return null;
+  }
+}
+
+// GET /api/verify-email  y también /api/google?__verify=1
 async function verifyEmail(req, res){
   try{
     const url = new URL(req.url, 'http://x');
-    const token = url.searchParams.get('token') || '';
-    const email = normalizeEmail(url.searchParams.get('email') || '');
-    if(!token || !email) { res.statusCode=400; return res.end('Parámetros inválidos.'); }
+    const token = url.searchParams.get('token') || url.searchParams.get('t') || '';
+    let email   = normalizeEmail(url.searchParams.get('email') || url.searchParams.get('e') || '');
+
+    if(!token && !email) { res.statusCode=400; return res.end('Parámetros inválidos.'); }
 
     const stripe = getStripe();
-    const found = await stripe.customers.search({ query: `email:'${escapeStripeQueryValue(email)}'`, limit:1 });
-    if(!found.data.length){ res.statusCode=400; return res.end('Token inválido.'); }
+    let customer = null;
 
-    const c = found.data[0];
-    const exp = Number(c.metadata?.taply_email_exp || '0');
-    const saved = c.metadata?.taply_email_token || '';
-    if (saved !== token || exp < Math.floor(Date.now()/1000)) {
+    // Si tengo email, pruebo por email
+    if (email) {
+      const found = await stripe.customers.search({ query: `email:'${escapeStripeQueryValue(email)}'`, limit:1 });
+      customer = found.data[0] || null;
+      if (!customer && !token) { res.statusCode=400; return res.end('Token inválido.'); }
+    }
+
+    // Si falta email o no encontré, pruebo por token
+    if (!customer && token) {
+      customer = await findCustomerByVerifyToken(stripe, token);
+      if (customer && !email) email = normalizeEmail(customer.email || '');
+    }
+
+    if(!customer){ res.statusCode=400; return res.end('Token inválido.'); }
+
+    const exp = Number(customer.metadata?.taply_email_exp || '0');
+    const saved = customer.metadata?.taply_email_token || '';
+    if (!token || saved !== token || exp < Math.floor(Date.now()/1000)) {
       res.statusCode=400; return res.end('Token inválido o caducado.');
     }
 
-    await stripe.customers.update(c.id, { metadata: { ...(c.metadata||{}), taply_email_verified:'1', taply_email_token:'', taply_email_exp:'' }});
-    setSession(res, { email, name: c.name || null, customerId: c.id });
+    await stripe.customers.update(customer.id, { metadata: { ...(customer.metadata||{}), taply_email_verified:'1', taply_email_token:'', taply_email_exp:'' }});
+    setSession(res, { email, name: customer.name || null, customerId: customer.id });
 
     const html = `<!doctype html><meta charset="utf-8">
       <title>Correo verificado</title>
@@ -543,6 +575,361 @@ async function verifyEmail(req, res){
     console.error('verifyEmail error', e?.message||e);
     res.status(500).end('Error verificando el correo.');
   }
+}
+
+/* ===== Reenviar verificación ===== */
+async function resendVerification(req, res){
+  const email = normalizeEmail(getBody(req).email);
+  if(!email) return res.status(422).json({ error:'validation_error', message:'El correo es obligatorio.', fieldErrors:{ email:'El correo es obligatorio.' } });
+
+  try{
+    const stripe = getStripe();
+    const found = await stripe.customers.search({ query: `email:'${escapeStripeQueryValue(email)}'`, limit:1 });
+    if(!found.data.length) return res.status(200).json({ ok:true, message:'Si el correo existe, enviaremos un enlace de verificación.' });
+
+    const c = found.data[0];
+    if (c.metadata?.taply_email_verified === '1') return res.status(200).json({ ok:true, message:'Tu correo ya estaba verificado.' });
+
+    const token = crypto.randomBytes(24).toString('hex');
+    const exp   = Math.floor(Date.now()/1000) + EMAIL_VERIFY_TTL_SECONDS;
+    await stripe.customers.update(c.id, { metadata: { ...(c.metadata||{}), taply_email_token: token, taply_email_exp: String(exp) }});
+
+    const verifyUrl = `${appBase(req)}/api/verify-email?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+    const tpl = makeVerifyEmailUI({ name: c.name || null, verifyUrl });
+    await sendEmail({ to: email, subject: tpl.subject, html: tpl.html });
+
+    return res.status(200).json({ ok:true, message:'Te enviamos un nuevo enlace de verificación.' });
+  }catch(e){
+    console.error('resendVerification error', e?.message||e);
+    return res.status(500).json({ error:'server_error', message:'No pudimos reenviar el correo de verificación.' });
+  }
+}
+
+/* ===== Portal + Subscriptions + Checkout ===== */
+async function getUpcomingPhaseInfo(stripe, sub){
+  try{
+    if(!sub?.schedule) return null;
+    const schedule = await stripe.subscriptionSchedules.retrieve(sub.schedule, { expand: ['phases.items.price'] });
+    const now = Math.floor(Date.now()/1000);
+    const next = (schedule?.phases || []).find(p => (p.start_date||0) > now) || null;
+    if(!next) return null;
+    const item = next.items?.[0];
+    const price = item?.price;
+    return {
+      upcoming_start_date: next.start_date || null,
+      upcoming_price_id: price?.id || null,
+      upcoming_price_nickname: price?.nickname || null
+    };
+  }catch{ return null; }
+}
+
+async function createPortalSession(req, res){
+  const sess = getSessionFromCookie(req);
+  if(!sess) return res.status(401).json({ error:'auth_required', message:'Debes iniciar sesión.' });
+  const stripe = getStripe();
+  const customerId = await ensureCustomerId(stripe, sess);
+  if(!customerId) return res.status(401).json({ error:'auth_required', message:'Debes iniciar sesión.' });
+
+  const best = await getBestSubscription(stripe, customerId);
+  if(!best || !['active','trialing','past_due'].includes(best.status)){
+    return res.status(400).json({ error:'no_active_subscription', message:'No tienes ninguna suscripción activa.' });
+  }
+
+  try{
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: customerId, return_url: appBase(req) + '/gestionar.html'
+    });
+    return res.status(200).json({ url: portal.url });
+  }catch(e){
+    console.error('createPortalSession error:', e?.message || e);
+    return res.status(500).json({ error:'portal_unavailable', message:'El portal de facturación no está disponible.' });
+  }
+}
+
+async function subscriptionCancel(req, res){
+  const sess = getSessionFromCookie(req);
+  if(!sess) return res.status(401).json({ error:'auth_required', message:'Debes iniciar sesión.' });
+  const stripe = getStripe();
+  const sub = await getBestSubscription(stripe, sess.customerId);
+  if(!sub) return res.status(400).json({ error:'no_active_subscription', message:'No tienes ninguna suscripción activa.' });
+  const atPeriodEnd = (getBody(req).at_period_end !== false);
+  const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: !!atPeriodEnd });
+  const normalized = normalizeSub(updated);
+  return res.status(200).json({ subscription: normalized, cancel_effective_date: normalized.current_period_end || null });
+}
+async function subscriptionResume(req, res){
+  const sess = getSessionFromCookie(req);
+  if(!sess) return res.status(401).json({ error:'auth_required', message:'Debes iniciar sesión.' });
+  const stripe = getStripe();
+  const sub = await getBestSubscription(stripe, sess.customerId);
+  if(!sub) return res.status(400).json({ error:'no_active_subscription', message:'No tienes ninguna suscripción activa.' });
+  const updated = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: false });
+  return res.status(200).json({ subscription: normalizeSub(updated) });
+}
+
+async function subscriptionSwap(req, res){
+  const sess = getSessionFromCookie(req);
+  if(!sess) return res.status(401).json({ error:'auth_required', message:'Debes iniciar sesión.' });
+  const { priceId } = getBody(req);
+  if(!priceId) return res.status(422).json({ error:'validation_error', message:'Falta el identificador del precio.' });
+
+  const stripe = getStripe();
+  const best = await getBestSubscription(stripe, sess.customerId);
+  if(!best) return res.status(400).json({ error:'no_active_subscription', message:'No tienes ninguna suscripción activa.' });
+  const sub = await stripe.subscriptions.retrieve(best.id, { expand: ['items.data.price','schedule'] });
+
+  const currentItems = sub.items.data.map(it => ({ price: it.price.id, quantity: it.quantity || 1 }));
+
+  try{
+    if (sub.schedule) {
+      const phases = [
+        { start_date: 'now', end_date: sub.current_period_end, items: currentItems, proration_behavior: 'none' },
+        { start_date: sub.current_period_end, items: [{ price: priceId, quantity: 1 }], proration_behavior: 'none' }
+      ];
+      await stripe.subscriptionSchedules.update(sub.schedule, { phases });
+    } else {
+      await stripe.subscriptionSchedules.create({
+        from_subscription: sub.id,
+        phases: [
+          { start_date: 'now', end_date: sub.current_period_end, items: currentItems, proration_behavior: 'none' },
+          { start_date: sub.current_period_end, items: [{ price: priceId, quantity: 1 }], proration_behavior: 'none' }
+        ],
+        metadata: { app:'taply', change:'swap_at_period_end' }
+      });
+    }
+
+    const updated = await stripe.subscriptions.retrieve(sub.id, { expand:['items.data.price'] });
+    const nextInfo = await getUpcomingPhaseInfo(stripe, updated);
+    return res.status(200).json({ subscription: normalizeSub(updated), scheduled_change: nextInfo || null });
+  }catch(e){
+    console.error('subscriptionSwap schedule error', e?.message || e);
+    return res.status(500).json({ error:'swap_failed', message:'No pudimos programar el cambio de plan.' });
+  }
+}
+
+async function createCheckoutSession(req, res){
+  const { tier, frequency } = getBody(req);
+  if (!tier || !frequency) return res.status(422).json({ error:'validation_error', message:'Faltan parámetros de plan.' });
+  const price = PRICES?.[frequency]?.[tier];
+  if (!price) return res.status(400).json({ error: 'price_not_found', message:'No encontramos el precio seleccionado.' });
+
+  const sess = getSessionFromCookie(req);
+  if(!sess) return res.status(401).json({ error: 'auth_required', message:'Debes iniciar sesión.' });
+
+  const stripe = getStripe();
+  const customerId = await ensureCustomerId(stripe, sess);
+
+  const already = await hasValidSubscription(stripe, customerId);
+  if (already) {
+    const best = await getBestSubscription(stripe, customerId);
+    const sub = normalizeSub(best);
+    return res.status(409).json({ error: 'already_subscribed', message:'Ya tienes una suscripción activa.', current: sub });
+  }
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    ui_mode: 'hosted',
+    line_items: [{ price, quantity: 1 }],
+    allow_promotion_codes: true,
+    success_url: `${appBase(req)}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:  `${appBase(req)}/cancelado.html`,
+    phone_number_collection: { enabled: true },
+    customer: customerId,
+    subscription_data: { metadata: { type: 'subscription', tier, frequency, app:'taply' } },
+    metadata: { type: 'subscription', tier, frequency, app:'taply' }
+  });
+
+  if (!session?.url) return res.status(500).json({ error: 'no_session_url', message:'No pudimos iniciar el pago.' });
+  return res.status(200).json({ url: session.url });
+}
+
+async function buyNfc(req, res){
+  if (!PRICE_ID_NFC) return res.status(500).json({ error: 'missing_nfc_price_id', message:'Falta configurar el precio NFC.' });
+  const sess = getSessionFromCookie(req);
+  if(!sess) return res.status(401).json({ error: 'auth_required', message:'Debes iniciar sesión.' });
+  const { quantity = 1 } = getBody(req);
+  const qty = Math.max(1, Math.min(Number(quantity) || 1, 999));
+  const stripe = getStripe();
+  const customerId = await ensureCustomerId(stripe, sess);
+  if(!customerId) return res.status(401).json({ error:'auth_required', message:'Debes iniciar sesión.' });
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment', ui_mode: 'hosted',
+    line_items: [{ price: PRICE_ID_NFC, quantity: qty }],
+    success_url: `${appBase(req)}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:  `${appBase(req)}/cancelado.html`,
+    allow_promotion_codes: true,
+    phone_number_collection: { enabled: true },
+    billing_address_collection: 'auto',
+    shipping_address_collection: { allowed_countries: ['ES'] },
+    metadata: { type: 'nfc', qty: String(qty), app:'taply' },
+    customer: customerId
+  });
+  if (!session?.url) return res.status(500).json({ error: 'no_session_url', message:'No pudimos iniciar el pago.' });
+  return res.status(200).json({ url: session.url });
+}
+
+/* ===== Post-pago ===== */
+async function postPago(req, res){
+  const stripe = getStripe();
+  const url = new URL(req.url, 'http://x');
+  const qpSession = url.searchParams.get('session_id');
+  const { session_id: bodySession, type } = getBody(req);
+  const sessionId = bodySession || qpSession || null;
+
+  let buyerEmail = null, buyerPhone = null, lineSummary = '', amountText = '', customerId = null;
+  let cs = null;
+
+  if(sessionId){
+    try{
+      cs = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['line_items','customer_details'] });
+      buyerEmail = cs.customer_details?.email || cs.customer_email || null;
+      buyerPhone = cs.customer_details?.phone || null;
+      customerId = typeof cs.customer === 'string' ? cs.customer : cs.customer?.id || null;
+      const li = cs.line_items?.data || [];
+      lineSummary = li.map(i => `${i.quantity} × ${i.description || i.price?.nickname || i.price?.id}`).join(', ');
+      amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '';
+
+      if (cs.mode === 'payment' && PRICE_ID_NFC && customerId) {
+        const addQty = li.reduce((acc, it) => acc + ((it.price?.id === PRICE_ID_NFC) ? (it.quantity || 0) : 0), 0);
+        if(addQty > 0){
+          const cust = await stripe.customers.retrieve(customerId);
+          const prev = parseInt(cust?.metadata?.taply_nfc_qty || '0', 10) || 0;
+          await stripe.customers.update(customerId, { metadata: { ...(cust.metadata||{}), taply_nfc_qty: String(prev + addQty) }});
+        }
+      }
+    }catch(e){ console.error('post-pago retrieve error', e?.message || e); }
+  }
+
+  if(!buyerEmail && customerId){
+    try{
+      const cust = await stripe.customers.retrieve(customerId);
+      buyerEmail = cust?.email || null;
+      if(!buyerPhone) buyerPhone = cust?.phone || null;
+    }catch{}
+  }
+
+  const sess = getSessionFromCookie(req);
+  if(!buyerEmail && sess?.email) buyerEmail = sess.email;
+
+  if(buyerEmail){
+    try{
+      if (cs?.mode === 'subscription') {
+        const item = cs?.line_items?.data?.[0];
+        const tierNickname = item?.price?.nickname || item?.description || 'Taply';
+        const name = _safeName(cs?.customer_details?.name);
+        const tpl = makeSubscriptionEmailUI({ name, tierLabel: tierNickname, panelUrl: appBase(req) + '/panel.html' });
+        const ok = await sendEmail({ to: buyerEmail, subject: tpl.subject, html: tpl.html });
+        if(!ok){ await sendEmail({ to: buyerEmail, subject: 'Suscripción activa — Taply', html: `<h2>¡Gracias!</h2><p>Tu suscripción está activa.</p>` }); }
+      } else {
+        const qtyNfc = (cs?.line_items?.data || []).reduce((acc,i)=> acc + (i.price?.id === PRICE_ID_NFC ? (i.quantity||0) : 0), 0) || 1;
+        const name = _safeName(cs?.customer_details?.name);
+        const tpl = makeNfcEmailUI({ name, qty: qtyNfc });
+        const ok = await sendEmail({ to: buyerEmail, subject: tpl.subject, html: tpl.html });
+        if(!ok){ await sendEmail({ to: buyerEmail, subject: 'Pedido recibido — Taply', html: `<h2>¡Gracias!</h2><p>Hemos recibido tu pedido NFC.</p>` }); }
+      }
+    }catch(e){
+      console.error('send designed email failed, falling back', e?.message || e);
+      const subj = '¡Gracias! Hemos recibido tu compra';
+      const html = `<h2>Gracias por tu compra en Taply</h2>
+        <p>Hemos recibido tu ${type || 'pedido'} correctamente.</p>
+        ${lineSummary ? `<p><strong>Productos:</strong> ${lineSummary}</p>` : ''}
+        ${amountText ? `<p><strong>Importe:</strong> ${amountText}</p>` : ''}
+        <p>Te contactaremos por WhatsApp con los siguientes pasos.</p>`;
+      await sendEmail({ to: buyerEmail, subject: subj, html });
+    }
+  }
+
+  if(process.env.EMAIL_FROM){
+    const subjAdm = 'Nueva compra recibida';
+    const htmlAdm = `
+      <p>Compra recibida (${type || cs?.mode || 'checkout'}).</p>
+      ${buyerEmail ? `<p>Email cliente: ${buyerEmail}</p>` : ''}
+      ${buyerPhone ? `<p>Teléfono cliente: ${buyerPhone}</p>` : ''}
+      ${lineSummary ? `<p>Line items: ${lineSummary}</p>` : ''}
+      ${amountText ? `<p>Importe: ${amountText}</p>` : ''}
+      ${sessionId ? `<p>Checkout Session: ${sessionId}</p>` : ''}
+    `;
+    await sendEmail({ to: process.env.EMAIL_FROM, subject: subjAdm, html: htmlAdm });
+  }
+
+  return res.status(200).json({ ok:true });
+}
+
+async function storeCustomerFromSession(req, res){
+  const { session_id } = getBody(req);
+  if(!session_id) return res.status(422).json({ error:'validation_error', message:'Falta session_id.' });
+
+  try{
+    const stripe = getStripe();
+    const cs = await stripe.checkout.sessions.retrieve(session_id, { expand:['customer','customer_details'] });
+    const custObj = (typeof cs.customer === 'string') ? await stripe.customers.retrieve(cs.customer) : cs.customer;
+    const customerId = custObj?.id || null;
+    const email = cs.customer_details?.email || cs.customer_email || custObj?.email || null;
+    const name  = cs.customer_details?.name  || custObj?.name  || null;
+    if(!customerId || !email) return res.status(400).json({ error:'no_customer_in_session', message:'No pudimos obtener los datos del cliente.' });
+
+    if(name && custObj && !custObj.name){ try{ await stripe.customers.update(customerId, { name }); }catch{} }
+    setSession(res, { email, name: name || null, customerId });
+    return res.status(200).json({ user: { email, name: name || null, customerId }});
+  }catch(e){
+    console.error('storeCustomerFromSession error', e?.message || e);
+    return res.status(500).json({ error:'server_error', message:'No pudimos guardar tu sesión.' });
+  }
+}
+
+/* ===== Session ===== */
+async function session(req, res){
+  const sess = getSessionFromCookie(req);
+  if(!sess) return res.status(200).json({ user:null });
+
+  const stripe = getStripe();
+
+  let nfcQty = 0, customer = null;
+  try {
+    customer = await stripe.customers.retrieve(sess.customerId);
+    nfcQty = parseInt(customer?.metadata?.taply_nfc_qty || '0', 10) || 0;
+  } catch {
+    return res.status(200).json({ user: { email: sess.email, name: sess.name || null, customerId: null, subscription: null, subscription_status: null, nfc_qty: 0 }});
+  }
+
+  const best = await getBestSubscription(stripe, sess.customerId);
+  const sub = normalizeSub(best);
+
+  let nextGuess = null;
+  if (sub?.current_period_start) {
+    const start = new Date(sub.current_period_start * 1000);
+    nextGuess = (sub.price?.interval === 'year')
+      ? new Date(start.getFullYear()+1, start.getMonth(), start.getDate()).getTime()/1000
+      : Math.floor(addDays(start, 30).getTime()/1000);
+  } else if (sub?.current_period_end) {
+    nextGuess = sub.current_period_end;
+  }
+
+  const upcoming = await getUpcomingPhaseInfo(getStripe(), best);
+
+  return res.status(200).json({
+    user: {
+      email: sess.email,
+      name: sess.name || (customer?.name || null),
+      customerId: sess.customerId,
+      subscription: sub,
+      subscription_status: sub?.status || null,
+      current_period_end: sub?.current_period_end || null,
+      current_period_start: sub?.current_period_start || null,
+      nfc_qty: nfcQty,
+      next_period_anchor_guess: nextGuess,
+      cancel_effective_date: sub?.cancel_at_period_end ? (sub?.current_period_end || nextGuess || null) : null,
+      scheduled_change: upcoming ? {
+        upcoming_price_id: upcoming.upcoming_price_id || null,
+        upcoming_price_nickname: upcoming.upcoming_price_nickname || null,
+        upcoming_start_date: upcoming.upcoming_start_date || null
+      } : null,
+      upcoming_price_id: upcoming?.upcoming_price_id || null,
+      upcoming_price_nickname: upcoming?.upcoming_price_nickname || null,
+      upcoming_start_date: upcoming?.upcoming_start_date || null
+    }
+  });
 }
 
 /* ===== Router ===== */
@@ -662,4 +1049,3 @@ async function resetPassword(req, res){
   await stripe.customers.update(customer.id, { metadata: { ...meta, taply_pass_hash: hash, taply_reset_token: '', taply_reset_exp: '' }});
   return res.status(200).json({ ok:true, message:'Contraseña actualizada.' });
 }
-
