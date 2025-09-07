@@ -196,7 +196,7 @@
     <!-- PLAN BÁSICO -->
     <article class="card plan">
       <span class="badge">Básico</span>
-      <div class="price-lg"><span id="p-basic">25€</span> <span class="per">/mes</span></div>
+      <div class="price-lg"><span id="p-basic">29€</span> <span class="per">/mes</span></div>
       <p class="desc">Con este plan te brindamos todo el entorno de Taply (NFC configurados para tu restaurante), y además te damos acceso a un panel privado en Google Sheets donde se guardan todas las encuestas privadas de tus clientes. El panel incluye gráficos de los problemas más repetidos, filtros por fechas y descarga de datos. Así podrás detectar qué falla, corregirlo rápido y mejorar tu restaurante sin que esas críticas negativas aparezcan en Google.</p>
       <div class="actions"><a class="btn plan acct-guard" data-tier="basic">Elegir Básico</a></div>
     </article>
@@ -204,7 +204,7 @@
     <!-- PLAN PRO (RECOMENDADO) -->
     <article class="card plan rec">
       <span class="badge">Pro · Recomendado</span>
-      <div class="price-lg"><span id="p-pro">45€</span> <span class="per">/mes</span></div>
+      <div class="price-lg"><span id="p-pro">55€</span> <span class="per">/mes</span></div>
       <p class="desc">Este plan lo tiene todo: incluye lo del Plan Básico y además la gestión completa de tus reseñas en Google. Nos encargamos de monitorizar lo que escriben los clientes, responder con mensajes profesionales y avisarte de críticas importantes. De esta manera tu imagen pública en Google siempre está cuidada, ganas visibilidad y atraes muchos más clientes.</p>
       <div class="actions"><a class="btn plan acct-guard" data-tier="pro">Elegir Pro</a></div>
     </article>
@@ -340,7 +340,7 @@
   window.addEventListener('load',()=>document.body.classList.add('is-loaded'));
 
   // SOLO BÁSICO Y PRO
-  const PRICE={ nfcUnit:5, monthly:{ basic:25, pro:45 }, annualDiscount:.20 };
+  const PRICE={ nfcUnit:5, monthly:{ basic:29, pro:55 }, annualDiscount:.20 };
   let qty=1, yearly=false;
 
   $('#showNfc').addEventListener('click',e=>{e.preventDefault();$('#panel-nfc').classList.add('show');$('#panel-sub').classList.remove('show');$('#panel-nfc').scrollIntoView({behavior:'smooth'});});
