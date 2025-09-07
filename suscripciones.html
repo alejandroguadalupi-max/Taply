@@ -193,24 +193,19 @@
   </div>
 
   <div class="plan-grid">
+    <!-- PLAN BÁSICO -->
     <article class="card plan">
       <span class="badge">Básico</span>
       <div class="price-lg"><span id="p-basic">25€</span> <span class="per">/mes</span></div>
-      <p class="desc">Empieza a captar reseñas con tu NFC listo y acceso a tus datos exportables.</p>
+      <p class="desc">Impulsa reseñas con NFC + acceso a datos exportables. Ideal para empezar.</p>
       <div class="actions"><a class="btn plan acct-guard" data-tier="basic">Elegir Básico</a></div>
     </article>
 
+    <!-- PLAN PRO (RECOMENDADO) -->
     <article class="card plan rec">
-      <span class="badge">Medio · Recomendado</span>
-      <div class="price-lg"><span id="p-medio">35€</span> <span class="per">/mes</span></div>
-      <p class="desc">Todo lo de Básico más un panel privado con filtros para controlar mejor tu reputación.</p>
-      <div class="actions"><a class="btn plan acct-guard" data-tier="medio">Elegir Medio</a></div>
-    </article>
-
-    <article class="card plan">
-      <span class="badge">Pro</span>
+      <span class="badge">Pro · Recomendado</span>
       <div class="price-lg"><span id="p-pro">45€</span> <span class="per">/mes</span></div>
-      <p class="desc">Todo lo de Medio con integración en Telegram, cambios bajo demanda y opción de incentivo para clientes.</p>
+      <p class="desc">Todo lo del Básico + panel avanzado, filtros, integraciones y soporte prioritario.</p>
       <div class="actions"><a class="btn plan acct-guard" data-tier="pro">Elegir Pro</a></div>
     </article>
   </div>
@@ -344,7 +339,8 @@
   const fmt = v => new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(v);
   window.addEventListener('load',()=>document.body.classList.add('is-loaded'));
 
-  const PRICE={nfcUnit:5,monthly:{basic:25,medio:35,pro:45},annualDiscount:.20};
+  // SOLO BÁSICO Y PRO
+  const PRICE={ nfcUnit:5, monthly:{ basic:25, pro:45 }, annualDiscount:.20 };
   let qty=1, yearly=false;
 
   $('#showNfc').addEventListener('click',e=>{e.preventDefault();$('#panel-nfc').classList.add('show');$('#panel-sub').classList.remove('show');$('#panel-nfc').scrollIntoView({behavior:'smooth'});});
@@ -363,11 +359,13 @@
   }
   attachStepper($('#minus'), -1); attachStepper($('#plus'), +1); paintNfc();
 
-  function planAmount(tier){const m=PRICE.monthly[tier];return yearly?Math.round(m*12*(1-PRICE.annualDiscount)):m}
+  function planAmount(tier){
+    const m=PRICE.monthly[tier];
+    return yearly?Math.round(m*12*(1-PRICE.annualDiscount)):m;
+  }
   function paintPrices(){
-    $('#p-basic').textContent=yearly?fmt(planAmount('basic')):PRICE.monthly.basic+'€';
-    $('#p-medio').textContent=yearly?fmt(planAmount('medio')):PRICE.monthly.medio+'€';
-    $('#p-pro').textContent=yearly?fmt(planAmount('pro')):PRICE.monthly.pro+'€';
+    $('#p-basic').textContent= yearly ? fmt(planAmount('basic')) : PRICE.monthly.basic+'€';
+    $('#p-pro').textContent  = yearly ? fmt(planAmount('pro'))   : PRICE.monthly.pro+'€';
     $$('.per').forEach(el=>el.textContent=yearly?'/año':'/mes');
   }
   $('#btn-month').addEventListener('click',()=>{yearly=false;$('#btn-month').classList.add('active');$('#btn-year').classList.remove('active');$('#btn-month').setAttribute('aria-selected','true');$('#btn-year').setAttribute('aria-selected','false');paintPrices()});
@@ -390,7 +388,6 @@
     }
 
     function getInterval(u){ return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase(); }
-    function addDays(date, days){ const x=new Date(date); x.setDate(x.getDate()+days); return x; }
     function prettyPlan(u){
       const nick = (u?.subscription?.price?.nickname || u?.subscription?.plan?.nickname || '').trim();
       if(nick) return nick;
@@ -398,7 +395,6 @@
       const idOrNick=((u?.subscription?.price?.id||'')+' '+(u?.subscription?.plan?.nickname||'')).toLowerCase();
       let base='Básico';
       if(/pro/.test(idOrNick)) base='Pro';
-      else if(/medio|standard|estándar/.test(idOrNick)) base='Medio';
       return `${base} ${interval}`;
     }
     function isSubActive(u){
@@ -590,7 +586,6 @@
       if(authCta) authCta.style.display='none';
       statusEl.textContent = isSubActive(S.user) ? prettyPlan(S.user) : 'Sin plan activo';
       const qty = Number(S.user.nfc_qty || 0); nfcEl.textContent = `NFC comprados: ${qty}`;
-      // Mostrar botón de portal SOLO si hay suscripción activa
       if(portalRow) portalRow.style.display = isSubActive(S.user) ? 'block' : 'none';
     }
 
@@ -683,22 +678,19 @@
       }
     });
 
-    // --- Abrir Portal de Stripe (con fallback a tu URL pública de Stripe) ---
+    // --- Portal Stripe ---
     async function openPortal(){
       try{
         const res = await fetch('/api/portal', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include' });
         const data = await res.json();
         if(res.ok && data?.url){ location.href = data.url; return; }
       }catch{}
-      // Fallback directo al portal de Stripe que pasaste
       location.href = 'https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00';
     }
-    // Botón del panel de planes
     document.getElementById('portalBtn')?.addEventListener('click', async (e)=>{
       if(!S.user){ e.preventDefault(); openModal('login'); return; }
       await openPortal();
     });
-    // Botón dentro de la card "Mi suscripción"
     document.getElementById('portalBtnAccount')?.addEventListener('click', async (e)=>{
       if(!S.user){ e.preventDefault(); openModal('login'); return; }
       await openPortal();
@@ -707,9 +699,9 @@
     getSession();
   })();
 
-  // -------- Pago suscripciones --------
+  // -------- Pago suscripciones (BÁSICO y PRO) --------
   $$('.btn.plan').forEach(btn => btn.addEventListener('click', async () => {
-    const tier = btn.dataset.tier;
+    const tier = btn.dataset.tier; // 'basic' | 'pro'
     const frequency = (document.querySelector('#btn-year')?.classList.contains('active')) ? 'annual' : 'monthly';
 
     if (window.taplyAuth?.user && (window.taplyAuth.user.subscription || window.taplyAuth.user.isSubscribed)) {
@@ -717,7 +709,6 @@
         try{
           const r=await fetch('/api/portal',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include'});
           const d=await r.json(); if(r.ok && d?.url){ location.href=d.url; return; }
-          // Fallback
           location.href='https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00';
         }catch{
           location.href='https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00';
