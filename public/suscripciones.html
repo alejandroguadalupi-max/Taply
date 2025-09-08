@@ -341,11 +341,7 @@
 </div>
 
 <script>
-  /* ===== Manejo de retornos desde Stripe (Portal y Checkout) =====
-     - Si venimos de Stripe Portal: redirige/abre la sección de suscripciones
-     - Si volvemos desde Checkout con ?session_id=...: dispara /api/post-pago para enviar correos
-     - Si el usuario pulsa "Volver a entorno de prueba" (sin success_url configurado): detecta referrer *.stripe.com y vuelve a /suscripciones
-  */
+  /* ===== Manejo de retornos desde Stripe (Portal y Checkout) — SOLO FRONT ===== */
   (function(){
     const hash = (location.hash||'').replace(/^#/, '');
     const search = (location.search||'').replace(/^\?/, '');
@@ -365,34 +361,6 @@
       try{ sub && sub.scrollIntoView({behavior:'smooth'}); }catch(e){}
     }
 
-    async function redirectToSubs(anchor=''){
-      const dests = ['/suscripciones.html', '/suscripciones', '/suscripciones/'];
-      for (const p of dests){
-        try{
-          const res = await fetch(p, { method:'HEAD', cache:'no-store' });
-          if(res.ok){ location.replace(p + (anchor || '')); return; }
-        }catch(e){}
-      }
-      // Último recurso: a inicio, pero mantén hash para que el UI abra la sección
-      location.replace('/' + (anchor || ''));
-    }
-
-    async function firePostPago(sessionId){
-      try{
-        // Guarda cliente en sesión (para UI) y dispara correo
-        await fetch('/api/store-customer-from-session', {
-          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-          body: JSON.stringify({ session_id: sessionId })
-        }).catch(()=>{});
-        const r = await fetch('/api/post-pago', {
-          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-          body: JSON.stringify({ session_id: sessionId })
-        });
-        // No bloquea por errores, solo informa en consola
-        try { const d = await r.json(); console.debug('post-pago:', d); } catch {}
-      }catch(e){ console.warn('post-pago error', e); }
-    }
-
     function showBanner(msg, type='ok'){
       const b = document.getElementById('top-banner');
       const t = document.getElementById('top-banner-text');
@@ -404,62 +372,46 @@
     function cleanUrl(){ try{ history.replaceState(null,'',location.pathname); }catch{} }
 
     (async function main(){
-      const onSubsPage = /\/suscripciones(\.html|\/)?$/i.test(location.pathname);
+      const onThisPageHasSubs = document.getElementById('panel-sub') != null;
 
-      // 1) Portal
+      // Señal guardada al salir hacia el Portal
+      const flagPortal = sessionStorage.getItem('taply_portal_intent') === '1';
+
+      // Señales que indica Stripe:
       const fromPortal = h.get('from')==='stripe-portal' || q.get('from')==='stripe-portal' ||
                          h.has('stripe_portal_return') || q.has('stripe_portal_return');
-      if (fromPortal) {
-        if (onSubsPage) {
-          openSubPanelHere();
-          cleanUrl();
-        } else {
-          await redirectToSubs('#from=stripe-portal');
-        }
+
+      // También si venimos con referrer de Stripe (ej: "Volver a entorno de prueba")
+      const stripeBack = isStripeReferrer();
+
+      // Si detectamos cualquiera de las señales o la bandera, abrimos el panel AQUÍ
+      if (onThisPageHasSubs && (fromPortal || stripeBack || flagPortal)) {
+        openSubPanelHere();
+        showBanner('Has vuelto desde Stripe.', 'ok');
+        cleanUrl();
+        // Limpia la bandera para próximas visitas
+        try{ sessionStorage.removeItem('taply_portal_intent'); }catch{}
         return;
       }
 
-      // 2) Checkout con session_id
+      // Checkout con session_id (opcional, por si lo usas)
       const sessionId = h.get('session_id') || q.get('session_id');
-      const redirectStatus = h.get('redirect_status') || q.get('redirect_status'); // algunos flujos lo usan
-      if (sessionId) {
-        // En cualquier página, dispara post-pago y vuelve a suscripciones
-        await firePostPago(sessionId);
-        if (onSubsPage) {
+      const redirectStatus = h.get('redirect_status') || q.get('redirect_status');
+      if (sessionId || redirectStatus === 'succeeded') {
+        if (onThisPageHasSubs) {
           openSubPanelHere();
           showBanner('¡Compra confirmada! Te hemos enviado un correo con los siguientes pasos. 🎉');
           cleanUrl();
         } else {
-          await redirectToSubs('#from=checkout-done');
-        }
-        return;
-      }
-
-      // 3) Sin session_id pero referrer de Stripe (por "volver a entorno de prueba")
-      if (isStripeReferrer()) {
-        if (onSubsPage) {
-          openSubPanelHere();
-          showBanner('Has vuelto desde Stripe.', 'ok');
+          // Si por lo que sea estás en otra página, al menos limpia hash
           cleanUrl();
-        } else {
-          await redirectToSubs('#from=stripe-return');
         }
-        return;
-      }
-
-      // 4) Señales genéricas de éxito
-      if (redirectStatus === 'succeeded') {
-        if (onSubsPage) {
-          openSubPanelHere();
-          showBanner('Pago confirmado. Te contactaremos en breve ✅');
-          cleanUrl();
-        } else {
-          await redirectToSubs('#from=checkout-ok');
-        }
+        try{ sessionStorage.removeItem('taply_portal_intent'); }catch{}
       }
     })();
   })();
 </script>
+
 
 <script>
   // ----------- Utilidades UI ----------- 
@@ -815,12 +767,21 @@
     // --- Portal Stripe ---
     async function openPortal(){
       try{
+        // Deja bandera para que, al volver SIN return_url, abramos suscripciones
+        try{
+          sessionStorage.setItem('taply_portal_intent','1');
+          // De paso, coloca en la URL un hash “inofensivo” por si la vuelta es con back()
+          history.replaceState(null,'', location.pathname + '#from=stripe-portal');
+        }catch{}
+
         const res = await fetch('/api/portal', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include' });
         const data = await res.json();
         if(res.ok && data?.url){ location.href = data.url; return; }
       }catch{}
+      // Fallback a login de Portal test si tu endpoint falla
       location.href = 'https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00';
     }
+
     document.getElementById('portalBtn')?.addEventListener('click', async (e)=>{
       if(!S.user){ e.preventDefault(); openModal('login'); return; }
       await openPortal();
