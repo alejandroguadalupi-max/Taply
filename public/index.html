@@ -170,7 +170,19 @@
     .acct-cover{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));height:6px;width:100%}
     .acct-body{padding:22px}
     .acct-head{display:flex;justify-content:center;align-items:center;margin:10px 0 18px}
-    .acct-logo{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));color:#061017;font-weight:900}
+    .acct-logo{
+      width:48px; 
+      height:48px;
+      border-radius:16px;
+      display:block;
+      background:url('img/logo.png') center/cover no-repeat;
+      box-shadow:var(--shadow);
+      /* ocultar el “⌁” */
+      color:transparent;
+      font-size:0;
+      line-height:0;
+    }
+
     .acct-title{margin:10px 0 0;text-align:center;font-weight:800;font-size:1.25rem}
     .acct-sub{margin:6px 0 0;text-align:center;color:var(--muted);font-size:.96rem}
 
