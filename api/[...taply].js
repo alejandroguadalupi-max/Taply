@@ -119,8 +119,6 @@ async function hasValidSubscription(stripe, customerId){
 }
 function addDays(d, days){ return new Date(d.getTime() + days*24*60*60*1000); }
 
-/* ===== Email (Sendgrid) con reintentos ===== */
-/* ===== Email (Sendgrid) con parsing robusto ===== */
 /* ===== Email (Sendgrid) robusto ===== */
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 async function withTimeout(promise, ms){
@@ -182,7 +180,6 @@ async function sendEmail({to, subject, text, html}){
   return false;
 }
 
-
 /* ===== Plantillas email ===== */
 function _safeName(name){ return (name || '').trim() || null; }
 function _emailBaseCss(){
@@ -194,10 +191,9 @@ function _emailBaseCss(){
   /* Header: logo + marca */
   .hdr{padding:22px 24px;display:flex;align-items:center;gap:12px;background:#0b1020}
   .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(180deg,#7c3aed,#3b82f6)}
-  /* Alineamos el texto al centro del logo sin mover nada más */
   .brand{
     font-weight:600;color:#e9eefc;font-size:17px;letter-spacing:.2px;
-    display:flex;align-items:center;height:34px;line-height:1; /* <-- clave */
+    display:flex;align-items:center;height:34px;line-height:1;
   }
   .body{background:#0e1424;padding:28px 24px 20px;color:#dbe6ff}
   h1{margin:0 0 8px;font-size:36px;line-height:1.1;color:#e9eefc}
@@ -283,7 +279,6 @@ async function register(req, res){
   const { email:rawEmail, password, name } = getBody(req);
   const email = normalizeEmail(rawEmail);
 
-  // Validación de presencia (primero)
   const fieldErrors = {};
   if(!name) fieldErrors.name = 'El nombre es obligatorio.';
   if(!email) fieldErrors.email = 'El correo es obligatorio.';
@@ -292,7 +287,6 @@ async function register(req, res){
     return res.status(422).json({ error:'validation_error', message:'Revisa los campos obligatorios.', fieldErrors });
   }
 
-  // Buscar email (prioridad errores graves)
   const stripe = getStripe();
   const found = await stripe.customers.search({ query: `email:'${escapeStripeQueryValue(email)}'`, limit: 1 });
   const exists = found.data[0];
@@ -307,10 +301,8 @@ async function register(req, res){
     if(isVerified){
       return res.status(409).json({ error:'email_in_use', message:'Este correo ya está registrado y verificado.' });
     }
-    // si existe pero NO verificado -> continuamos (se “resetea”)
   }
 
-  // Fuerza mínima de contraseña (después de comprobar email en uso)
   if(String(password).length < 6){
     return res.status(422).json({ error:'weak_password', message:'La contraseña es demasiado corta (mínimo 6 caracteres).' });
   }
@@ -345,7 +337,6 @@ async function register(req, res){
     });
   }
 
-  // Enlace de verificación robusto (con token+email)
   const verifyUrl = `${appBase(req)}/api/verify-email?token=${encodeURIComponent(verifyToken)}&email=${encodeURIComponent(email)}`;
   const tpl = makeVerifyEmailUI({ name, verifyUrl });
   await sendEmail({ to: email, subject: tpl.subject, html: tpl.html });
@@ -373,7 +364,6 @@ async function login(req, res){
   const customer = found.data[0];
   const meta = customer.metadata || {};
 
-  // Si está registrada con Google y no tiene contraseña → mensaje claro
   const usedByGoogle = (meta.taply_google === '1' || meta.taply_google === 'true');
   const hasPass = !!meta.taply_pass_hash;
   if (usedByGoogle && !hasPass) {
@@ -383,7 +373,6 @@ async function login(req, res){
     });
   }
 
-  // Si NO está verificado, actúa como si no existiera
   if (meta.taply_email_verified !== '1') {
     return res.status(404).json({ error:'account_not_found', message:'No encontramos ninguna cuenta con ese correo.' });
   }
@@ -566,19 +555,14 @@ async function verifyEmail(req, res){
     const stripe = getStripe();
     let customer = null;
 
-    // Si tengo email, pruebo por email
     if (email) {
       const found = await stripe.customers.search({ query: `email:'${escapeStripeQueryValue(email)}'`, limit:1 });
       customer = found.data[0] || null;
     }
-
-    // Si falta email o no encontré, pruebo por token
     if (!customer && token) {
       customer = await findCustomerByVerifyToken(stripe, token);
       if (customer && !email) email = normalizeEmail(customer.email || '');
     }
-
-    // Si no encuentro cliente
     if(!customer){
       return invalidOrExpiredHtml(res, email);
     }
@@ -918,7 +902,6 @@ async function postPago(req, res){
       ${sessionId ? `<p>Checkout Session: ${sessionId}</p>` : ''}
     `;
     await sendEmail({ to: parseAddress(process.env.EMAIL_FROM).email, subject: subjAdm, html: htmlAdm });
-
   }
 
   return res.status(200).json({ ok:true });
@@ -1026,6 +1009,9 @@ export default async function handler(req, res){
       }
 
       if (route === 'verify-email') return verifyEmail(req,res);
+
+      // ✅ Permitir pruebas de post-pago por GET con ?session_id=...
+      if (route === 'post-pago') return postPago(req,res);
     }
 
     if (req.method === 'POST') {
