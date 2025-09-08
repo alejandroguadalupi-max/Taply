@@ -18,6 +18,7 @@
       --blue-1:#38bdf8; --blue-2:#2563eb;
       --radius:20px; --shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
       --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 36px);
+      --ok:#22c55e; --warn:#f59e0b;
     }
     *{box-sizing:border-box}
     html{-webkit-text-size-adjust:100%}
@@ -36,31 +37,16 @@
     header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px)}
     .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0; position:relative}
     .brand{display:flex;gap:10px;align-items:center;font-weight:800;letter-spacing:.3px}
-    .brand-logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));display:grid;place-items:center;box-shadow:0 8px 22px rgba(124,58,237,.35)}
-    .brand-logo svg{width:20px;height:20px}
+    /* LOGO: contenedor neutro + imagen, sin degradados ni svg */
+    .brand-logo{
+      width:34px;height:34px;border-radius:10px;
+      display:grid;place-items:center;overflow:hidden;
+      background:none;box-shadow:none;padding:0;
+    }
+    .brand-logo img{display:block;width:100%;height:100%;object-fit:contain}
     .nav-links{display:flex;gap:18px;align-items:center}
     .ghost{padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);color:var(--txt);touch-action:manipulation}
     .menu{display:none}
-    .brand-logo img{
-      display:block;
-      width:100%;
-      height:100%;
-      object-fit:contain;    /* encaja el PNG sin deformarlo */
-    }
-
-    /* Cuenta */
-    .acct-chip{display:inline-flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(255,255,255,.04);cursor:pointer}
-    .acct-avatar{width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));display:grid;place-items:center;font-weight:800;color:#061017}
-    .acct-dd{position:relative}
-    .acct-menu{position:absolute;right:0;top:110%;min-width:220px;background:#0b0f1a;border:1px solid rgba(255,255,255,.12);border-radius:14px;box-shadow:var(--shadow);display:none;padding:6px}
-    .acct-menu a,.acct-menu button{display:flex;width:100%;text-align:left;background:transparent;border:0;color:inherit;padding:10px 12px;border-radius:10px;cursor:pointer}
-    .acct-menu a:hover,.acct-menu button:hover{background:rgba(255,255,255,.06)}
-    .acct-dd.open .acct-menu{display:block}
-
-    .mobile-menu{position:absolute; left:0; right:0; top:100%; display:none; padding:14px; background:#0b0f1a; border-top:1px solid rgba(255,255,255,.08); box-shadow:0 16px 40px rgba(0,0,0,.45)}
-    .mobile-links{display:flex;flex-direction:column;gap:10px}
-    .mobile-links .ghost{background:rgba(255,255,255,.02); border-color:rgba(255,255,255,.18)}
-    .mobile-links .btn{width:100%; justify-content:center}
 
     .btn{
       --p:14px 18px; background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
@@ -90,6 +76,36 @@
     .card h3{margin:.2rem 0 .6rem}
     .card p{color:var(--muted);margin:0}
 
+    /* ===== NUEVO ESTILO BENEFICIOS (no tarjetas) ===== */
+    #beneficios .benefits-wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:24px;margin-top:20px;align-items:start}
+    #beneficios .benefit{
+      display:grid;grid-template-columns:44px 1fr;gap:12px;
+      padding:14px 16px;border-left:4px solid var(--brand-2);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      border-radius:12px; align-items:start;
+    }
+    #beneficios .benefit + .benefit{margin-top:12px}
+    #beneficios .benefit .ico{
+      width:44px;height:44px;border-radius:10px;
+      display:grid;place-items:center;
+      background:linear-gradient(135deg, rgba(124,58,237,.25), rgba(56,189,248,.25));
+      border:1px solid rgba(255,255,255,.12);
+      font-size:22px
+    }
+    #beneficios h3{margin:.2rem 0 .25rem;text-align:left}
+    #beneficios p{margin:0;text-align:left;color:var(--muted)}
+    #beneficios .aside{
+      background:linear-gradient(135deg, rgba(0,212,255,.07), rgba(124,58,237,.07));
+      border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:18px;
+      text-align:left
+    }
+    #beneficios .aside h4{margin:.2rem 0 .6rem}
+    #beneficios .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+    #beneficios .stat{
+      background:#0a0f16;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;text-align:center
+    }
+    #beneficios .stat b{display:block;font-size:1.2rem}
+
     /* Reviews / carrusel */
     .reviews{position:relative;margin:36px 0}
     .reviews h2{margin:0 0 14px}
@@ -100,7 +116,6 @@
       overscroll-behavior-x: contain; touch-action: pan-x;
     }
     .reviews-track::-webkit-scrollbar{display:none}
-
     .review-card{
       flex:0 0 clamp(320px, 86vw, 520px);
       max-width:520px;
@@ -131,6 +146,10 @@
     input,select,textarea,button{font-size:16px}
     :focus-visible{outline:2px solid #7c3aed; outline-offset:2px; border-radius:8px}
 
+    @media (max-width: 992px){
+      #beneficios .benefits-wrap{grid-template-columns:1fr}
+      #beneficios .stats{grid-template-columns:repeat(3,1fr)}
+    }
     @media (max-width: 768px){
       :root{ --arrowSize:42px; --edgePad:calc(var(--arrowSize) + 44px); }
       section{padding:48px 0}
@@ -145,6 +164,7 @@
       .menu:active{transform:translateY(1px)}
       .carousel-btn.left{ left:-6px; transform:translate(-8%, -50%); }
       .carousel-btn.right{ right:-6px; transform:translate(8%, -50%); }
+      #beneficios .stats{grid-template-columns:repeat(2,1fr)}
     }
     @media (max-width:480px){
       :root{ --arrowSize:38px; --edgePad:calc(var(--arrowSize) + 48px); }
@@ -152,6 +172,7 @@
       .reviews-track{ padding:0 var(--edgePad); }
       .carousel-btn.left{ left:-8px; transform:translate(-10%, -50%); }
       .carousel-btn.right{ right:-8px; transform:translate(10%, -50%); }
+      #beneficios .stats{grid-template-columns:1fr}
     }
     @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
@@ -200,7 +221,6 @@
           <img src="img/logo.png" alt="" width="34" height="34" loading="eager">
         </span>
         <span>Taply</span>
-
       </a>
 
       <nav class="nav-links">
@@ -241,16 +261,52 @@
       </div>
     </section>
 
-    <section id="beneficios">
+    <!-- ====== BENEFICIOS (nuevo layout) ====== -->
+    <section id="beneficios" aria-labelledby="beneficios-title">
       <div class="container">
-        <h2>¿Qué podrás conseguir gracias a nuestro sistema?</h2>
-        <p class="lead">Taply te asegura conseguir <strong>mejores reseñas</strong>, atraer <strong>más clientes</strong> y generar <strong>más ingresos</strong>.</p>
-        <div class="grid-3" style="margin-top:20px">
-          <article class="card"><h3>Crea un clima donde la opinión importa</h3><p>El cliente acerca su móvil al NFC y deja su reseña en segundos.</p></article>
-          <article class="card"><h3>Encuentra puntos débiles</h3><p>Las negativas no se publican: van a tu panel privado para aprender y mejorar.</p></article>
-          <article class="card"><h3>Gana dinero</h3><p>Mejores valoraciones = más visibilidad = más clientes.</p></article>
+        <h2 id="beneficios-title">¿Qué podrás conseguir gracias a nuestro sistema?</h2>
+        <p class="lead">Taply te ayuda a lograr <strong>mejores reseñas</strong>, atraer <strong>más clientes</strong> y generar <strong>más ingresos</strong>.</p>
+
+        <div class="benefits-wrap">
+          <div>
+            <div class="benefit">
+              <div class="ico">✅</div>
+              <div>
+                <h3>Crea un clima donde la opinión importa</h3>
+                <p>El cliente acerca su móvil al NFC y deja su reseña en segundos, sin fricción.</p>
+              </div>
+            </div>
+
+            <div class="benefit">
+              <div class="ico">🧭</div>
+              <div>
+                <h3>Aprende de lo negativo (en privado)</h3>
+                <p>Las valoraciones negativas no se publican: llegan a tu panel para corregir y mejorar.</p>
+              </div>
+            </div>
+
+            <div class="benefit">
+              <div class="ico">📈</div>
+              <div>
+                <h3>Gana visibilidad y clientes</h3>
+                <p>Mejores valoraciones = más visibilidad en Google = más reservas y ventas.</p>
+              </div>
+            </div>
+          </div>
+
+          <aside class="aside" aria-label="Resultados esperados">
+            <h4>Resultados habituales</h4>
+            <div class="stats">
+              <div class="stat"><b>+35%</b><small> más reseñas/mes</small></div>
+              <div class="stat"><b>4,7★</b><small> media sostenida</small></div>
+              <div class="stat"><b>-60%</b><small> quejas públicas</small></div>
+            </div>
+            <p style="margin-top:12px;color:var(--muted)">Cada negocio es distinto, pero el patrón es claro: más reseñas reales y mejor reputación.</p>
+            <div class="cta-row" style="justify-content:flex-start;margin-top:14px">
+              <a class="btn" href="suscripciones.html">Empezar ahora</a>
+            </div>
+          </aside>
         </div>
-        <div class="cta-row"><a class="btn" href="suscripciones.html">Empezar ahora</a></div>
       </div>
     </section>
 
@@ -509,7 +565,7 @@
         if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; }
       });
 
-      // ===== API helper: lanza Error con code/message/fieldErrors
+      // ===== API helper
       async function api(method,url,body){
         const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:body?JSON.stringify(body):undefined});
         let data=null; try{ data=await res.json(); }catch{}
@@ -585,7 +641,6 @@
           okRegister.textContent = data?.message || 'Te enviamos un correo de verificación. Revisa tu bandeja y el spam.';
           okRegister.style.display='block';
           resendRegisterBtn.style.display='inline-flex';
-          // Dejamos al usuario en la pestaña de registro para poder reenviar si hace falta
         }catch(err){
           const code = err.code || String(err);
           let msg = err.message || 'No se pudo crear la cuenta.';
@@ -612,7 +667,7 @@
           errs.login.style.display='none';
           okRegister.textContent = d?.message || 'Te enviamos un nuevo enlace de verificación.';
           okRegister.style.display='block';
-          setTab('register', true); // mostrar mensaje en el panel con más espacio
+          setTab('register', true);
         }catch(err){
           errs.login.textContent = err.message || 'No pudimos reenviar el correo.';
           errs.login.style.display='block';
@@ -710,7 +765,6 @@
         }
       }
 
-      // Mapeo errores Google + hash
       function mapGoogleError(code){
         switch(String(code||'').toLowerCase()){
           case 'email_in_use_password': return 'Ese correo ya tiene una cuenta con contraseña. Inicia sesión con tu contraseña.';
