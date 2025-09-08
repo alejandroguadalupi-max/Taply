@@ -18,7 +18,6 @@
       --blue-1:#38bdf8; --blue-2:#2563eb;
       --radius:20px; --shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
       --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 36px);
-      --ok:#22c55e; --warn:#f59e0b;
     }
     *{box-sizing:border-box}
     html{-webkit-text-size-adjust:100%}
@@ -34,14 +33,13 @@
     .container{width:min(1200px,92%);margin-inline:auto}
     body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.6px);background-size:26px 26px;opacity:.12}
 
+    /* ===== Header y navegación (como estaba) ===== */
     header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px)}
     .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0; position:relative}
     .brand{display:flex;gap:10px;align-items:center;font-weight:800;letter-spacing:.3px}
-    /* LOGO: contenedor neutro + imagen, sin degradados ni svg */
     .brand-logo{
       width:34px;height:34px;border-radius:10px;
-      display:grid;place-items:center;overflow:hidden;
-      background:none;box-shadow:none;padding:0;
+      display:grid;place-items:center;overflow:hidden;background:none;box-shadow:none;padding:0;
     }
     .brand-logo img{display:block;width:100%;height:100%;object-fit:contain}
     .nav-links{display:flex;gap:18px;align-items:center}
@@ -76,35 +74,36 @@
     .card h3{margin:.2rem 0 .6rem}
     .card p{color:var(--muted);margin:0}
 
-    /* ===== NUEVO ESTILO BENEFICIOS (no tarjetas) ===== */
-    #beneficios .benefits-wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:24px;margin-top:20px;align-items:start}
+    /* ===== BENEFICIOS (bloques más pequeños) ===== */
+    #beneficios .benefits-wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;margin-top:16px;align-items:start}
     #beneficios .benefit{
-      display:grid;grid-template-columns:44px 1fr;gap:12px;
-      padding:14px 16px;border-left:4px solid var(--brand-2);
+      display:grid;grid-template-columns:36px 1fr;gap:10px;
+      padding:10px 12px;border-left:3px solid var(--brand-2);
       background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
-      border-radius:12px; align-items:start;
+      border-radius:10px; align-items:start;
     }
-    #beneficios .benefit + .benefit{margin-top:12px}
+    #beneficios .benefit + .benefit{margin-top:10px}
     #beneficios .benefit .ico{
-      width:44px;height:44px;border-radius:10px;
+      width:36px;height:36px;border-radius:8px;
       display:grid;place-items:center;
-      background:linear-gradient(135deg, rgba(124,58,237,.25), rgba(56,189,248,.25));
-      border:1px solid rgba(255,255,255,.12);
-      font-size:22px
+      background:linear-gradient(135deg, rgba(124,58,237,.22), rgba(56,189,248,.22));
+      border:1px solid rgba(255,255,255,.1);
+      font-size:18px
     }
-    #beneficios h3{margin:.2rem 0 .25rem;text-align:left}
-    #beneficios p{margin:0;text-align:left;color:var(--muted)}
+    #beneficios h3{margin:.15rem 0 .2rem;text-align:left;font-size:1.02rem}
+    #beneficios p{margin:0;text-align:left;color:var(--muted);font-size:.95rem}
     #beneficios .aside{
-      background:linear-gradient(135deg, rgba(0,212,255,.07), rgba(124,58,237,.07));
-      border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:18px;
+      background:linear-gradient(135deg, rgba(0,212,255,.06), rgba(124,58,237,.06));
+      border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:14px;
       text-align:left
     }
-    #beneficios .aside h4{margin:.2rem 0 .6rem}
-    #beneficios .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+    #beneficios .aside h4{margin:.1rem 0 .45rem;font-size:1.02rem}
+    #beneficios .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
     #beneficios .stat{
-      background:#0a0f16;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;text-align:center
+      background:#0a0f16;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px;text-align:center
     }
-    #beneficios .stat b{display:block;font-size:1.2rem}
+    #beneficios .stat b{display:block;font-size:1.05rem}
+    #beneficios .cta-row{margin-top:10px}
 
     /* Reviews / carrusel */
     .reviews{position:relative;margin:36px 0}
@@ -146,6 +145,7 @@
     input,select,textarea,button{font-size:16px}
     :focus-visible{outline:2px solid #7c3aed; outline-offset:2px; border-radius:8px}
 
+    /* ===== Breakpoints como los tenías ===== */
     @media (max-width: 992px){
       #beneficios .benefits-wrap{grid-template-columns:1fr}
       #beneficios .stats{grid-template-columns:repeat(3,1fr)}
@@ -155,7 +155,7 @@
       section{padding:48px 0}
       header{background:#0a0f16}
       .grid-3{grid-template-columns:1fr}
-      .nav-links{display:none}
+      .nav-links{display:none}            /* Menú móvil como antes */
       .menu{
         display:block;background:#0f172a;color:#e9eefc;border:1px solid rgba(255,255,255,.28);
         box-shadow:0 8px 24px rgba(0,0,0,.45);padding:10px 14px;border-radius:999px;touch-action:manipulation;
@@ -176,7 +176,7 @@
     }
     @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
-    /* ===== MODAL ACCESO ===== */
+    /* ===== MODAL ACCESO (sin cambios) ===== */
     #acct-modal.acct-hidden{display:none!important}
     #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.65);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
     .acct-dialog{
@@ -220,7 +220,7 @@
         <span class="brand-logo" aria-hidden="true">
           <img src="img/logo.png" alt="" width="34" height="34" loading="eager">
         </span>
-        <span>Taply</span>
+        <span>taply</span>
       </a>
 
       <nav class="nav-links">
@@ -261,7 +261,7 @@
       </div>
     </section>
 
-    <!-- ====== BENEFICIOS (nuevo layout) ====== -->
+    <!-- ====== BENEFICIOS (bloques pequeños) ====== -->
     <section id="beneficios" aria-labelledby="beneficios-title">
       <div class="container">
         <h2 id="beneficios-title">¿Qué podrás conseguir gracias a nuestro sistema?</h2>
@@ -301,8 +301,8 @@
               <div class="stat"><b>4,7★</b><small> media sostenida</small></div>
               <div class="stat"><b>-60%</b><small> quejas públicas</small></div>
             </div>
-            <p style="margin-top:12px;color:var(--muted)">Cada negocio es distinto, pero el patrón es claro: más reseñas reales y mejor reputación.</p>
-            <div class="cta-row" style="justify-content:flex-start;margin-top:14px">
+            <p style="margin-top:8px;color:var(--muted)">Cada negocio es distinto, pero el patrón es claro: más reseñas reales y mejor reputación.</p>
+            <div class="cta-row" style="justify-content:flex-start;margin-top:10px">
               <a class="btn" href="suscripciones.html">Empezar ahora</a>
             </div>
           </aside>
@@ -319,7 +319,7 @@
           <button class="carousel-btn left" id="revPrev" aria-label="Opinión anterior"><span>‹</span></button>
           <button class="carousel-btn right" id="revNext" aria-label="Opinión siguiente"><span>›</span></button>
 
-          <div class="reviews-track" id="reviewsTrack" tabindex="0" aria-label="Opiniones de clientes">
+        <div class="reviews-track" id="reviewsTrack" tabindex="0" aria-label="Opiniones de clientes">
             <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=26" alt="Sara Cordero" width="54" height="54"></div><div><div class="review-name">Sara Cordero</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Instalación en 5 minutos. Los avisos de reseñas negativas nos han permitido corregir fallos en días.</p></article>
             <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=33" alt="Marlon Melara" width="54" height="54"></div><div><div class="review-name">Marlon Melara</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Ahorra tiempo en reputación online. Muy fácil para el cliente.</p></article>
             <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=12" alt="Joan Blanch" width="54" height="54"></div><div><div class="review-name">Joan Blanch</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Subimos reseñas sin pedirlo. El panel de negativas nos ha ayudado a mejorar procesos.</p></article>
@@ -456,7 +456,7 @@
   <script>
     window.addEventListener('load', () => document.body.classList.add('is-loaded'));
 
-    // Menú móvil
+    // Menú móvil (igual que antes)
     const menuBtn=document.getElementById('menuBtn');
     const mobileMenu=document.getElementById('mobileMenu');
     menuBtn?.addEventListener('click', ()=> {
@@ -482,7 +482,7 @@
       let t; track.addEventListener('scroll',()=>{ clearTimeout(t); t=setTimeout(()=>scrollToIndex(nearestIndex()),120); }, {passive:true});
     })();
 
-    /* ======= Cuenta ======= */
+    /* ======= Cuenta (sin cambios) ======= */
     (function(){
       const S = { user:null, polling:null };
       const $  = s => document.querySelector(s);
@@ -504,7 +504,6 @@
       const resendLoginBtn = $('#acct-resend-login');
       const resendRegisterBtn = $('#acct-resend-register');
 
-      // ---- Navegación / historial
       const AUTH_HASHES = ['#auth-login','#auth-register','#auth-recover'];
       function pushAuthState(tab){ history.pushState({auth:true, tab}, '', '#auth-' + tab); }
       window.addEventListener('popstate', (e)=>{
@@ -531,6 +530,7 @@
         });
         if(name==='login'){ $('#acct-title').textContent='Inicia sesión en tu cuenta'; $('#acct-sub').textContent='Introduce tus datos de acceso o crea una cuenta nueva.'; }
         if(name==='register'){ $('#acct-title').textContent='Crea tu cuenta ahora mismo'; $('#acct-sub').textContent='Completa tus datos para registrarte en Taply.'; }
+        ifname==='recover'
         if(name==='recover'){ $('#acct-title').textContent='Recuperar contraseña'; $('#acct-sub').textContent='Te enviaremos un enlace a tu correo para restablecerla.'; }
         if(!fromHistory) pushAuthState(name);
       }
@@ -551,13 +551,11 @@
       $('#link-forgot')?.addEventListener('click', ()=> setTab('recover'));
       $('#recover-back')?.addEventListener('click', ()=> setTab('login'));
 
-      // toggle ojos
       $$('.toggle-eye').forEach(btn=>btn.addEventListener('click', ()=>{
         const sel=btn.getAttribute('data-toggle'); const input=document.querySelector(sel);
         if(!input) return; input.type = input.type==='password' ? 'text' : 'password';
       }));
 
-      // Métrica de contraseña
       const meter = document.getElementById('pw-meter');
       document.getElementById('acct-reg-pass')?.addEventListener('input', e=>{
         const v=e.target.value||''; let score=0;
@@ -565,7 +563,6 @@
         if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; }
       });
 
-      // ===== API helper
       async function api(method,url,body){
         const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:body?JSON.stringify(body):undefined});
         let data=null; try{ data=await res.json(); }catch{}
@@ -585,7 +582,6 @@
         paintNav();
       }
 
-      // Recover
       forms.recover?.addEventListener('submit', async e=>{
         e.preventDefault();
         errs.recover.style.display='none'; okRecover.style.display='none';
@@ -600,7 +596,6 @@
         }
       });
 
-      // Login
       forms.login?.addEventListener('submit', async e=>{
         e.preventDefault();
         errs.login.style.display='none'; resendLoginBtn.style.display='none';
@@ -627,7 +622,6 @@
         }
       });
 
-      // Registro
       forms.register?.addEventListener('submit', async e=>{
         e.preventDefault();
         errs.register.style.display='none'; okRegister.style.display='none'; resendRegisterBtn.style.display='none';
@@ -657,7 +651,6 @@
         }
       });
 
-      // Reenviar verificación (desde LOGIN)
       resendLoginBtn?.addEventListener('click', async ()=>{
         const email = ($('#acct-login-email').value||'').trim();
         errs.login.style.display='none';
@@ -674,7 +667,6 @@
         }
       });
 
-      // Reenviar verificación (desde REGISTER)
       resendRegisterBtn?.addEventListener('click', async ()=>{
         const email = ($('#acct-reg-email').value||'').trim();
         errs.register.style.display='none';
@@ -689,7 +681,6 @@
         }
       });
 
-      // ------- Google: popup + polling
       function startGooglePolling(){
         if(S.polling) clearInterval(S.polling);
         let tries=0;
@@ -713,18 +704,12 @@
           try{ sessionStorage.setItem('taply_from', from); }catch{}
           const url = `/api/google?from=${encodeURIComponent(from)}`;
           const w = window.open(url, '_blank', 'noopener,noreferrer');
-          if(w){
-            startGooglePolling();
-            e.preventDefault();
-          }else{
-            startGooglePolling();
-          }
+          if(w){ startGooglePolling(); e.preventDefault(); } else { startGooglePolling(); }
         }, {capture:true});
       }
       bindGoogle('btn-google-login','login');
       bindGoogle('btn-google-register','register');
 
-      // Menú / sesión
       function paintNav(){
         const slots = ['#acct-nav-slot','#acct-nav-slot-mobile'].map(s=>document.querySelector(s)).filter(Boolean);
         slots.forEach(slot=>{
@@ -749,8 +734,7 @@
           document.addEventListener('click', (e)=>{ if(!dd.contains(e.target)) dd.classList.remove('open'); });
           dd.querySelector('#acct-logout-btn')?.addEventListener('click', async ()=>{
             try{ await api('POST','/api/logout',{});}catch{}
-            setUser(null);
-            alert('Sesión cerrada');
+            setUser(null); alert('Sesión cerrada');
           });
         });
       }
