@@ -96,12 +96,8 @@
       display:block;
       background:url('img/logo.png') center/cover no-repeat;
       box-shadow:var(--shadow);
-      /* ocultar el “⌁” */
-      color:transparent;
-      font-size:0;
-      line-height:0;
+      color:transparent; font-size:0; line-height:0;
     }
-
     .acct-title{margin:10px 0 0;text-align:center;font-weight:800;font-size:1.25rem}
     .acct-sub{margin:6px 0 0;text-align:center;color:var(--muted);font-size:.96rem}
 
@@ -222,9 +218,10 @@
     </article>
   </div>
 
-  <!-- CTA gestionar suscripción (Stripe Portal) bajo las tarjetas -->
+  <!-- CTA gestionar suscripción (Stripe Portal) bajo las tarjetas) -->
   <div class="container" style="text-align:center;margin-top:16px">
-    <button id="portalBtn" class="btn acct-guard">Gestionar mi suscripción</button>
+    <!-- Oculto por defecto; se muestra solo si hay suscripción activa -->
+    <button id="portalBtn" class="btn acct-guard" style="display:none">Gestionar mi suscripción</button>
   </div>
 </section>
 
@@ -587,17 +584,24 @@
     function paintAccountSection(){
       const statusEl = $('#acct-status'), nfcEl = $('#acct-nfc'), authCta = $('#acct-auth-cta');
       const portalRow = $('#acct-portal-row');
+      const portalBtn = document.getElementById('portalBtn'); // botón bajo las tarjetas
+
       if(!S.user){
         statusEl.textContent='Sesión no iniciada';
         nfcEl.textContent='NFC comprados: 0';
         if(authCta) authCta.style.display='block';
         if(portalRow) portalRow.style.display='none';
+        if(portalBtn) portalBtn.style.display='none';
         return;
       }
+
       if(authCta) authCta.style.display='none';
-      statusEl.textContent = isSubActive(S.user) ? prettyPlan(S.user) : 'Sin plan activo';
+      const active = isSubActive(S.user);
+      statusEl.textContent = active ? prettyPlan(S.user) : 'Sin plan activo';
       const qty = Number(S.user.nfc_qty || 0); nfcEl.textContent = `NFC comprados: ${qty}`;
-      if(portalRow) portalRow.style.display = isSubActive(S.user) ? 'block' : 'none';
+
+      if(portalRow) portalRow.style.display = active ? 'block' : 'none';
+      if(portalBtn) portalBtn.style.display = active ? 'inline-flex' : 'none';
     }
 
     async function forceSessionRefresh(retries=4, delay=600){
