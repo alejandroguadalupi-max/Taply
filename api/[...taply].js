@@ -120,28 +120,53 @@ async function hasValidSubscription(stripe, customerId){
 function addDays(d, days){ return new Date(d.getTime() + days*24*60*60*1000); }
 
 /* ===== Email (Sendgrid) con reintentos ===== */
+/* ===== Email (Sendgrid) con parsing robusto ===== */
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 async function withTimeout(promise, ms){
   let t; const timeout = new Promise((_,rej)=> t=setTimeout(()=>rej(Object.assign(new Error('email_timeout'),{code:'email_timeout'})), ms));
   try { return await Promise.race([promise, timeout]); }
   finally { clearTimeout(t); }
 }
+function parseAddress(v=''){
+  // admite: "Nombre <correo>", "correo", "Nombre<correo>", comillas, espacios…
+  const s = String(v).trim();
+  const m = s.match(/^(?:"?([^"<]+)"?\s*)?<\s*([^>]+)\s*>$/); // Nombre <correo>
+  if (m) return { email: m[2].trim(), name: (m[1]||'').trim() || undefined };
+  return { email: s, name: undefined };
+}
+function isTaplyEmail(v=''){ return /@taply\.es$/i.test(String(v).trim()); }
+
 async function sendEmail({to, subject, text, html}){
   try{
-    if(!process.env.SENDGRID_API_KEY || !process.env.EMAIL_FROM || !to){
-      console.warn('sendEmail: falta configuración o destinatario', { hasKey:!!process.env.SENDGRID_API_KEY, from:process.env.EMAIL_FROM, to });
+    const RAW_FROM = (process.env.EMAIL_FROM || '').trim();
+    const RAW_REPLY = (process.env.EMAIL_REPLY_TO || '').trim();
+    if(!process.env.SENDGRID_API_KEY || !RAW_FROM || !to){
+      console.warn('sendEmail: falta cfg', { hasKey:!!process.env.SENDGRID_API_KEY, RAW_FROM, to });
       return false;
     }
+
     const { default: sgMail } = await import('@sendgrid/mail');
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+    // Normalizamos FROM / REPLY-TO
+    const fromParsed = parseAddress(RAW_FROM);
+    const replyParsed = RAW_REPLY ? parseAddress(RAW_REPLY) : null;
+
+    // Forzamos que DKIM firme con taply.es: si el FROM no es @taply.es, abortamos
+    if (!isTaplyEmail(fromParsed.email)) {
+      console.error('FROM no es dominio taply.es. Corrige EMAIL_FROM en Vercel:', fromParsed.email);
+      return false;
+    }
+    // Evita Reply-To en gmail mientras pruebas BIMI
+    const replyTo = replyParsed && isTaplyEmail(replyParsed.email) ? { email: replyParsed.email, name: replyParsed.name } : undefined;
 
     const isVerify = /Confirma tu correo/i.test(subject) || /\/api\/verify-email/i.test(String(html||''));
     const payload = {
       to,
-      from: process.env.EMAIL_FROM,
-      replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM,
+      from: { email: fromParsed.email, name: fromParsed.name || 'Taply' }, // 👈 objeto; SendGrid lo traga siempre
+      ...(replyTo ? { replyTo } : {}),
       subject,
-      text: text || (html ? html.replace(/<[^>]+>/g,' ') : ''),
+      text: text || (html ? String(html).replace(/<[^>]+>/g,' ') : ''),
       html: html || `<p>${text || ''}</p>`,
       ...(isVerify ? { trackingSettings: { clickTracking: { enable: false, enableText: false } } } : {})
     };
@@ -896,7 +921,8 @@ async function postPago(req, res){
       ${amountText ? `<p>Importe: ${amountText}</p>` : ''}
       ${sessionId ? `<p>Checkout Session: ${sessionId}</p>` : ''}
     `;
-    await sendEmail({ to: process.env.EMAIL_FROM, subject: subjAdm, html: htmlAdm });
+    await sendEmail({ to: parseAddress(process.env.EMAIL_FROM).email, subject: subjAdm, html: htmlAdm });
+
   }
 
   return res.status(200).json({ ok:true });
