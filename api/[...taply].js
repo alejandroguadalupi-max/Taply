@@ -125,10 +125,14 @@ async function withTimeout(promise, ms){
   try { return await Promise.race([promise, timeout]); }
   finally { clearTimeout(t); }
 }
+// Acepta: Name<mail>, Name <mail>, "Name" <mail>, <mail>, o solo email.
+// También corrige accidentalmente guiones bajos en lugar de espacios.
 function parseAddress(v=''){
-  const s = String(v).trim();
-  const m = s.match(/^(?:"?([^"<]+)"?\s*)?<\s*([^>]+)\s*>$/);
+  const s = String(v).trim().replace(/_/g, ' ');
+  let m = s.match(/^(?:"?([^"<]+)"?)?\s*<\s*([^>]+)\s*>$/);
   if (m) return { email: m[2].trim(), name: (m[1]||'').trim() || undefined };
+  m = s.match(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/);
+  if (m) return { email: m[1], name: undefined };
   return { email: s, name: undefined };
 }
 function isTaplyEmail(v=''){ return /@taply\.es$/i.test(String(v).trim()); }
@@ -152,22 +156,19 @@ async function sendEmail({to, subject, text, html}){
     }
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+    // FROM y REPLY-TO tolerantes
     const fromParsed  = parseAddress(RAW_FROM);
     const replyParsed = RAW_REPLY ? parseAddress(RAW_REPLY) : null;
 
-    // En prod puedes exigir @taply.es; en dev comenta este if si hace falta.
-    if (!isTaplyEmail(fromParsed.email)) {
-      console.error('EMAIL_FROM debe ser @taply.es. Valor actual:', fromParsed.email);
-      return false;
-    }
-    const replyTo = replyParsed && isTaplyEmail(replyParsed.email)
-      ? { email: replyParsed.email, name: replyParsed.name }
-      : undefined;
+    // Fallback seguro para no bloquear envíos si EMAIL_FROM viene raro
+    const defaultFrom = { email: 'notificaciones@taply.es', name: 'Taply' };
+    const from = isTaplyEmail(fromParsed.email) ? { email: fromParsed.email, name: fromParsed.name || 'Taply' } : defaultFrom;
+    const replyTo = replyParsed ? { email: replyParsed.email, name: replyParsed.name } : undefined;
 
     const isVerify = /Confirma tu correo/i.test(subject) || /\/api\/verify-email/i.test(String(html||''));
     const payload = {
       to,
-      from: { email: fromParsed.email, name: fromParsed.name || 'Taply' },
+      from,
       ...(replyTo ? { replyTo } : {}),
       subject,
       text: text || (html ? String(html).replace(/<[^>]+>/g,' ') : ''),
@@ -188,7 +189,7 @@ async function sendEmail({to, subject, text, html}){
   return false;
 }
 
-/* ===== Plantillas email ===== */
+/* ===== Plantillas email (sin logo) ===== */
 function _safeName(name){ return (name || '').trim() || null; }
 function _emailBaseCss(){
   return `
@@ -196,13 +197,7 @@ function _emailBaseCss(){
   body{margin:0;background:#0b0f1a;font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial,sans-serif}
   .wrap{padding:24px}
   .card{max-width:680px;margin:0 auto;background:#0e1424;border:1px solid rgba(255,255,255,.12);border-radius:16px;overflow:hidden}
-  /* Header: logo + marca */
-  .hdr{padding:22px 24px;display:flex;align-items:center;gap:12px;background:#0b1020}
-  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(180deg,#7c3aed,#3b82f6)}
-  .brand{
-    font-weight:600;color:#e9eefc;font-size:17px;letter-spacing:.2px;
-    display:flex;align-items:center;height:34px;line-height:1;
-  }
+  .hdr{padding:18px 24px;background:#0b1020;color:#e9eefc;font-weight:600;letter-spacing:.2px}
   .body{background:#0e1424;padding:28px 24px 20px;color:#dbe6ff}
   h1{margin:0 0 8px;font-size:36px;line-height:1.1;color:#e9eefc}
   .lead{font-size:18px;line-height:1.5;margin:14px 0 10px;color:#c9d6ff}
@@ -214,7 +209,7 @@ function _emailBaseCss(){
   @media (prefers-color-scheme: light){
     body{background:#f3f6ff}
     .card{background:#ffffff;border:1px solid rgba(2,6,23,.08)}
-    .hdr{background:#f7f9ff}
+    .hdr{background:#f7f9ff;color:#18213b}
     .body{background:#fff;color:#26324d}
     h1{color:#18213b}
     .lead,.p{color:#394b76}
@@ -228,7 +223,7 @@ function _shell({title, preheader, lead, blocks=[], cta, ctaUrl, brand='Taply'})
   <title>${title}</title><style>${_emailBaseCss()}</style></head><body>
   <span style="display:none!important;opacity:0;max-height:0;overflow:hidden">${pre}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</span>
   <div class="wrap"><div class="card">
-    <div class="hdr"><div class="logo"></div><div class="brand">${brand}</div></div>
+    <div class="hdr">${brand}</div>
     <div class="body">
       <h1>${title}</h1>
       ${lead?`<div class="lead">${lead}</div>`:''}
@@ -535,7 +530,7 @@ async function googleOAuthCallback(req, res){
   }
 }
 
-/* ===== Verificación de email (acepta token+email o sólo token; GET y POST) ===== */
+/* ===== Verificación de email ===== */
 async function findCustomerByVerifyToken(stripe, token){
   try{
     const q = `metadata['taply_email_token']:'${escapeStripeQueryValue(token)}'`;
@@ -1087,6 +1082,13 @@ export default async function handler(req, res){
 
       if (route === 'resend-verification') return resendVerification(req,res);
       if (route === 'verify-email') return verifyEmail(req,res); // permite POST también
+
+      // ---- Self test de email (opcional) ----
+      if (route === 'email-self-test') {
+        const to = getBody(req).to || parseAddress(process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM || '').email;
+        const ok = await sendEmail({ to, subject: 'Ping Taply', html: '<p>Funciona ✅</p>' });
+        return res.status(ok ? 200 : 500).json({ ok });
+      }
     }
 
     return res.status(404).json({ error:'not_found', message:'Ruta no encontrada.', route, method:req.method });
