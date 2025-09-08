@@ -126,7 +126,7 @@ async function withTimeout(promise, ms){
   finally { clearTimeout(t); }
 }
 // Acepta: Name<mail>, Name <mail>, "Name" <mail>, <mail>, o solo email.
-// También corrige accidentalmente guiones bajos en lugar de espacios.
+// Corrige guiones bajos usados como espacio (ej. "Taply_<...>").
 function parseAddress(v=''){
   const s = String(v).trim().replace(/_/g, ' ');
   let m = s.match(/^(?:"?([^"<]+)"?)?\s*<\s*([^>]+)\s*>$/);
@@ -160,12 +160,27 @@ async function sendEmail({to, subject, text, html}){
     const fromParsed  = parseAddress(RAW_FROM);
     const replyParsed = RAW_REPLY ? parseAddress(RAW_REPLY) : null;
 
-    // Fallback seguro para no bloquear envíos si EMAIL_FROM viene raro
+    // Fallback seguro: usa dominio taply.es si el FROM no cuadra
     const defaultFrom = { email: 'notificaciones@taply.es', name: 'Taply' };
     const from = isTaplyEmail(fromParsed.email) ? { email: fromParsed.email, name: fromParsed.name || 'Taply' } : defaultFrom;
     const replyTo = replyParsed ? { email: replyParsed.email, name: replyParsed.name } : undefined;
 
+    // Desactivar click-tracking para:
+    // - verificación de correo (para evitar enlaces "trackeados")
+    // - destinatarios Apple (@icloud/@me/@mac), que a veces filtran enlaces con tracking
     const isVerify = /Confirma tu correo/i.test(subject) || /\/api\/verify-email/i.test(String(html||''));
+    const toEmailForCheck = (() => {
+      if (typeof to === 'string') return to;
+      if (Array.isArray(to)) {
+        const first = to[0];
+        return typeof first === 'string' ? first : (first?.email || '');
+      }
+      if (to && typeof to === 'object') return to.email || '';
+      return '';
+    })();
+    const isApple = /@(icloud|me|mac)\.com$/i.test(toEmailForCheck);
+    const disableClicks = isVerify || isApple;
+
     const payload = {
       to,
       from,
@@ -173,7 +188,7 @@ async function sendEmail({to, subject, text, html}){
       subject,
       text: text || (html ? String(html).replace(/<[^>]+>/g,' ') : ''),
       html: html || `<p>${text || ''}</p>`,
-      ...(isVerify ? { trackingSettings: { clickTracking: { enable: false, enableText: false } } } : {})
+      ...(disableClicks ? { trackingSettings: { clickTracking: { enable: false, enableText: false } } } : {})
     };
 
     for(let i=1;i<=3;i++){
@@ -875,7 +890,7 @@ async function postPago(req, res){
   const sess = getSessionFromCookie(req);
   if(!buyerEmail && sess?.email) buyerEmail = sess.email;
 
-  // Idempotencia: evita correos duplicados si reintentan
+  // Idempotencia
   let idempotencyMarked = false;
   const piId = typeof cs?.payment_intent === 'string' ? cs.payment_intent : cs?.payment_intent?.id;
 
@@ -883,7 +898,6 @@ async function postPago(req, res){
     try{
       const pi = await stripe.paymentIntents.retrieve(piId);
       if (pi?.metadata?.taply_thankyou_sent === '1') {
-        // Ya se notificó antes
         return res.status(200).json({ ok:true, already_notified:true });
       }
     }catch(e){ console.error('read PI metadata error', e?.message || e); }
