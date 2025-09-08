@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Restablecer contraseña — Taply</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12); --brand1:#00d4ff; --brand2:#7c3aed; --err:#ef4444; --ok:#22c55e }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui}
+    a{color:inherit;text-decoration:none}
+    .wrap{width:min(560px,94%);margin:36px auto}
+    .card{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:22px}
+    h1{margin:0 0 8px}
+    p{margin:0 0 10px}
+    label{display:grid;gap:6px;margin:10px 0}
+    input{font-size:16px;background:#0a0f16;border:1px solid var(--b);color:inherit;border-radius:12px;padding:12px}
+    .btn{padding:12px 16px;border:0;border-radius:999px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017}
+    .btn.ghost{background:transparent;border:1px solid var(--b);color:var(--txt)}
+    .muted{color:var(--muted)} .err{color:var(--err)} .ok{color:var(--ok)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <!-- Pide email (cuando NO hay token) -->
+    <article id="view-request" class="card" style="display:none">
+      <h1>Recuperar acceso</h1>
+      <p class="muted">Escribe tu correo y te enviaremos un enlace para restablecer tu contraseña.</p>
+      <form id="form-request" novalidate>
+        <label>Correo
+          <input id="req-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
+        </label>
+        <div class="row">
+          <button class="btn" type="submit">Enviar enlace</button>
+          <a class="btn ghost" href="suscripciones.html">Volver</a>
+        </div>
+        <p id="req-msg" class="muted"></p>
+      </form>
+    </article>
+
+    <!-- Pone nueva contraseña (cuando SÍ hay token) -->
+    <article id="view-reset" class="card" style="display:none">
+      <h1>Restablecer contraseña</h1>
+      <p class="muted">Introduce una nueva contraseña para tu cuenta.</p>
+      <form id="form-reset" novalidate>
+        <label>Nueva contraseña
+          <input id="p1" type="password" minlength="6" required placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        </label>
+        <label>Confirmar contraseña
+          <input id="p2" type="password" minlength="6" required placeholder="Repite la contraseña" autocomplete="new-password">
+        </label>
+        <div class="row">
+          <button class="btn" type="submit">Guardar</button>
+          <a class="btn ghost" href="suscripciones.html">Cancelar</a>
+        </div>
+        <p id="msg" class="muted"></p>
+      </form>
+    </article>
+  </main>
+
+<script>
+  const $=s=>document.querySelector(s);
+  const qs=new URLSearchParams(location.search);
+  const token=(qs.get('token')||'').trim();
+  const email=(qs.get('email')||'').trim();
+
+  // Simple helper con códigos de error
+  async function api(method,url,body){
+    const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',body:body?JSON.stringify(body):undefined});
+    let d=null; try{ d=await r.json(); }catch{}
+    if(!r.ok){ const e=new Error(d?.message||'error'); e.code=d?.error||'http_error'; throw e; }
+    return d;
+  }
+
+  // Mostrar vista correcta
+  if(token && email){
+    // Formulario de NUEVA contraseña
+    $('#view-reset').style.display='block';
+    const form=$('#form-reset'), msg=$('#msg');
+    form.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const p1=$('#p1').value, p2=$('#p2').value;
+      msg.className='muted'; msg.textContent='Guardando…';
+      if(p1.length<6){ msg.textContent='La contraseña debe tener al menos 6 caracteres.'; msg.className='err'; return; }
+      if(p1!==p2){ msg.textContent='Las contraseñas no coinciden.'; msg.className='err'; return; }
+      try{
+        await api('POST','/api/reset-password',{ email, token, password:p1 });
+        msg.textContent='Contraseña cambiada. Ya puedes iniciar sesión.'; msg.className='ok';
+        setTimeout(()=>location.href='suscripciones.html#auth-login',1200);
+      }catch(err){
+        msg.textContent = (err.code==='invalid_or_expired_token') ? 'El enlace no es válido o ha caducado.' : (err.message || 'No se pudo restablecer.');
+        msg.className='err';
+      }
+    });
+  }else{
+    // Formulario de SOLICITAR enlace
+    $('#view-request').style.display='block';
+    const form=$('#form-request'), msg=$('#req-msg');
+    form.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const em=$('#req-email').value.trim();
+      if(!em){ msg.textContent='Escribe tu correo.'; msg.className='err'; return; }
+      msg.textContent='Enviando…'; msg.className='muted';
+      try{
+        const res=await api('POST','/api/request-password-reset',{email:em});
+        // Si el backend confirma, mostramos OK. Si no existe, debe devolver error 'account_not_found'
+        msg.textContent = res?.message || 'Te enviamos un enlace de restablecimiento (caduca en 1 hora).';
+        msg.className='ok';
+      }catch(err){
+        if(err.code==='account_not_found'){
+          msg.textContent='No existe ninguna cuenta con ese correo.';
+          msg.className='err';
+        }else{
+          msg.textContent=err.message||'No se pudo enviar el correo.';
+          msg.className='err';
+        }
+      }
+    });
+  }
+</script>
+</body>
+</html>
+

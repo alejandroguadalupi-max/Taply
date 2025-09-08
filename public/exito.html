@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>¡Gracias! — Taply</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12); --brand1:#00d4ff; --brand2:#7c3aed; }
+    *{box-sizing:border-box} html,body{height:100%} html{-webkit-text-size-adjust:100%}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui;display:grid;place-items:center}
+    .card{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:28px 22px;max-width:560px;width:92%;text-align:center;box-shadow:0 12px 30px rgba(0,0,0,.45)}
+    h1{margin:.2rem 0 .6rem}
+    p{color:var(--muted);margin:.4rem 0}
+    .btn{display:inline-block;margin-top:14px;padding:12px 18px;border-radius:999px;font-weight:800;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017;text-decoration:none}
+    .muted{color:var(--muted)}
+    .ok{color:#86efac}
+    .spinner{width:30px;height:30px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:#b3e1ff;margin:10px auto;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    code{background:#0a0f16;padding:2px 6px;border-radius:6px;border:1px solid var(--b);color:#cfe3ff}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div style="font-size:56px;line-height:1">🎉</div>
+    <h1>¡Pago correcto!</h1>
+    <p id="line1">Estamos guardando tu compra y actualizando tu cuenta…</p>
+    <div class="spinner" id="spin"></div>
+    <p class="muted" id="hint">Si no pasa nada en unos segundos, pulsa el botón.</p>
+    <a id="go" class="btn" href="gestionar.html" style="display:inline-block">Ir a gestionar</a>
+    <p class="muted" style="margin-top:14px"><small id="debug"></small></p>
+  </main>
+
+  <script>
+  (async ()=>{
+    const qs = new URLSearchParams(location.search);
+    const sid = qs.get('session_id');
+    const $ = s => document.querySelector(s);
+
+    function setDebug(msg){ $('#debug').textContent = msg || ''; }
+
+    try{
+      if(sid){
+        // 1) Si el usuario llegó sin cookie, crea sesión a partir del checkout
+        try{
+          await fetch('/api/store-customer-from-session', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            credentials:'include',
+            body: JSON.stringify({ session_id: sid })
+          });
+        }catch(e){ /* puede fallar si ya hay sesión, no pasa nada */ }
+
+        // 2) Fallback de post-pago: suma NFC y notifica por email (si procede)
+        try{
+          await fetch('/api/post-pago', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            credentials:'include',
+            body: JSON.stringify({ session_id: sid })
+          });
+        }catch(e){ /* silencioso */ }
+
+        // 3) Limpia la query
+        try{
+          qs.delete('session_id');
+          const url = location.pathname + (qs.toString()?('?'+qs.toString()):'');
+          history.replaceState({}, '', url);
+        }catch{}
+      }
+
+      // 4) Decide destino en función de si hay suscripción activa
+      let next = 'suscripciones.html';
+      try{
+        const r = await fetch('/api/session',{ credentials:'include', cache:'no-store' });
+        const data = await r.json();
+        const st = (data?.user?.subscription_status||'').toLowerCase();
+        if(st==='active' || st==='trialing' || st==='past_due') next = 'gestionar.html';
+      }catch{}
+
+      // 5) UI + autoredirección
+      $('#line1').innerHTML = '<span class="ok">Listo.</span> Hemos actualizado tu cuenta.';
+      $('#spin').style.display='none';
+      $('#go').setAttribute('href', next);
+      setTimeout(()=> location.replace(next), 1200);
+      setDebug('');
+    }catch(ex){
+      $('#spin').style.display='none';
+      $('#hint').textContent = 'Algo fue lento. Puedes continuar ahora.';
+      setDebug(String(ex));
+    }
+  })();
+  </script>
+</body>
+</html>

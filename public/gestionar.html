@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+  <title>Gestionar suscripción — Taply</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12);
+           --brand1:#00d4ff; --brand2:#7c3aed; }
+    *{box-sizing:border-box} html,body{height:100%} html{-webkit-text-size-adjust:100%}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui;display:grid;place-items:center}
+    .card{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:22px;width:min(620px,94%)}
+    .btn{padding:12px 16px;border:0;border-radius:999px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017}
+    .ghost{padding:12px 16px;border:1px solid var(--b);border-radius:999px;background:transparent;color:inherit}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    a{color:#b3e1ff;text-decoration:none}
+    .muted{color:var(--muted)}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1 style="margin:0 0 8px">Gestionar suscripción</h1>
+    <p id="state" class="muted">Abriendo portal seguro…</p>
+    <div class="row" style="margin-top:12px">
+      <a class="ghost" href="suscripciones.html">Volver a suscripciones</a>
+      <button id="retry" class="btn">Reintentar</button>
+    </div>
+  </main>
+
+  <script>
+    const $=s=>document.querySelector(s);
+    async function api(method,url,body){
+      const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:body?JSON.stringify(body):undefined});
+      let data=null; try{ data=await res.json(); }catch{}
+      if(!res.ok){ const e=new Error(data?.message||'error'); e.code=data?.error||'http_error'; throw e; }
+      return data;
+    }
+
+    async function go(){
+      $('#state').textContent='Comprobando sesión…';
+      try{
+        const s=await api('GET','/api/session');
+        if(!s?.user){ location.href='suscripciones.html#auth-login'; return; }
+      }catch{
+        location.href='suscripciones.html#auth-login';
+        return;
+      }
+      $('#state').textContent='Creando sesión en el portal…';
+      try{
+        const r=await fetch('/api/portal',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include'});
+        const d=await r.json().catch(()=>null);
+        if(r.ok && d?.url){ location.href=d.url; return; }
+        throw new Error(d?.message || d?.error || 'No se recibió URL del portal');
+      }catch(ex){
+        console.error(ex);
+        $('#state').textContent = 'No se pudo abrir el portal. Puedes intentarlo de nuevo.';
+      }
+    }
+
+    $('#retry').addEventListener('click', go);
+    go();
+  </script>
+</body>
+</html>
+
