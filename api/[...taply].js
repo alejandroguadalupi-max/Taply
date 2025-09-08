@@ -11,15 +11,14 @@ const COOKIE_NAME = 'taply_session';
 const RESET_TTL_SECONDS = 60 * 60; // 1 hora
 const EMAIL_VERIFY_TTL_SECONDS = 60 * 60 * 24; // 24h
 
+// Solo existen basic y pro
 const PRICES = {
   monthly: {
     basic: process.env.PRICE_ID_BASIC_MONTH,
-    medio: process.env.PRICE_ID_MEDIO_MONTH,
     pro:   process.env.PRICE_ID_PRO_MONTH,
   },
   annual: {
     basic: process.env.PRICE_ID_BASIC_YEAR,
-    medio: process.env.PRICE_ID_MEDIO_YEAR,
     pro:   process.env.PRICE_ID_PRO_YEAR,
   },
 };
@@ -144,12 +143,19 @@ async function sendEmail({to, subject, text, html}){
       return false;
     }
 
-    const { default: sgMail } = await import('@sendgrid/mail');
+    // Import robusto para CJS/ESM
+    const mod = await import('@sendgrid/mail');
+    const sgMail = mod.default || mod;
+    if (!sgMail || typeof sgMail.setApiKey !== 'function') {
+      console.error('sendEmail: import de @sendgrid/mail no expone setApiKey');
+      return false;
+    }
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
     const fromParsed  = parseAddress(RAW_FROM);
     const replyParsed = RAW_REPLY ? parseAddress(RAW_REPLY) : null;
 
+    // En prod puedes exigir @taply.es; en dev comenta este if si hace falta.
     if (!isTaplyEmail(fromParsed.email)) {
       console.error('EMAIL_FROM debe ser @taply.es. Valor actual:', fromParsed.email);
       return false;
@@ -170,8 +176,10 @@ async function sendEmail({to, subject, text, html}){
     };
 
     for(let i=1;i<=3;i++){
-      try{ await withTimeout(sgMail.send(payload), 8000); return true; }
-      catch(e){
+      try{
+        await withTimeout(sgMail.send(payload), 8000);
+        return true;
+      }catch(e){
         console.error(`sendEmail intento ${i} falló:`, e?.message || e, e?.response?.body || '');
         if(i<3) await sleep(600*i);
       }
@@ -213,7 +221,6 @@ function _emailBaseCss(){
     .foot{background:#f7f9ff;border-color:rgba(2,6,23,.06);color:#4d5f86}
   }`;
 }
-
 function _shell({title, preheader, lead, blocks=[], cta, ctaUrl, brand='Taply'}){
   const b = blocks.map(t=>`<p class="p">${t}</p>`).join('');
   const pre = (preheader||'').replace(/\n/g,' ').slice(0,140);
@@ -833,10 +840,20 @@ async function postPago(req, res){
 
   if(sessionId){
     try{
-      cs = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['line_items','customer_details'] });
-      buyerEmail = cs.customer_details?.email || cs.customer_email || null;
-      buyerPhone = cs.customer_details?.phone || null;
+      cs = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ['line_items.data.price','customer','customer_details','payment_intent']
+      });
+
+      // Solo enviamos correo si el pago está completado
+      const isPaid = cs?.payment_status === 'paid' || cs?.status === 'complete';
+      if (!isPaid) {
+        return res.status(202).json({ ok:false, pending:true, message:'La sesión de pago no está completada todavía.' });
+      }
+
+      buyerEmail = cs.customer_details?.email || cs.customer_email || (typeof cs.customer !== 'string' ? cs.customer?.email : null) || null;
+      buyerPhone = cs.customer_details?.phone || (typeof cs.customer !== 'string' ? cs.customer?.phone : null) || null;
       customerId = typeof cs.customer === 'string' ? cs.customer : cs.customer?.id || null;
+
       const li = cs.line_items?.data || [];
       lineSummary = li.map(i => `${i.quantity} × ${i.description || i.price?.nickname || i.price?.id}`).join(', ');
       amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '';
@@ -863,6 +880,26 @@ async function postPago(req, res){
   const sess = getSessionFromCookie(req);
   if(!buyerEmail && sess?.email) buyerEmail = sess.email;
 
+  // Idempotencia: evita correos duplicados si reintentan
+  let idempotencyMarked = false;
+  const piId = typeof cs?.payment_intent === 'string' ? cs.payment_intent : cs?.payment_intent?.id;
+
+  if (piId) {
+    try{
+      const pi = await stripe.paymentIntents.retrieve(piId);
+      if (pi?.metadata?.taply_thankyou_sent === '1') {
+        // Ya se notificó antes
+        return res.status(200).json({ ok:true, already_notified:true });
+      }
+    }catch(e){ console.error('read PI metadata error', e?.message || e); }
+  } else if (cs?.id) {
+    try{
+      if (cs?.metadata?.taply_thankyou_sent === '1') {
+        return res.status(200).json({ ok:true, already_notified:true });
+      }
+    }catch(e){ console.error('read CS metadata error', e?.message || e); }
+  }
+
   if(buyerEmail){
     try{
       if (cs?.mode === 'subscription') {
@@ -879,6 +916,18 @@ async function postPago(req, res){
         const ok = await sendEmail({ to: buyerEmail, subject: tpl.subject, html: tpl.html });
         if(!ok){ await sendEmail({ to: buyerEmail, subject: 'Pedido recibido — Taply', html: `<h2>¡Gracias!</h2><p>Hemos recibido tu pedido NFC.</p>` }); }
       }
+
+      // Marca idempotencia
+      try{
+        if (piId) {
+          const pi = await stripe.paymentIntents.retrieve(piId);
+          await stripe.paymentIntents.update(piId, { metadata: { ...(pi.metadata||{}), taply_thankyou_sent:'1' }});
+        } else if (cs?.id) {
+          await stripe.checkout.sessions.update(cs.id, { metadata: { ...(cs.metadata||{}), taply_thankyou_sent:'1' }});
+        }
+        idempotencyMarked = true;
+      }catch(e){ console.error('set idempotency flag error', e?.message || e); }
+
     }catch(e){
       console.error('send designed email failed, falling back', e?.message || e);
       const subj = '¡Gracias! Hemos recibido tu compra';
@@ -904,7 +953,7 @@ async function postPago(req, res){
     await sendEmail({ to: parseAddress(process.env.EMAIL_FROM).email, subject: subjAdm, html: htmlAdm });
   }
 
-  return res.status(200).json({ ok:true });
+  return res.status(200).json({ ok:true, notified: !!buyerEmail, idempotencyMarked });
 }
 
 async function storeCustomerFromSession(req, res){
@@ -1010,7 +1059,7 @@ export default async function handler(req, res){
 
       if (route === 'verify-email') return verifyEmail(req,res);
 
-      // ✅ Permitir pruebas de post-pago por GET con ?session_id=...
+      // Permitir pruebas de post-pago por GET con ?session_id=...
       if (route === 'post-pago') return postPago(req,res);
     }
 
@@ -1037,7 +1086,7 @@ export default async function handler(req, res){
       if (route === 'store-customer-from-session') return storeCustomerFromSession(req,res);
 
       if (route === 'resend-verification') return resendVerification(req,res);
-      if (route === 'verify-email') return verifyEmail(req,res); // <-- permite POST también
+      if (route === 'verify-email') return verifyEmail(req,res); // permite POST también
     }
 
     return res.status(404).json({ error:'not_found', message:'Ruta no encontrada.', route, method:req.method });
