@@ -96,7 +96,10 @@
       display:block;
       background:url('img/logo.png') center/cover no-repeat;
       box-shadow:var(--shadow);
-      color:transparent; font-size:0; line-height:0;
+      /* ocultar el “⌁” */
+      color:transparent;
+      font-size:0;
+      line-height:0;
     }
     .acct-title{margin:10px 0 0;text-align:center;font-weight:800;font-size:1.25rem}
     .acct-sub{margin:6px 0 0;text-align:center;color:var(--muted);font-size:.96rem}
@@ -151,29 +154,32 @@
   <div class="container">
     <h1 class="h1">Empieza en dos pasos</h1>
     <p class="lead">Primero compra los NFC para tus mesas, después activa la suscripción que más te convenga. Son pagos independientes y tras cada compra recibirás un WhatsApp con instrucciones y contacto directo.</p>
-    <div class="steps">
-      <span class="step-pill"><span class="n">1</span> Comprar NFC</span>
-      <span class="step-pill"><span class="n">2</span> Elegir suscripción</span>
-    </div>
+  </div>
+</section>
 
-    <div class="chooser">
-      <article class="card">
-        <span class="badge">Paso 1</span>
-        <h3>Comprar NFC</h3>
-        <p>Dispositivos que colocas en las mesas o mostradores. Pago único, necesarios para empezar.</p>
-        <div class="actions">
-          <a href="#" id="showNfc" class="btn">Comprar NFC</a>
-        </div>
-      </article>
-      <article class="card">
-        <span class="badge">Paso 2</span>
-        <h3>Activar Suscripción</h3>
-        <p>Elige plan mensual o anual para gestionar reseñas, panel privado y más. Una vez tengas NFC.</p>
-        <div class="actions">
-          <a href="#" id="showSub" class="btn">Ver planes</a>
-        </div>
-      </article>
-    </div>
+<section class="container">
+  <div class="steps">
+    <span class="step-pill"><span class="n">1</span> Comprar NFC</span>
+    <span class="step-pill"><span class="n">2</span> Elegir suscripción</span>
+  </div>
+
+  <div class="chooser">
+    <article class="card">
+      <span class="badge">Paso 1</span>
+      <h3>Comprar NFC</h3>
+      <p>Dispositivos que colocas en las mesas o mostradores. Pago único, necesarios para empezar.</p>
+      <div class="actions">
+        <a href="#" id="showNfc" class="btn">Comprar NFC</a>
+      </div>
+    </article>
+    <article class="card">
+      <span class="badge">Paso 2</span>
+      <h3>Activar Suscripción</h3>
+      <p>Elige plan mensual o anual para gestionar reseñas, panel privado y más. Una vez tengas NFC.</p>
+      <div class="actions">
+        <a href="#" id="showSub" class="btn">Ver planes</a>
+      </div>
+    </article>
   </div>
 </section>
 
@@ -342,6 +348,49 @@
 </div>
 
 <script>
+  /* ===== Manejo de retorno desde Stripe Portal =====
+     Acepta: ?from=stripe-portal o #from=stripe-portal (y stripe_portal_return)
+     Sugerencia Return URL: https://taply.es/suscripciones#from=stripe-portal
+  */
+  (function(){
+    const hash = (location.hash||'').replace(/^#/,'');
+    const search = (location.search||'').replace(/^\?/,'');
+    const h = new URLSearchParams(hash);
+    const q = new URLSearchParams(search);
+    const from = h.get('from') || q.get('from') ||
+                 (h.has('stripe_portal_return') ? 'stripe-portal' : null) ||
+                 (q.has('stripe_portal_return') ? 'stripe-portal' : null);
+
+    function openSubPanelHere(){
+      document.addEventListener('DOMContentLoaded', function(){
+        const sub = document.getElementById('panel-sub');
+        const nfc = document.getElementById('panel-nfc');
+        if(sub) sub.classList.add('show');
+        if(nfc) nfc.classList.remove('show');
+        try{ sub && sub.scrollIntoView({behavior:'smooth'}); }catch(e){}
+        try{ history.replaceState(null,'',location.pathname); }catch(e){}
+      });
+    }
+
+    async function redirectToSubs(){
+      const candidates = ['/suscripciones', '/suscripciones.html', '/suscripciones/'];
+      for (const p of candidates){
+        try{
+          const res = await fetch(p, { method:'HEAD', cache:'no-store' });
+          if(res.ok){ location.replace(p + '#from=stripe-portal'); return; }
+        }catch(e){}
+      }
+      // Último recurso: vuelve a inicio con ancla
+      location.replace('/#suscripciones');
+    }
+
+    if(from === 'stripe-portal'){
+      const onSubs = /\/suscripciones(\.html|\/)?$/i.test(location.pathname);
+      if(onSubs) openSubPanelHere();
+      else redirectToSubs();
+    }
+  })();
+
   // ----------- Utilidades UI ----------- 
   const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
   const fmt = v => new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(v);
@@ -511,7 +560,6 @@
           <a id="resend-verif" class="badge" style="cursor:pointer">Reenviar verificación</a>
         `;
         oks.register.style.display='block';
-        setTimeout(()=>{ document.getElementById('resend-verif')?.addEventListener('click',()=>resendVerification(email)); },0);
       }catch(err){
         const map = {
           email_in_use_google:'Ese correo ya existe como cuenta Google. Inicia sesión con Google.',
