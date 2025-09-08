@@ -3,115 +3,90 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>¡Pago correcto! — Taply</title>
+  <title>¡Gracias! — Taply</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12);
-           --g1:#00d4ff; --g2:#7c3aed; }
+    :root{ --bg:#0b0f1a; --card:#0e1424; --txt:#e9eefc; --muted:#9fb0c6; --b:rgba(255,255,255,.12); --brand1:#00d4ff; --brand2:#7c3aed; }
     *{box-sizing:border-box} html,body{height:100%} html{-webkit-text-size-adjust:100%}
     body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui;display:grid;place-items:center}
     .card{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:28px 22px;max-width:560px;width:92%;text-align:center;box-shadow:0 12px 30px rgba(0,0,0,.45)}
-    h1{margin:.25rem 0 .6rem}
+    h1{margin:.2rem 0 .6rem}
     p{color:var(--muted);margin:.4rem 0}
-    .row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:8px}
-    .pill{border:1px solid var(--b);border-radius:999px;padding:8px 12px}
-    .btn{display:inline-block;margin-top:16px;padding:12px 18px;border-radius:999px;font-weight:800;background:linear-gradient(135deg,var(--g1),var(--g2));color:#061017;text-decoration:none}
-    .ok{color:#86efac;font-weight:800}
+    .btn{display:inline-block;margin-top:14px;padding:12px 18px;border-radius:999px;font-weight:800;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#061017;text-decoration:none}
+    .muted{color:var(--muted)}
+    .ok{color:#86efac}
+    .spinner{width:30px;height:30px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:#b3e1ff;margin:10px auto;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    code{background:#0a0f16;padding:2px 6px;border-radius:6px;border:1px solid var(--b);color:#cfe3ff}
   </style>
 </head>
 <body>
   <main class="card">
     <div style="font-size:56px;line-height:1">🎉</div>
     <h1>¡Pago correcto!</h1>
-    <p id="msg"><span class="ok">Gracias.</span> Estamos activando tu cuenta…</p>
-
-    <!-- Resumen rápido -->
-    <div id="summary" class="row" style="display:none">
-      <span id="sum-plan" class="pill">Plan: —</span>
-      <span id="sum-nfc"  class="pill">NFC: —</span>
-    </div>
-
-    <p id="hint">Volvemos a <strong>suscripciones</strong> en <span id="count">3</span> s.</p>
-    <a id="go" class="btn" href="/suscripciones.html#from=stripe-portal">Volver ahora</a>
+    <p id="line1">Estamos guardando tu compra y actualizando tu cuenta…</p>
+    <div class="spinner" id="spin"></div>
+    <p class="muted" id="hint">Volvemos a <strong>suscripciones</strong> en <span id="count">5</span> s. Si lo prefieres, pulsa el botón.</p>
+    <a id="go" class="btn" href="suscripciones.html#from=stripe-portal" style="display:inline-block">Ir a suscripciones</a>
+    <p class="muted" style="margin-top:14px"><small id="debug"></small></p>
   </main>
 
   <script>
-    (async () => {
-      const $ = s => document.querySelector(s);
+  (async ()=>{
+    const qs = new URLSearchParams(location.search);
+    const sid = qs.get('session_id');
+    const $ = s => document.querySelector(s);
 
-      // ===== util: nombre "bonito" del plan =====
-      function getInterval(u){
-        return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase();
-      }
-      function prettyPlan(u){
-        const nick = (u?.subscription?.price?.nickname || u?.subscription?.plan?.nickname || '').trim();
-        if (nick) return nick;
-        const interval = (getInterval(u) === 'year') ? 'Anual' : 'Mensual';
-        const idOrNick = ((u?.subscription?.price?.id||'') + ' ' + (u?.subscription?.plan?.nickname||'')).toLowerCase();
-        let base = 'Básico'; if (/pro/.test(idOrNick)) base = 'Pro';
-        return `${base} ${interval}`;
-      }
+    function setDebug(msg){ $('#debug').textContent = msg || ''; }
 
-      // ===== destino fijo a suscripciones (simple) =====
-      let dest = '/suscripciones.html#from=stripe-portal';
-      $('#go').href = dest;
-
-      // ===== 1 llamada: confirmar checkout en backend =====
-      const qs = new URLSearchParams(location.search);
-      const session_id = qs.get('session_id');
-
-      if (session_id) {
-        try {
-          const r = await fetch('/api/checkout/confirm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',          // mantiene la sesión
-            body: JSON.stringify({ session_id })
+    try{
+      if(sid){
+        // 1) Si el usuario llegó sin cookie, crea sesión a partir del checkout
+        try{
+          await fetch('/api/store-customer-from-session', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            credentials:'include',
+            body: JSON.stringify({ session_id: sid })
           });
-          const data = await r.json().catch(()=> ({}));
+        }catch(e){ /* puede fallar si ya hay sesión, no pasa nada */ }
 
-          // Esperamos que devuelva el usuario actualizado
-          const user = data?.user || null;
+        // 2) Fallback de post-pago: suma NFC y notifica por email (si procede)
+        try{
+          await fetch('/api/post-pago', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            credentials:'include',
+            body: JSON.stringify({ session_id: sid })
+          });
+        }catch(e){ /* silencioso */ }
 
-          // Persistimos para que "suscripciones" lo lea al instante
-          try { localStorage.setItem('acct_user', user ? JSON.stringify(user) : ''); } catch {}
-          window.taplyAuth = window.taplyAuth || {};
-          window.taplyAuth.user = user || null;
-
-          // Pinta pequeño resumen (plan + NFC) si hay datos
-          if (user) {
-            const nfc = Number(user.nfc_qty || 0);
-            $('#sum-plan').textContent = 'Plan: ' + (user.subscription || user.subscription_status ? prettyPlan(user) : '—');
-            $('#sum-nfc').textContent  = 'NFC: '  + nfc;
-            $('#summary').style.display = 'flex';
-            $('#msg').innerHTML = '<span class="ok">Listo.</span> Tu cuenta está actualizada.';
-          } else {
-            $('#msg').textContent = 'Pago confirmado. Volvemos a suscripciones.';
-          }
-        } catch {
-          // Si algo falla, igualmente dejamos que el webhook haga su trabajo y redirigimos
-          $('#msg').textContent = 'Pago registrado. Volvemos a suscripciones.';
-        }
-
-        // Limpia la query (no dejes session_id en la URL)
-        try {
+        // 3) Limpia la query
+        try{
           qs.delete('session_id');
-          const clean = location.pathname + (qs.toString() ? '?' + qs.toString() : '') + location.hash;
-          history.replaceState({}, '', clean);
-        } catch {}
-      } else {
-        // Sin session_id, simplemente regresamos
-        $('#msg').textContent = 'Pago correcto. Volvemos a suscripciones.';
+          const url = location.pathname + (qs.toString()?('?'+qs.toString()):'');
+          history.replaceState({}, '', url);
+        }catch{}
       }
 
-      // ===== cuenta atrás simple y redirección =====
-      let t = 3;
-      const id = setInterval(() => {
-        t--; $('#count').textContent = String(t);
-        if (t <= 0) { clearInterval(id); location.replace(dest); }
-      }, 1000);
-      setTimeout(() => { try { clearInterval(id); } catch {} location.replace(dest); }, 3000);
-    })();
+      // 4) Siempre redirige a suscripciones (con ancla para mostrar el bloque correcto)
+      const next = 'suscripciones.html#from=stripe-portal';
+
+      // 5) UI + cuenta atrás más larga para leer
+      $('#line1').innerHTML = '<span class="ok">Listo.</span> Hemos actualizado tu cuenta.';
+      $('#spin').style.display='none';
+      $('#go').setAttribute('href', next);
+
+      let t = 5;
+      const cnt = $('#count');
+      const timer = setInterval(()=>{ t--; if(cnt) cnt.textContent = String(t); if(t<=0){ clearInterval(timer); location.replace(next); }}, 1000);
+      setDebug('');
+    }catch(ex){
+      $('#spin').style.display='none';
+      $('#hint').textContent = 'Algo fue lento. Puedes continuar ahora.';
+      setDebug(String(ex));
+    }
+  })();
   </script>
 </body>
 </html>
