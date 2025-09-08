@@ -121,6 +121,7 @@ function addDays(d, days){ return new Date(d.getTime() + days*24*60*60*1000); }
 
 /* ===== Email (Sendgrid) con reintentos ===== */
 /* ===== Email (Sendgrid) con parsing robusto ===== */
+/* ===== Email (Sendgrid) robusto ===== */
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 async function withTimeout(promise, ms){
   let t; const timeout = new Promise((_,rej)=> t=setTimeout(()=>rej(Object.assign(new Error('email_timeout'),{code:'email_timeout'})), ms));
@@ -128,9 +129,8 @@ async function withTimeout(promise, ms){
   finally { clearTimeout(t); }
 }
 function parseAddress(v=''){
-  // admite: "Nombre <correo>", "correo", "Nombre<correo>", comillas, espacios…
   const s = String(v).trim();
-  const m = s.match(/^(?:"?([^"<]+)"?\s*)?<\s*([^>]+)\s*>$/); // Nombre <correo>
+  const m = s.match(/^(?:"?([^"<]+)"?\s*)?<\s*([^>]+)\s*>$/);
   if (m) return { email: m[2].trim(), name: (m[1]||'').trim() || undefined };
   return { email: s, name: undefined };
 }
@@ -138,8 +138,9 @@ function isTaplyEmail(v=''){ return /@taply\.es$/i.test(String(v).trim()); }
 
 async function sendEmail({to, subject, text, html}){
   try{
-    const RAW_FROM = (process.env.EMAIL_FROM || '').trim();
+    const RAW_FROM  = (process.env.EMAIL_FROM || '').trim();
     const RAW_REPLY = (process.env.EMAIL_REPLY_TO || '').trim();
+
     if(!process.env.SENDGRID_API_KEY || !RAW_FROM || !to){
       console.warn('sendEmail: falta cfg', { hasKey:!!process.env.SENDGRID_API_KEY, RAW_FROM, to });
       return false;
@@ -148,22 +149,21 @@ async function sendEmail({to, subject, text, html}){
     const { default: sgMail } = await import('@sendgrid/mail');
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-    // Normalizamos FROM / REPLY-TO
-    const fromParsed = parseAddress(RAW_FROM);
+    const fromParsed  = parseAddress(RAW_FROM);
     const replyParsed = RAW_REPLY ? parseAddress(RAW_REPLY) : null;
 
-    // Forzamos que DKIM firme con taply.es: si el FROM no es @taply.es, abortamos
     if (!isTaplyEmail(fromParsed.email)) {
-      console.error('FROM no es dominio taply.es. Corrige EMAIL_FROM en Vercel:', fromParsed.email);
+      console.error('EMAIL_FROM debe ser @taply.es. Valor actual:', fromParsed.email);
       return false;
     }
-    // Evita Reply-To en gmail mientras pruebas BIMI
-    const replyTo = replyParsed && isTaplyEmail(replyParsed.email) ? { email: replyParsed.email, name: replyParsed.name } : undefined;
+    const replyTo = replyParsed && isTaplyEmail(replyParsed.email)
+      ? { email: replyParsed.email, name: replyParsed.name }
+      : undefined;
 
     const isVerify = /Confirma tu correo/i.test(subject) || /\/api\/verify-email/i.test(String(html||''));
     const payload = {
       to,
-      from: { email: fromParsed.email, name: fromParsed.name || 'Taply' }, // 👈 objeto; SendGrid lo traga siempre
+      from: { email: fromParsed.email, name: fromParsed.name || 'Taply' },
       ...(replyTo ? { replyTo } : {}),
       subject,
       text: text || (html ? String(html).replace(/<[^>]+>/g,' ') : ''),
@@ -171,21 +171,17 @@ async function sendEmail({to, subject, text, html}){
       ...(isVerify ? { trackingSettings: { clickTracking: { enable: false, enableText: false } } } : {})
     };
 
-    const attempts = 3;
-    for(let i=1;i<=attempts;i++){
-      try{
-        await withTimeout(sgMail.send(payload), 8000);
-        return true;
-      }catch(e){
+    for(let i=1;i<=3;i++){
+      try{ await withTimeout(sgMail.send(payload), 8000); return true; }
+      catch(e){
         console.error(`sendEmail intento ${i} falló:`, e?.message || e, e?.response?.body || '');
-        if(i<attempts) await sleep(600*i);
+        if(i<3) await sleep(600*i);
       }
     }
-  }catch(e){
-    console.error('sendEmail error fatal', e?.message || e);
-  }
+  }catch(e){ console.error('sendEmail error fatal', e?.message || e); }
   return false;
 }
+
 
 /* ===== Plantillas email ===== */
 function _safeName(name){ return (name || '').trim() || null; }
