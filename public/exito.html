@@ -36,6 +36,7 @@
     const qs = new URLSearchParams(location.search);
     const sid = qs.get('session_id');
     const $ = s => document.querySelector(s);
+    const HOLD_MS = 1500; // mantener el primer mensaje 1.5 s antes de cambiar
 
     function setDebug(msg){ $('#debug').textContent = msg || ''; }
 
@@ -69,17 +70,27 @@
         }catch{}
       }
 
-      // 4) Siempre redirige a suscripciones (con ancla para mostrar el bloque correcto)
+      // 4) Siempre redirige a suscripciones
       const next = 'suscripciones.html#from=stripe-portal';
-
-      // 5) UI + cuenta atrás más larga para leer
-      $('#line1').innerHTML = '<span class="ok">Listo.</span> Hemos actualizado tu cuenta.';
-      $('#spin').style.display='none';
       $('#go').setAttribute('href', next);
 
-      let t = 5;
-      const cnt = $('#count');
-      const timer = setInterval(()=>{ t--; if(cnt) cnt.textContent = String(t); if(t<=0){ clearInterval(timer); location.replace(next); }}, 1000);
+      // 5) Mantén el primer mensaje/spinner 1.5 s, luego cambia a "Listo" y empieza la cuenta atrás
+      setTimeout(()=>{
+        $('#line1').innerHTML = '<span class="ok">Listo.</span> Hemos actualizado tu cuenta.';
+        $('#spin').style.display='none';
+
+        let t = 5;
+        const cnt = $('#count');
+        const timer = setInterval(()=>{
+          t--;
+          if(cnt) cnt.textContent = String(t);
+          if(t<=0){
+            clearInterval(timer);
+            location.replace(next);
+          }
+        }, 1000);
+      }, HOLD_MS);
+
       setDebug('');
     }catch(ex){
       $('#spin').style.display='none';
