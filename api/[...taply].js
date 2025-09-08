@@ -1,4 +1,3 @@
-// api/[...taply].js
 export const config = { runtime: "nodejs" };
 
 import Stripe from 'stripe';
@@ -135,7 +134,6 @@ function parseAddress(v=''){
   if (m) return { email: m[1], name: undefined };
   return { email: s, name: undefined };
 }
-function isTaplyEmail(v=''){ return /@taply\.es$/i.test(String(v).trim()); }
 
 async function sendEmail({to, subject, text, html}){
   try{
@@ -156,19 +154,15 @@ async function sendEmail({to, subject, text, html}){
     }
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-    // FROM y REPLY-TO tolerantes
+    // FROM/REPLY-TO EXACTOS (como antes)
     const fromParsed  = parseAddress(RAW_FROM);
+    if(!fromParsed.email) { console.error('sendEmail: EMAIL_FROM inválido'); return false; }
     const replyParsed = RAW_REPLY ? parseAddress(RAW_REPLY) : null;
-
-    // Fallback seguro: usa dominio taply.es si el FROM no cuadra
-    const defaultFrom = { email: 'notificaciones@taply.es', name: 'Taply' };
-    const from = isTaplyEmail(fromParsed.email) ? { email: fromParsed.email, name: fromParsed.name || 'Taply' } : defaultFrom;
+    const from = { email: fromParsed.email, name: fromParsed.name || 'Taply' };
     const replyTo = replyParsed ? { email: replyParsed.email, name: replyParsed.name } : undefined;
 
-    // Desactivar click-tracking para:
-    // - verificación de correo (para evitar enlaces "trackeados")
-    // - destinatarios Apple (@icloud/@me/@mac), que a veces filtran enlaces con tracking
-    const isVerify = /Confirma tu correo/i.test(subject) || /\/api\/verify-email/i.test(String(html||''));
+    // Desactivar tracking SOLO en verificación y destinos Apple
+    const isVerify = /Confirma tu correo|Confirma tu correo|Confirmar mi correo|verify/i.test(subject + ' ' + String(html||''));
     const toEmailForCheck = (() => {
       if (typeof to === 'string') return to;
       if (Array.isArray(to)) {
@@ -179,7 +173,7 @@ async function sendEmail({to, subject, text, html}){
       return '';
     })();
     const isApple = /@(icloud|me|mac)\.com$/i.test(toEmailForCheck);
-    const disableClicks = isVerify || isApple;
+    const disableTracking = isVerify || isApple;
 
     const payload = {
       to,
@@ -188,7 +182,17 @@ async function sendEmail({to, subject, text, html}){
       subject,
       text: text || (html ? String(html).replace(/<[^>]+>/g,' ') : ''),
       html: html || `<p>${text || ''}</p>`,
-      ...(disableClicks ? { trackingSettings: { clickTracking: { enable: false, enableText: false } } } : {})
+      ...(disableTracking ? {
+        trackingSettings: {
+          clickTracking: { enable: false, enableText: false },
+          openTracking: { enable: false }
+        }
+      } : {}),
+      headers: {
+        'Auto-Submitted': 'auto-generated',
+        'X-Auto-Response-Suppress': 'All',
+        'X-Entity-Ref-ID': crypto.randomBytes(16).toString('hex')
+      }
     };
 
     for(let i=1;i<=3;i++){
@@ -204,51 +208,66 @@ async function sendEmail({to, subject, text, html}){
   return false;
 }
 
-/* ===== Plantillas email (sin logo) ===== */
+/* ===== Plantillas email (modo claro forzado) ===== */
 function _safeName(name){ return (name || '').trim() || null; }
+
+// CSS + tablas + bgcolor para que Gmail respete el fondo y Apple Mail no aplique dark-mode.
 function _emailBaseCss(){
   return `
-  :root { color-scheme: light dark; supported-color-schemes: light dark; }
-  body{margin:0;background:#0b0f1a;font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial,sans-serif}
-  .wrap{padding:24px}
-  .card{max-width:680px;margin:0 auto;background:#0e1424;border:1px solid rgba(255,255,255,.12);border-radius:16px;overflow:hidden}
-  .hdr{padding:18px 24px;background:#0b1020;color:#e9eefc;font-weight:600;letter-spacing:.2px}
-  .body{background:#0e1424;padding:28px 24px 20px;color:#dbe6ff}
-  h1{margin:0 0 8px;font-size:36px;line-height:1.1;color:#e9eefc}
-  .lead{font-size:18px;line-height:1.5;margin:14px 0 10px;color:#c9d6ff}
-  .p{font-size:16px;line-height:1.6;margin:10px 0;color:#c9d6ff}
-  .hr{margin:18px 0;border-top:1px solid rgba(255,255,255,.08)}
-  .cta{display:inline-block;margin:18px 0 8px;padding:12px 16px;border-radius:10px;background:#7c3aed;color:#fff;text-decoration:none;font-weight:600}
-  .foot{border-top:1px solid rgba(255,255,255,.08);padding:16px 24px;color:#a8b4d6;font-size:13px;background:#0b1020}
-  @media (max-width:520px){ h1{font-size:30px} .card{border-radius:14px} }
-  @media (prefers-color-scheme: light){
-    body{background:#f3f6ff}
-    .card{background:#ffffff;border:1px solid rgba(2,6,23,.08)}
-    .hdr{background:#f7f9ff;color:#18213b}
-    .body{background:#fff;color:#26324d}
-    h1{color:#18213b}
-    .lead,.p{color:#394b76}
-    .foot{background:#f7f9ff;border-color:rgba(2,6,23,.06);color:#4d5f86}
+  :root { color-scheme: light; supported-color-schemes: light; }
+  @media (prefers-color-scheme: dark){
+    body, .bg-page { background:#f3f6ff !important; }
+    .card { background:#ffffff !important; border-color: rgba(2,6,23,.08) !important; }
+    .hdr { background:#f7f9ff !important; color:#18213b !important; }
+    .txt, .p, .lead { color:#26324d !important; }
+    .hr { background:rgba(2,6,23,.08) !important; }
   }`;
 }
+
 function _shell({title, preheader, lead, blocks=[], cta, ctaUrl, brand='Taply'}){
-  const b = blocks.map(t=>`<p class="p">${t}</p>`).join('');
   const pre = (preheader||'').replace(/\n/g,' ').slice(0,140);
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${title}</title><style>${_emailBaseCss()}</style></head><body>
+  const paragraphs = blocks.map(t => `<p class="p" style="margin:10px 0;font-size:16px;line-height:1.6;color:#394b76">${t}</p>`).join('');
+  return `<!doctype html>
+<html lang="es" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>${title}</title>
+  <style>${_emailBaseCss()}</style>
+</head>
+<body class="bg-page" style="margin:0;padding:0;background:#f3f6ff">
   <span style="display:none!important;opacity:0;max-height:0;overflow:hidden">${pre}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</span>
-  <div class="wrap"><div class="card">
-    <div class="hdr">${brand}</div>
-    <div class="body">
-      <h1>${title}</h1>
-      ${lead?`<div class="lead">${lead}</div>`:''}
-      ${b}
-      ${cta && ctaUrl ? `<a href="${ctaUrl}" class="cta">${cta}</a>`:''}
-      <div class="hr"></div>
-      <p class="p" style="font-size:14px;opacity:.85">Este correo se envió automáticamente. Si no reconoces esta acción, respóndenos.</p>
-    </div>
-  </div></div></body></html>`;
+  <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#f3f6ff" style="background:#f3f6ff">
+    <tr>
+      <td align="center" style="padding:24px">
+        <table role="presentation" width="680" border="0" cellspacing="0" cellpadding="0" bgcolor="#ffffff" class="card" style="width:680px;max-width:680px;background:#ffffff;border:1px solid rgba(2,6,23,.08);border-radius:16px;overflow:hidden">
+          <tr>
+            <td class="hdr" bgcolor="#f7f9ff" style="background:#f7f9ff;color:#18213b;font-weight:600;letter-spacing:.2px;padding:18px 24px">${brand}</td>
+          </tr>
+          <tr>
+            <td style="background:#ffffff;color:#26324d;padding:28px 24px 20px">
+              <h1 class="txt" style="margin:0 0 8px;font-size:28px;line-height:1.25;color:#18213b">${title}</h1>
+              ${lead ? `<div class="lead" style="font-size:18px;line-height:1.5;margin:14px 0 10px;color:#394b76">${lead}</div>` : ''}
+              ${paragraphs}
+              ${cta && ctaUrl ? `<div style="margin:18px 0 8px">
+                  <a href="${ctaUrl}" style="display:inline-block;padding:12px 16px;border-radius:10px;background:#7c3aed;color:#ffffff;text-decoration:none;font-weight:600">${cta}</a>
+                </div>` : ''}
+              <div class="hr" style="height:1px;background:rgba(2,6,23,.08);margin:18px 0"></div>
+              <p class="p" style="font-size:14px;color:#4d5f86;opacity:.95;margin:0">Este correo se envió automáticamente. Si no reconoces esta acción, respóndenos.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
+
 function makeSubscriptionEmailUI({name, tierLabel, panelUrl}){
   const title = '¡Suscripción activa!';
   const lead = `Hola${name?` ${name}`:''}, tu suscripción <strong>${tierLabel}</strong> está activa.`;
@@ -596,9 +615,9 @@ async function verifyEmail(req, res){
 
     const html = `<!doctype html><meta charset="utf-8">
       <title>Correo verificado</title>
-      <style>body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#0b0f1a;color:#e9eefc;display:grid;place-items:center;height:100vh;margin:0}
-      .card{background:#0e1424;border:1px solid rgba(255,255,255,.12);padding:22px;border-radius:14px;max-width:520px;text-align:center}
-      a{color:#9ad2ff}</style>
+      <style>body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#f3f6ff;color:#18213b;display:grid;place-items:center;height:100vh;margin:0}
+      .card{background:#ffffff;border:1px solid rgba(2,6,23,.08);padding:22px;border-radius:14px;max-width:520px;text-align:center}
+      a{color:#3354ff}</style>
       <div class="card">
         <h2>¡Correo verificado!</h2>
         <p>Tu cuenta ha sido activada.</p>
@@ -628,10 +647,10 @@ function invalidOrExpiredHtml(res, email){
   return res.end(`<!doctype html><meta charset="utf-8">
   <title>Enlace inválido</title>
   <style>
-    body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#0b0f1a;color:#e9eefc;display:grid;place-items:center;height:100vh;margin:0}
-    .card{background:#0e1424;border:1px solid rgba(255,255,255,.12);padding:22px;border-radius:14px;max-width:520px;text-align:center}
+    body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#f3f6ff;color:#18213b;display:grid;place-items:center;height:100vh;margin:0}
+    .card{background:#ffffff;border:1px solid rgba(2,6,23,.08);padding:22px;border-radius:14px;max-width:520px;text-align:center}
     button{padding:10px 14px;border-radius:10px;background:#7c3aed;color:#fff;border:0;cursor:pointer}
-    input{width:100%;padding:8px;border-radius:8px;border:1px solid #334;background:#0b1020;color:#e9eefc}
+    input{width:100%;padding:8px;border-radius:8px;border:1px solid #c9d2f0;background:#fff;color:#18213b}
   </style>
   <div class="card">
     <h2>Enlace inválido o caducado</h2>
@@ -1169,3 +1188,4 @@ async function resetPassword(req, res){
   await stripe.customers.update(customer.id, { metadata: { ...meta, taply_pass_hash: hash, taply_reset_token: '', taply_reset_exp: '' }});
   return res.status(200).json({ ok:true, message:'Contraseña actualizada.' });
 }
+
