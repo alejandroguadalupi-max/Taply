@@ -921,7 +921,8 @@ async function postPago(req, res){
       ${amountText ? `<p>Importe: ${amountText}</p>` : ''}
       ${sessionId ? `<p>Checkout Session: ${sessionId}</p>` : ''}
     `;
-    
+    await sendEmail({ to: parseAddress(process.env.EMAIL_FROM).email, subject: subjAdm, html: htmlAdm });
+
   }
 
   return res.status(200).json({ ok:true });
