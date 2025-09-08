@@ -13,7 +13,9 @@
     .card{background:var(--card);border:1px solid var(--b);border-radius:18px;padding:28px 22px;max-width:560px;width:92%;text-align:center;box-shadow:0 12px 30px rgba(0,0,0,.45)}
     h1{margin:.25rem 0 .6rem}
     p{color:var(--muted);margin:.4rem 0}
-    .btn{display:inline-block;margin-top:14px;padding:12px 18px;border-radius:999px;font-weight:800;background:linear-gradient(135deg,var(--g1),var(--g2));color:#061017;text-decoration:none}
+    .row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+    .pill{border:1px solid var(--b);border-radius:999px;padding:8px 12px}
+    .btn{display:inline-block;margin-top:16px;padding:12px 18px;border-radius:999px;font-weight:800;background:linear-gradient(135deg,var(--g1),var(--g2));color:#061017;text-decoration:none}
     .ok{color:#86efac;font-weight:800}
   </style>
 </head>
@@ -21,28 +23,94 @@
   <main class="card">
     <div style="font-size:56px;line-height:1">🎉</div>
     <h1>¡Pago correcto!</h1>
-    <p><span class="ok">Gracias.</span> Enseguida te llevamos a la página de suscripciones.</p>
-    <a id="go" class="btn" href="/">Ir ahora</a>
+    <p id="msg"><span class="ok">Gracias.</span> Estamos activando tu cuenta…</p>
+
+    <!-- Resumen rápido -->
+    <div id="summary" class="row" style="display:none">
+      <span id="sum-plan" class="pill">Plan: —</span>
+      <span id="sum-nfc"  class="pill">NFC: —</span>
+    </div>
+
+    <p id="hint">Volvemos a <strong>suscripciones</strong> en <span id="count">3</span> s.</p>
+    <a id="go" class="btn" href="/suscripciones.html#from=stripe-portal">Volver ahora</a>
   </main>
 
   <script>
     (async () => {
-      // Destinos posibles para evitar 404 en distintos hostings
-      const candidates = ['/suscripciones', '/suscripciones.html', '/suscripciones/', '/#suscripciones', '/'];
-      let dest = candidates[candidates.length - 1];
+      const $ = s => document.querySelector(s);
 
-      for (const p of candidates) {
-        try {
-          // HEAD es rápido; si el hosting no lo soporta caerá al siguiente
-          const r = await fetch(p, { method:'HEAD', cache:'no-store' });
-          if (r.ok) { dest = p; break; }
-        } catch { /* ignorar y probar el siguiente */ }
+      // ===== util: nombre "bonito" del plan =====
+      function getInterval(u){
+        return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase();
+      }
+      function prettyPlan(u){
+        const nick = (u?.subscription?.price?.nickname || u?.subscription?.plan?.nickname || '').trim();
+        if (nick) return nick;
+        const interval = (getInterval(u) === 'year') ? 'Anual' : 'Mensual';
+        const idOrNick = ((u?.subscription?.price?.id||'') + ' ' + (u?.subscription?.plan?.nickname||'')).toLowerCase();
+        let base = 'Básico'; if (/pro/.test(idOrNick)) base = 'Pro';
+        return `${base} ${interval}`;
       }
 
-      // Actualiza el botón y redirige solo
-      const go = document.getElementById('go');
-      go.href = dest;
-      setTimeout(() => location.replace(dest), 1500);
+      // ===== destino fijo a suscripciones (simple) =====
+      let dest = '/suscripciones.html#from=stripe-portal';
+      $('#go').href = dest;
+
+      // ===== 1 llamada: confirmar checkout en backend =====
+      const qs = new URLSearchParams(location.search);
+      const session_id = qs.get('session_id');
+
+      if (session_id) {
+        try {
+          const r = await fetch('/api/checkout/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',          // mantiene la sesión
+            body: JSON.stringify({ session_id })
+          });
+          const data = await r.json().catch(()=> ({}));
+
+          // Esperamos que devuelva el usuario actualizado
+          const user = data?.user || null;
+
+          // Persistimos para que "suscripciones" lo lea al instante
+          try { localStorage.setItem('acct_user', user ? JSON.stringify(user) : ''); } catch {}
+          window.taplyAuth = window.taplyAuth || {};
+          window.taplyAuth.user = user || null;
+
+          // Pinta pequeño resumen (plan + NFC) si hay datos
+          if (user) {
+            const nfc = Number(user.nfc_qty || 0);
+            $('#sum-plan').textContent = 'Plan: ' + (user.subscription || user.subscription_status ? prettyPlan(user) : '—');
+            $('#sum-nfc').textContent  = 'NFC: '  + nfc;
+            $('#summary').style.display = 'flex';
+            $('#msg').innerHTML = '<span class="ok">Listo.</span> Tu cuenta está actualizada.';
+          } else {
+            $('#msg').textContent = 'Pago confirmado. Volvemos a suscripciones.';
+          }
+        } catch {
+          // Si algo falla, igualmente dejamos que el webhook haga su trabajo y redirigimos
+          $('#msg').textContent = 'Pago registrado. Volvemos a suscripciones.';
+        }
+
+        // Limpia la query (no dejes session_id en la URL)
+        try {
+          qs.delete('session_id');
+          const clean = location.pathname + (qs.toString() ? '?' + qs.toString() : '') + location.hash;
+          history.replaceState({}, '', clean);
+        } catch {}
+      } else {
+        // Sin session_id, simplemente regresamos
+        $('#msg').textContent = 'Pago correcto. Volvemos a suscripciones.';
+      }
+
+      // ===== cuenta atrás simple y redirección =====
+      let t = 3;
+      const id = setInterval(() => {
+        t--; $('#count').textContent = String(t);
+        if (t <= 0) { clearInterval(id); location.replace(dest); }
+      }, 1000);
+      setTimeout(() => { try { clearInterval(id); } catch {} location.replace(dest); }, 3000);
     })();
   </script>
 </body>
