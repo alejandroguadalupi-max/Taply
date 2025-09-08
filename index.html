@@ -33,18 +33,34 @@
     .container{width:min(1200px,92%);margin-inline:auto}
     body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.6px);background-size:26px 26px;opacity:.12}
 
-    /* ===== Header y navegación (como estaba) ===== */
     header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px)}
     .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0; position:relative}
     .brand{display:flex;gap:10px;align-items:center;font-weight:800;letter-spacing:.3px}
-    .brand-logo{
-      width:34px;height:34px;border-radius:10px;
-      display:grid;place-items:center;overflow:hidden;background:none;box-shadow:none;padding:0;
-    }
-    .brand-logo img{display:block;width:100%;height:100%;object-fit:contain}
+    .brand-logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));display:grid;place-items:center;box-shadow:0 8px 22px rgba(124,58,237,.35)}
+    .brand-logo svg{width:20px;height:20px}
     .nav-links{display:flex;gap:18px;align-items:center}
     .ghost{padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);color:var(--txt);touch-action:manipulation}
     .menu{display:none}
+    .brand-logo img{
+      display:block;
+      width:100%;
+      height:100%;
+      object-fit:contain;    /* encaja el PNG sin deformarlo */
+    }
+
+    /* Cuenta */
+    .acct-chip{display:inline-flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(255,255,255,.04);cursor:pointer}
+    .acct-avatar{width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));display:grid;place-items:center;font-weight:800;color:#061017}
+    .acct-dd{position:relative}
+    .acct-menu{position:absolute;right:0;top:110%;min-width:220px;background:#0b0f1a;border:1px solid rgba(255,255,255,.12);border-radius:14px;box-shadow:var(--shadow);display:none;padding:6px}
+    .acct-menu a,.acct-menu button{display:flex;width:100%;text-align:left;background:transparent;border:0;color:inherit;padding:10px 12px;border-radius:10px;cursor:pointer}
+    .acct-menu a:hover,.acct-menu button:hover{background:rgba(255,255,255,.06)}
+    .acct-dd.open .acct-menu{display:block}
+
+    .mobile-menu{position:absolute; left:0; right:0; top:100%; display:none; padding:14px; background:#0b0f1a; border-top:1px solid rgba(255,255,255,.08); box-shadow:0 16px 40px rgba(0,0,0,.45)}
+    .mobile-links{display:flex;flex-direction:column;gap:10px}
+    .mobile-links .ghost{background:rgba(255,255,255,.02); border-color:rgba(255,255,255,.18)}
+    .mobile-links .btn{width:100%; justify-content:center}
 
     .btn{
       --p:14px 18px; background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
@@ -74,37 +90,6 @@
     .card h3{margin:.2rem 0 .6rem}
     .card p{color:var(--muted);margin:0}
 
-    /* ===== BENEFICIOS (bloques más pequeños) ===== */
-    #beneficios .benefits-wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;margin-top:16px;align-items:start}
-    #beneficios .benefit{
-      display:grid;grid-template-columns:36px 1fr;gap:10px;
-      padding:10px 12px;border-left:3px solid var(--brand-2);
-      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
-      border-radius:10px; align-items:start;
-    }
-    #beneficios .benefit + .benefit{margin-top:10px}
-    #beneficios .benefit .ico{
-      width:36px;height:36px;border-radius:8px;
-      display:grid;place-items:center;
-      background:linear-gradient(135deg, rgba(124,58,237,.22), rgba(56,189,248,.22));
-      border:1px solid rgba(255,255,255,.1);
-      font-size:18px
-    }
-    #beneficios h3{margin:.15rem 0 .2rem;text-align:left;font-size:1.02rem}
-    #beneficios p{margin:0;text-align:left;color:var(--muted);font-size:.95rem}
-    #beneficios .aside{
-      background:linear-gradient(135deg, rgba(0,212,255,.06), rgba(124,58,237,.06));
-      border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:14px;
-      text-align:left
-    }
-    #beneficios .aside h4{margin:.1rem 0 .45rem;font-size:1.02rem}
-    #beneficios .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
-    #beneficios .stat{
-      background:#0a0f16;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px;text-align:center
-    }
-    #beneficios .stat b{display:block;font-size:1.05rem}
-    #beneficios .cta-row{margin-top:10px}
-
     /* Reviews / carrusel */
     .reviews{position:relative;margin:36px 0}
     .reviews h2{margin:0 0 14px}
@@ -115,6 +100,7 @@
       overscroll-behavior-x: contain; touch-action: pan-x;
     }
     .reviews-track::-webkit-scrollbar{display:none}
+
     .review-card{
       flex:0 0 clamp(320px, 86vw, 520px);
       max-width:520px;
@@ -145,17 +131,12 @@
     input,select,textarea,button{font-size:16px}
     :focus-visible{outline:2px solid #7c3aed; outline-offset:2px; border-radius:8px}
 
-    /* ===== Breakpoints como los tenías ===== */
-    @media (max-width: 992px){
-      #beneficios .benefits-wrap{grid-template-columns:1fr}
-      #beneficios .stats{grid-template-columns:repeat(3,1fr)}
-    }
     @media (max-width: 768px){
       :root{ --arrowSize:42px; --edgePad:calc(var(--arrowSize) + 44px); }
       section{padding:48px 0}
       header{background:#0a0f16}
       .grid-3{grid-template-columns:1fr}
-      .nav-links{display:none}            /* Menú móvil como antes */
+      .nav-links{display:none}
       .menu{
         display:block;background:#0f172a;color:#e9eefc;border:1px solid rgba(255,255,255,.28);
         box-shadow:0 8px 24px rgba(0,0,0,.45);padding:10px 14px;border-radius:999px;touch-action:manipulation;
@@ -164,7 +145,6 @@
       .menu:active{transform:translateY(1px)}
       .carousel-btn.left{ left:-6px; transform:translate(-8%, -50%); }
       .carousel-btn.right{ right:-6px; transform:translate(8%, -50%); }
-      #beneficios .stats{grid-template-columns:repeat(2,1fr)}
     }
     @media (max-width:480px){
       :root{ --arrowSize:38px; --edgePad:calc(var(--arrowSize) + 48px); }
@@ -172,11 +152,10 @@
       .reviews-track{ padding:0 var(--edgePad); }
       .carousel-btn.left{ left:-8px; transform:translate(-10%, -50%); }
       .carousel-btn.right{ right:-8px; transform:translate(10%, -50%); }
-      #beneficios .stats{grid-template-columns:1fr}
     }
     @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
-    /* ===== MODAL ACCESO (sin cambios) ===== */
+    /* ===== MODAL ACCESO ===== */
     #acct-modal.acct-hidden{display:none!important}
     #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.65);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
     .acct-dialog{
@@ -220,7 +199,8 @@
         <span class="brand-logo" aria-hidden="true">
           <img src="img/logo.png" alt="" width="34" height="34" loading="eager">
         </span>
-        <span>taply</span>
+        <span>Taply</span>
+
       </a>
 
       <nav class="nav-links">
@@ -261,52 +241,16 @@
       </div>
     </section>
 
-    <!-- ====== BENEFICIOS (bloques pequeños) ====== -->
-    <section id="beneficios" aria-labelledby="beneficios-title">
+    <section id="beneficios">
       <div class="container">
-        <h2 id="beneficios-title">¿Qué podrás conseguir gracias a nuestro sistema?</h2>
-        <p class="lead">Taply te ayuda a lograr <strong>mejores reseñas</strong>, atraer <strong>más clientes</strong> y generar <strong>más ingresos</strong>.</p>
-
-        <div class="benefits-wrap">
-          <div>
-            <div class="benefit">
-              <div class="ico">✅</div>
-              <div>
-                <h3>Crea un clima donde la opinión importa</h3>
-                <p>El cliente acerca su móvil al NFC y deja su reseña en segundos, sin fricción.</p>
-              </div>
-            </div>
-
-            <div class="benefit">
-              <div class="ico">🧭</div>
-              <div>
-                <h3>Aprende de lo negativo (en privado)</h3>
-                <p>Las valoraciones negativas no se publican: llegan a tu panel para corregir y mejorar.</p>
-              </div>
-            </div>
-
-            <div class="benefit">
-              <div class="ico">📈</div>
-              <div>
-                <h3>Gana visibilidad y clientes</h3>
-                <p>Mejores valoraciones = más visibilidad en Google = más reservas y ventas.</p>
-              </div>
-            </div>
-          </div>
-
-          <aside class="aside" aria-label="Resultados esperados">
-            <h4>Resultados habituales</h4>
-            <div class="stats">
-              <div class="stat"><b>+35%</b><small> más reseñas/mes</small></div>
-              <div class="stat"><b>4,7★</b><small> media sostenida</small></div>
-              <div class="stat"><b>-60%</b><small> quejas públicas</small></div>
-            </div>
-            <p style="margin-top:8px;color:var(--muted)">Cada negocio es distinto, pero el patrón es claro: más reseñas reales y mejor reputación.</p>
-            <div class="cta-row" style="justify-content:flex-start;margin-top:10px">
-              <a class="btn" href="suscripciones.html">Empezar ahora</a>
-            </div>
-          </aside>
+        <h2>¿Qué podrás conseguir gracias a nuestro sistema?</h2>
+        <p class="lead">Taply te asegura conseguir <strong>mejores reseñas</strong>, atraer <strong>más clientes</strong> y generar <strong>más ingresos</strong>.</p>
+        <div class="grid-3" style="margin-top:20px">
+          <article class="card"><h3>Crea un clima donde la opinión importa</h3><p>El cliente acerca su móvil al NFC y deja su reseña en segundos.</p></article>
+          <article class="card"><h3>Encuentra puntos débiles</h3><p>Las negativas no se publican: van a tu panel privado para aprender y mejorar.</p></article>
+          <article class="card"><h3>Gana dinero</h3><p>Mejores valoraciones = más visibilidad = más clientes.</p></article>
         </div>
+        <div class="cta-row"><a class="btn" href="suscripciones.html">Empezar ahora</a></div>
       </div>
     </section>
 
@@ -319,7 +263,7 @@
           <button class="carousel-btn left" id="revPrev" aria-label="Opinión anterior"><span>‹</span></button>
           <button class="carousel-btn right" id="revNext" aria-label="Opinión siguiente"><span>›</span></button>
 
-        <div class="reviews-track" id="reviewsTrack" tabindex="0" aria-label="Opiniones de clientes">
+          <div class="reviews-track" id="reviewsTrack" tabindex="0" aria-label="Opiniones de clientes">
             <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=26" alt="Sara Cordero" width="54" height="54"></div><div><div class="review-name">Sara Cordero</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Instalación en 5 minutos. Los avisos de reseñas negativas nos han permitido corregir fallos en días.</p></article>
             <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=33" alt="Marlon Melara" width="54" height="54"></div><div><div class="review-name">Marlon Melara</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Ahorra tiempo en reputación online. Muy fácil para el cliente.</p></article>
             <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=12" alt="Joan Blanch" width="54" height="54"></div><div><div class="review-name">Joan Blanch</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Subimos reseñas sin pedirlo. El panel de negativas nos ha ayudado a mejorar procesos.</p></article>
@@ -456,7 +400,7 @@
   <script>
     window.addEventListener('load', () => document.body.classList.add('is-loaded'));
 
-    // Menú móvil (igual que antes)
+    // Menú móvil
     const menuBtn=document.getElementById('menuBtn');
     const mobileMenu=document.getElementById('mobileMenu');
     menuBtn?.addEventListener('click', ()=> {
@@ -482,7 +426,7 @@
       let t; track.addEventListener('scroll',()=>{ clearTimeout(t); t=setTimeout(()=>scrollToIndex(nearestIndex()),120); }, {passive:true});
     })();
 
-    /* ======= Cuenta (sin cambios) ======= */
+    /* ======= Cuenta ======= */
     (function(){
       const S = { user:null, polling:null };
       const $  = s => document.querySelector(s);
@@ -504,6 +448,7 @@
       const resendLoginBtn = $('#acct-resend-login');
       const resendRegisterBtn = $('#acct-resend-register');
 
+      // ---- Navegación / historial
       const AUTH_HASHES = ['#auth-login','#auth-register','#auth-recover'];
       function pushAuthState(tab){ history.pushState({auth:true, tab}, '', '#auth-' + tab); }
       window.addEventListener('popstate', (e)=>{
@@ -530,7 +475,6 @@
         });
         if(name==='login'){ $('#acct-title').textContent='Inicia sesión en tu cuenta'; $('#acct-sub').textContent='Introduce tus datos de acceso o crea una cuenta nueva.'; }
         if(name==='register'){ $('#acct-title').textContent='Crea tu cuenta ahora mismo'; $('#acct-sub').textContent='Completa tus datos para registrarte en Taply.'; }
-        ifname==='recover'
         if(name==='recover'){ $('#acct-title').textContent='Recuperar contraseña'; $('#acct-sub').textContent='Te enviaremos un enlace a tu correo para restablecerla.'; }
         if(!fromHistory) pushAuthState(name);
       }
@@ -551,11 +495,13 @@
       $('#link-forgot')?.addEventListener('click', ()=> setTab('recover'));
       $('#recover-back')?.addEventListener('click', ()=> setTab('login'));
 
+      // toggle ojos
       $$('.toggle-eye').forEach(btn=>btn.addEventListener('click', ()=>{
         const sel=btn.getAttribute('data-toggle'); const input=document.querySelector(sel);
         if(!input) return; input.type = input.type==='password' ? 'text' : 'password';
       }));
 
+      // Métrica de contraseña
       const meter = document.getElementById('pw-meter');
       document.getElementById('acct-reg-pass')?.addEventListener('input', e=>{
         const v=e.target.value||''; let score=0;
@@ -563,6 +509,7 @@
         if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; }
       });
 
+      // ===== API helper: lanza Error con code/message/fieldErrors
       async function api(method,url,body){
         const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:body?JSON.stringify(body):undefined});
         let data=null; try{ data=await res.json(); }catch{}
@@ -582,6 +529,7 @@
         paintNav();
       }
 
+      // Recover
       forms.recover?.addEventListener('submit', async e=>{
         e.preventDefault();
         errs.recover.style.display='none'; okRecover.style.display='none';
@@ -596,6 +544,7 @@
         }
       });
 
+      // Login
       forms.login?.addEventListener('submit', async e=>{
         e.preventDefault();
         errs.login.style.display='none'; resendLoginBtn.style.display='none';
@@ -622,6 +571,7 @@
         }
       });
 
+      // Registro
       forms.register?.addEventListener('submit', async e=>{
         e.preventDefault();
         errs.register.style.display='none'; okRegister.style.display='none'; resendRegisterBtn.style.display='none';
@@ -635,6 +585,7 @@
           okRegister.textContent = data?.message || 'Te enviamos un correo de verificación. Revisa tu bandeja y el spam.';
           okRegister.style.display='block';
           resendRegisterBtn.style.display='inline-flex';
+          // Dejamos al usuario en la pestaña de registro para poder reenviar si hace falta
         }catch(err){
           const code = err.code || String(err);
           let msg = err.message || 'No se pudo crear la cuenta.';
@@ -651,6 +602,7 @@
         }
       });
 
+      // Reenviar verificación (desde LOGIN)
       resendLoginBtn?.addEventListener('click', async ()=>{
         const email = ($('#acct-login-email').value||'').trim();
         errs.login.style.display='none';
@@ -660,13 +612,14 @@
           errs.login.style.display='none';
           okRegister.textContent = d?.message || 'Te enviamos un nuevo enlace de verificación.';
           okRegister.style.display='block';
-          setTab('register', true);
+          setTab('register', true); // mostrar mensaje en el panel con más espacio
         }catch(err){
           errs.login.textContent = err.message || 'No pudimos reenviar el correo.';
           errs.login.style.display='block';
         }
       });
 
+      // Reenviar verificación (desde REGISTER)
       resendRegisterBtn?.addEventListener('click', async ()=>{
         const email = ($('#acct-reg-email').value||'').trim();
         errs.register.style.display='none';
@@ -681,6 +634,7 @@
         }
       });
 
+      // ------- Google: popup + polling
       function startGooglePolling(){
         if(S.polling) clearInterval(S.polling);
         let tries=0;
@@ -704,12 +658,18 @@
           try{ sessionStorage.setItem('taply_from', from); }catch{}
           const url = `/api/google?from=${encodeURIComponent(from)}`;
           const w = window.open(url, '_blank', 'noopener,noreferrer');
-          if(w){ startGooglePolling(); e.preventDefault(); } else { startGooglePolling(); }
+          if(w){
+            startGooglePolling();
+            e.preventDefault();
+          }else{
+            startGooglePolling();
+          }
         }, {capture:true});
       }
       bindGoogle('btn-google-login','login');
       bindGoogle('btn-google-register','register');
 
+      // Menú / sesión
       function paintNav(){
         const slots = ['#acct-nav-slot','#acct-nav-slot-mobile'].map(s=>document.querySelector(s)).filter(Boolean);
         slots.forEach(slot=>{
@@ -734,7 +694,8 @@
           document.addEventListener('click', (e)=>{ if(!dd.contains(e.target)) dd.classList.remove('open'); });
           dd.querySelector('#acct-logout-btn')?.addEventListener('click', async ()=>{
             try{ await api('POST','/api/logout',{});}catch{}
-            setUser(null); alert('Sesión cerrada');
+            setUser(null);
+            alert('Sesión cerrada');
           });
         });
       }
@@ -749,6 +710,7 @@
         }
       }
 
+      // Mapeo errores Google + hash
       function mapGoogleError(code){
         switch(String(code||'').toLowerCase()){
           case 'email_in_use_password': return 'Ese correo ya tiene una cuenta con contraseña. Inicia sesión con tu contraseña.';
