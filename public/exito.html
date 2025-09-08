@@ -24,9 +24,9 @@
   <main class="card">
     <div style="font-size:56px;line-height:1">🎉</div>
     <h1>¡Pago correcto!</h1>
-    <p id="line1">Estamos guardando tu compra y actualizando tu cuenta…</p>
+    <p id="line1">Procesando…</p>
     <div class="spinner" id="spin"></div>
-    <p class="muted" id="hint">Volvemos a <strong>suscripciones</strong> en <span id="count">5</span> s. Si lo prefieres, pulsa el botón.</p>
+    <p class="muted" id="hint">Si lo prefieres, puedes pulsar el botón ahora.</p>
     <a id="go" class="btn" href="suscripciones.html#from=stripe-portal" style="display:inline-block">Ir a suscripciones</a>
     <p class="muted" style="margin-top:14px"><small id="debug"></small></p>
   </main>
@@ -36,13 +36,17 @@
     const qs = new URLSearchParams(location.search);
     const sid = qs.get('session_id');
     const $ = s => document.querySelector(s);
-    const HOLD_MS = 1500; // mantener el primer mensaje 1.5 s antes de cambiar
+    const next = 'suscripciones.html#from=stripe-portal';
+    const READ_SECS = 6; // tiempo para leer (en segundos)
+
+    // Botón siempre apunta a suscripciones
+    document.getElementById('go').setAttribute('href', next);
 
     function setDebug(msg){ $('#debug').textContent = msg || ''; }
 
     try{
       if(sid){
-        // 1) Si el usuario llegó sin cookie, crea sesión a partir del checkout
+        // Mantiene la sesión iniciada a partir de la sesión de Stripe (si no había cookie)
         try{
           await fetch('/api/store-customer-from-session', {
             method:'POST',
@@ -52,7 +56,7 @@
           });
         }catch(e){ /* puede fallar si ya hay sesión, no pasa nada */ }
 
-        // 2) Fallback de post-pago: suma NFC y notifica por email (si procede)
+        // Fallback post-pago: sumar NFC / activar suscripción / notificar
         try{
           await fetch('/api/post-pago', {
             method:'POST',
@@ -62,7 +66,7 @@
           });
         }catch(e){ /* silencioso */ }
 
-        // 3) Limpia la query
+        // Limpia la query
         try{
           qs.delete('session_id');
           const url = location.pathname + (qs.toString()?('?'+qs.toString()):'');
@@ -70,30 +74,23 @@
         }catch{}
       }
 
-      // 4) Siempre redirige a suscripciones
-      const next = 'suscripciones.html#from=stripe-portal';
-      $('#go').setAttribute('href', next);
+      // Un solo mensaje (no cambia), con cuenta atrás
+      const cnt = READ_SECS;
+      $('#line1').innerHTML = `Hemos actualizado tu cuenta. Volvemos a <strong>suscripciones</strong> en <span id="count">${cnt}</span> s.`;
+      const countEl = document.getElementById('count');
 
-      // 5) Mantén el primer mensaje/spinner 1.5 s, luego cambia a "Listo" y empieza la cuenta atrás
-      setTimeout(()=>{
-        $('#line1').innerHTML = '<span class="ok">Listo.</span> Hemos actualizado tu cuenta.';
-        $('#spin').style.display='none';
-
-        let t = 5;
-        const cnt = $('#count');
-        const timer = setInterval(()=>{
-          t--;
-          if(cnt) cnt.textContent = String(t);
-          if(t<=0){
-            clearInterval(timer);
-            location.replace(next);
-          }
-        }, 1000);
-      }, HOLD_MS);
+      let t = READ_SECS;
+      const timer = setInterval(()=>{
+        t--;
+        if(countEl) countEl.textContent = String(t);
+        if(t<=0){
+          clearInterval(timer);
+          location.replace(next);
+        }
+      }, 1000);
 
       setDebug('');
     }catch(ex){
-      $('#spin').style.display='none';
       $('#hint').textContent = 'Algo fue lento. Puedes continuar ahora.';
       setDebug(String(ex));
     }
@@ -101,3 +98,4 @@
   </script>
 </body>
 </html>
+
