@@ -89,7 +89,15 @@
     .acct-cover{background:linear-gradient(135deg,var(--brand-1),var(--brand-2));height:6px;width:100%}
     .acct-body{padding:22px}
     .acct-head{display:flex;justify-content:center;align-items:center;margin:10px 0 18px}
-    .acct-logo{width:48px;height:48px;border-radius:16px;display:block;background:url('img/logo.png') center/cover no-repeat;box-shadow:var(--shadow);color:transparent;font-size:0;line-height:0}
+    .acct-logo{
+      width:48px; 
+      height:48px;
+      border-radius:16px;
+      display:block;
+      background:url('img/logo.png') center/cover no-repeat;
+      box-shadow:var(--shadow);
+      color:transparent; font-size:0; line-height:0;
+    }
     .acct-title{margin:10px 0 0;text-align:center;font-weight:800;font-size:1.25rem}
     .acct-sub{margin:6px 0 0;text-align:center;color:var(--muted);font-size:.96rem}
 
@@ -111,8 +119,15 @@
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .acct-actions{display:grid;gap:10px}
 
-    .plan-badge{display:inline-flex;align-items:center;gap:8px;padding:12px 16px;border-radius:999px;background:linear-gradient(135deg,#22c55e,#00d4ff);color:#061017;font-weight:900;letter-spacing:.3px;text-transform:uppercase;box-shadow:0 10px 28px rgba(0,212,255,.25),inset 0 1px 0 rgba(255,255,255,.35)}
-    .nfc-chip{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:12px 16px;border-radius:14px;background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.35);font-weight:800;color:#cfe3ff}
+    .plan-badge{
+      display:inline-flex;align-items:center;gap:8px;padding:12px 16px;border-radius:999px;
+      background:linear-gradient(135deg,#22c55e,#00d4ff);color:#061017;font-weight:900;
+      letter-spacing:.3px;text-transform:uppercase;box-shadow:0 10px 28px rgba(0,212,255,.25),inset 0 1px 0 rgba(255,255,255,.35)
+    }
+    .nfc-chip{
+      display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:12px 16px;border-radius:14px;
+      background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.35);font-weight:800;color:#cfe3ff
+    }
     .acct-small{color:var(--muted);font-size:.92rem;margin-top:6px}
   </style>
 </head>
@@ -186,27 +201,31 @@
   </div>
 
   <div class="plan-grid">
+    <!-- PLAN BÁSICO -->
     <article class="card plan">
       <span class="badge">Básico</span>
       <div class="price-lg"><span id="p-basic">29€</span> <span class="per">/mes</span></div>
-      <p class="desc">Con este plan tendrás todo el entorno de Taply listo con NFC (comprar previamente) configurados para tu restaurante y un panel privado en Google Sheets…</p>
+      <p class="desc">Con este plan tendrás todo el entorno de Taply listo con NFC (comprar previamente) configurados para tu restaurante y un panel privado en Google Sheets donde se guardan las encuestas de tus clientes con gráficos de los problemas más comunes, y opciones para filtros por fecha y descargas de datos para que detectes fallos al instante, los corrijas rápido y mejores tu restaurante sin que las críticas negativas aparezcan en Google</p>
       <div class="actions"><a class="btn plan acct-guard" data-tier="basic">Elegir Básico</a></div>
     </article>
 
+    <!-- PLAN PRO (RECOMENDADO) -->
     <article class="card plan rec">
       <span class="badge">Pro · Recomendado</span>
       <div class="price-lg"><span id="p-pro">55€</span> <span class="per">/mes</span></div>
-      <p class="desc">Este plan lo tiene todo: incluye lo del Plan Básico y además la gestión completa de tus reseñas…</p>
+      <p class="desc">Este plan lo tiene todo: incluye lo del Plan Básico y además la gestión completa de tus reseñas en Google, nos encargamos de monitorizar lo que escriben los clientes, responder con mensajes profesionales y avisarte de críticas importantes para que tu imagen pública en Google siempre esté cuidada, ganes visibilidad y atraigas muchos más clientes..</p>
       <div class="actions"><a class="btn plan acct-guard" data-tier="pro">Elegir Pro</a></div>
     </article>
   </div>
 
+  <!-- CTA gestionar suscripción (Stripe Portal) bajo las tarjetas) -->
   <div class="container" style="text-align:center;margin-top:16px">
     <!-- Oculto por defecto; se muestra solo si hay suscripción activa -->
     <button id="portalBtn" class="btn acct-guard" style="display:none">Gestionar mi suscripción</button>
   </div>
 </section>
 
+<!-- === RESUMEN DE CUENTA === -->
 <section id="cuenta" class="container" style="padding:40px 0">
   <article class="card">
     <h3 style="margin:0 0 10px">Mi suscripción</h3>
@@ -216,9 +235,12 @@
         <div id="acct-nfc" class="nfc-chip">NFC comprados: 0</div>
       </div>
     </div>
+
+    <!-- CTA solo si hay sesión + suscripción activa -->
     <div id="acct-portal-row" style="display:none; margin-top:14px; text-align:left">
       <button id="portalBtnAccount" class="btn">Gestionar suscripción</button>
     </div>
+
     <p id="acct-auth-cta" class="acct-small" style="margin-top:10px;display:none">
       ¿No tienes cuenta?
       <a id="acct-open-from-section" class="badge" style="cursor:pointer">Inicia sesión o regístrate</a>
@@ -232,36 +254,92 @@
   </div>
 </footer>
 
-<!-- === SCRIPTS === -->
-<script>
-  /* ===== Helper de retorno desde Stripe Portal =====
-     Usa Return URL: https://taply.es/#from=stripe-portal  (o …/suscripciones.html#from=stripe-portal)
-  */
-  (function(){
-    var hash = (location.hash||'').replace(/^#/,'');
-    var search = (location.search||'').replace(/^\?/,'');
-    var h = new URLSearchParams(hash);
-    var q = new URLSearchParams(search);
-    var from = h.get('from') || q.get('from');
+<!-- === MODAL ACCESO === -->
+<div id="acct-modal" class="acct-hidden" role="dialog" aria-modal="true" aria-labelledby="acct-title">
+  <div class="acct-dialog">
+    <div class="acct-cover"></div>
+    <div class="acct-body">
+      <div class="acct-head"><div class="acct-logo">⌁</div></div>
+      <h3 id="acct-title" class="acct-title">Inicia sesión en tu cuenta</h3>
+      <p id="acct-sub" class="acct-sub">Introduce tus datos de acceso o crea una cuenta nueva.</p>
 
-    if (from === 'stripe-portal') {
-      // Si no estamos en /suscripciones.html, reenvía ahí.
-      if (!/\/suscripciones\.html$/i.test(location.pathname)) {
-        location.replace('/suscripciones.html#from=stripe-portal');
-        return;
-      }
-      // Ya estamos en suscripciones.html → abrir panel de planes y limpiar URL.
-      document.addEventListener('DOMContentLoaded', function(){
-        var sub = document.getElementById('panel-sub');
-        var nfc = document.getElementById('panel-nfc');
-        if (sub) sub.classList.add('show');
-        if (nfc) nfc.classList.remove('show');
-        try { sub && sub.scrollIntoView({behavior:'smooth'}); } catch(e){}
-        try { history.replaceState(null,'',location.pathname); } catch(e){}
-      });
-    }
-  })();
-</script>
+      <div class="acct-tabs" role="tablist">
+        <button class="acct-tab acct-tab-active" data-tab="login" role="tab" aria-selected="true">Iniciar sesión</button>
+        <button class="acct-tab" data-tab="register" role="tab" aria-selected="false">Registrarse</button>
+      </div>
+
+      <!-- LOGIN -->
+      <form id="acct-form-login" class="acct-form" autocomplete="on" novalidate>
+        <label class="acct-label">Correo
+          <span class="acct-input">
+            <input id="acct-login-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com">
+          </span>
+        </label>
+        <label class="acct-label">Contraseña
+          <span class="acct-input">
+            <input id="acct-login-pass" type="password" required autocomplete="current-password" placeholder="••••••••">
+            <button type="button" class="toggle-eye" data-toggle="#acct-login-pass" aria-label="Mostrar u ocultar contraseña">👁</button>
+          </span>
+        </label>
+
+        <div class="acct-row">
+          <label class="remember"><input type="checkbox" checked> Mantener sesión activa</label>
+          <span id="link-forgot" class="acct-tab" style="background:transparent;border:1px dashed var(--border);cursor:pointer">¿Olvidaste la contraseña?</span>
+        </div>
+
+        <div class="acct-actions">
+          <button type="submit" class="btn">Iniciar sesión</button>
+          <a id="btn-google-login" href="/api/google?from=login" class="btn btn-google">Continuar con Google</a>
+          <p id="acct-error-login" class="acct-err" style="display:none"></p>
+          <p id="acct-info-login" class="acct-ok" style="display:none"></p>
+        </div>
+      </form>
+
+      <!-- REGISTER -->
+      <form id="acct-form-register" class="acct-form" style="display:none" autocomplete="on" novalidate>
+        <label class="acct-label">Nombre
+          <span class="acct-input"><input id="acct-reg-name" type="text" required autocomplete="name" placeholder="Nombre y apellidos"></span>
+        </label>
+        <label class="acct-label">Correo
+          <span class="acct-input"><input id="acct-reg-email" type="email" required autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></span>
+        </label>
+        <label class="acct-label">Contraseña
+          <span class="acct-input">
+            <input id="acct-reg-pass" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass">👁</button>
+          </span>
+        </label>
+        <label class="acct-label">Confirmar contraseña
+          <span class="acct-input">
+            <input id="acct-reg-pass2" type="password" required minlength="6" autocomplete="new-password" placeholder="Repite la contraseña">
+            <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass2">👁</button>
+          </span>
+        </label>
+        <div class="meter" aria-hidden="true"><i id="pw-meter"></i></div>
+        <div class="acct-actions">
+          <button type="submit" class="btn">Crear cuenta</button>
+          <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google">Registrarme con Google</a>
+          <p id="acct-error-register" class="acct-err" style="display:none"></p>
+          <p id="acct-info-register" class="acct-ok" style="display:none"></p>
+        </div>
+      </form>
+
+      <!-- RECOVER -->
+      <form id="acct-form-recover" class="acct-form" style="display:none" autocomplete="on" novalidate>
+        <p class="acct-small">Te enviaremos un enlace para restablecer tu contraseña.</p>
+        <label class="acct-label">Correo
+          <span class="acct-input"><input id="acct-recover-email" type="email" autocomplete="email" inputmode="email" placeholder="tucorreo@ejemplo.com"></span>
+        </label>
+        <div class="acct-actions">
+          <button type="submit" class="btn">Enviar enlace</button>
+          <button type="button" class="btn ghost" id="recover-back">Volver</button>
+          <p id="acct-info-recover" class="acct-ok" style="display:none"></p>
+          <p id="acct-error-recover" class="acct-err" style="display:none"></p>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <script>
   // ----------- Utilidades UI ----------- 
@@ -269,6 +347,7 @@
   const fmt = v => new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(v);
   window.addEventListener('load',()=>document.body.classList.add('is-loaded'));
 
+  // SOLO BÁSICO Y PRO
   const PRICE={ nfcUnit:5, monthly:{ basic:29, pro:55 }, annualDiscount:.20 };
   let qty=1, yearly=false;
 
@@ -432,6 +511,7 @@
           <a id="resend-verif" class="badge" style="cursor:pointer">Reenviar verificación</a>
         `;
         oks.register.style.display='block';
+        setTimeout(()=>{ document.getElementById('resend-verif')?.addEventListener('click',()=>resendVerification(email)); },0);
       }catch(err){
         const map = {
           email_in_use_google:'Ese correo ya existe como cuenta Google. Inicia sesión con Google.',
@@ -504,7 +584,7 @@
     function paintAccountSection(){
       const statusEl = $('#acct-status'), nfcEl = $('#acct-nfc'), authCta = $('#acct-auth-cta');
       const portalRow = $('#acct-portal-row');
-      const portalBtn = document.getElementById('portalBtn');
+      const portalBtn = document.getElementById('portalBtn'); // botón bajo las tarjetas
 
       if(!S.user){
         statusEl.textContent='Sesión no iniciada';
@@ -636,7 +716,7 @@
 
   // -------- Pago suscripciones (BÁSICO y PRO) --------
   $$('.btn.plan').forEach(btn => btn.addEventListener('click', async () => {
-    const tier = btn.dataset.tier;
+    const tier = btn.dataset.tier; // 'basic' | 'pro'
     const frequency = (document.querySelector('#btn-year')?.classList.contains('active')) ? 'annual' : 'monthly';
 
     if (window.taplyAuth?.user && (window.taplyAuth.user.subscription || window.taplyAuth.user.isSubscribed)) {
