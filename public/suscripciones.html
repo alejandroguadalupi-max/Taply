@@ -341,49 +341,127 @@
 </div>
 
 <script>
-  /* ===== Manejo de retorno desde Stripe Portal =====
-     Acepta: ?from=stripe-portal o #from=stripe-portal (y stripe_portal_return)
-     Sugerencia Return URL segura en Stripe: https://taply.es/#from=stripe-portal
+  /* ===== Manejo de retornos desde Stripe (Portal y Checkout) =====
+     - Si venimos de Stripe Portal: redirige/abre la sección de suscripciones
+     - Si volvemos desde Checkout con ?session_id=...: dispara /api/post-pago para enviar correos
+     - Si el usuario pulsa "Volver a entorno de prueba" (sin success_url configurado): detecta referrer *.stripe.com y vuelve a /suscripciones
   */
   (function(){
     const hash = (location.hash||'').replace(/^#/, '');
     const search = (location.search||'').replace(/^\?/, '');
     const h = new URLSearchParams(hash);
     const q = new URLSearchParams(search);
-    const from = h.get('from') || q.get('from') ||
-                 (h.has('stripe_portal_return') ? 'stripe-portal' : null) ||
-                 (q.has('stripe_portal_return') ? 'stripe-portal' : null);
+
+    function isStripeReferrer(){
+      try { const host = new URL(document.referrer).hostname || ''; return /\.stripe\.com$/i.test(host); }
+      catch { return false; }
+    }
 
     function openSubPanelHere(){
-      document.addEventListener('DOMContentLoaded', function(){
-        const sub = document.getElementById('panel-sub');
-        const nfc = document.getElementById('panel-nfc');
-        if(sub) sub.classList.add('show');
-        if(nfc) nfc.classList.remove('show');
-        try{ sub && sub.scrollIntoView({behavior:'smooth'}); }catch(e){}
-        try{ history.replaceState(null,'',location.pathname); }catch(e){}
-      });
+      const sub = document.getElementById('panel-sub');
+      const nfc = document.getElementById('panel-nfc');
+      if(sub) sub.classList.add('show');
+      if(nfc) nfc.classList.remove('show');
+      try{ sub && sub.scrollIntoView({behavior:'smooth'}); }catch(e){}
     }
 
-    async function redirectToSubs(){
-      const candidates = ['/suscripciones', '/suscripciones.html', '/suscripciones/'];
-      for (const p of candidates){
+    async function redirectToSubs(anchor=''){
+      const dests = ['/suscripciones.html', '/suscripciones', '/suscripciones/'];
+      for (const p of dests){
         try{
           const res = await fetch(p, { method:'HEAD', cache:'no-store' });
-          if(res.ok){ location.replace(p + '#from=stripe-portal'); return; }
+          if(res.ok){ location.replace(p + (anchor || '')); return; }
         }catch(e){}
       }
-      // Último recurso: vuelve a inicio con hash (no 404)
-      location.replace('/#from=stripe-portal');
+      // Último recurso: a inicio, pero mantén hash para que el UI abra la sección
+      location.replace('/' + (anchor || ''));
     }
 
-    if(from === 'stripe-portal'){
-      const onSubs = /\/suscripciones(\.html|\/)?$/i.test(location.pathname);
-      if(onSubs) openSubPanelHere();
-      else redirectToSubs();
+    async function firePostPago(sessionId){
+      try{
+        // Guarda cliente en sesión (para UI) y dispara correo
+        await fetch('/api/store-customer-from-session', {
+          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+          body: JSON.stringify({ session_id: sessionId })
+        }).catch(()=>{});
+        const r = await fetch('/api/post-pago', {
+          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+          body: JSON.stringify({ session_id: sessionId })
+        });
+        // No bloquea por errores, solo informa en consola
+        try { const d = await r.json(); console.debug('post-pago:', d); } catch {}
+      }catch(e){ console.warn('post-pago error', e); }
     }
+
+    function showBanner(msg, type='ok'){
+      const b = document.getElementById('top-banner');
+      const t = document.getElementById('top-banner-text');
+      if(!b||!t) return;
+      b.classList.remove('err','warn'); if(type!=='ok') b.classList.add(type);
+      t.innerHTML = msg; b.classList.add('show');
+    }
+
+    function cleanUrl(){ try{ history.replaceState(null,'',location.pathname); }catch{} }
+
+    (async function main(){
+      const onSubsPage = /\/suscripciones(\.html|\/)?$/i.test(location.pathname);
+
+      // 1) Portal
+      const fromPortal = h.get('from')==='stripe-portal' || q.get('from')==='stripe-portal' ||
+                         h.has('stripe_portal_return') || q.has('stripe_portal_return');
+      if (fromPortal) {
+        if (onSubsPage) {
+          openSubPanelHere();
+          cleanUrl();
+        } else {
+          await redirectToSubs('#from=stripe-portal');
+        }
+        return;
+      }
+
+      // 2) Checkout con session_id
+      const sessionId = h.get('session_id') || q.get('session_id');
+      const redirectStatus = h.get('redirect_status') || q.get('redirect_status'); // algunos flujos lo usan
+      if (sessionId) {
+        // En cualquier página, dispara post-pago y vuelve a suscripciones
+        await firePostPago(sessionId);
+        if (onSubsPage) {
+          openSubPanelHere();
+          showBanner('¡Compra confirmada! Te hemos enviado un correo con los siguientes pasos. 🎉');
+          cleanUrl();
+        } else {
+          await redirectToSubs('#from=checkout-done');
+        }
+        return;
+      }
+
+      // 3) Sin session_id pero referrer de Stripe (por "volver a entorno de prueba")
+      if (isStripeReferrer()) {
+        if (onSubsPage) {
+          openSubPanelHere();
+          showBanner('Has vuelto desde Stripe.', 'ok');
+          cleanUrl();
+        } else {
+          await redirectToSubs('#from=stripe-return');
+        }
+        return;
+      }
+
+      // 4) Señales genéricas de éxito
+      if (redirectStatus === 'succeeded') {
+        if (onSubsPage) {
+          openSubPanelHere();
+          showBanner('Pago confirmado. Te contactaremos en breve ✅');
+          cleanUrl();
+        } else {
+          await redirectToSubs('#from=checkout-ok');
+        }
+      }
+    })();
   })();
+</script>
 
+<script>
   // ----------- Utilidades UI ----------- 
   const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
   const fmt = v => new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(v);
