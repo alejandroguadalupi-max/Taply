@@ -170,9 +170,14 @@ function _emailBaseCss(){
   body{margin:0;background:#0b0f1a;font-family:system-ui,-apple-system,Segoe UI,Inter,Roboto,Arial,sans-serif}
   .wrap{padding:24px}
   .card{max-width:680px;margin:0 auto;background:#0e1424;border:1px solid rgba(255,255,255,.12);border-radius:16px;overflow:hidden}
+  /* Header: logo + marca */
   .hdr{padding:22px 24px;display:flex;align-items:center;gap:12px;background:#0b1020}
   .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(180deg,#7c3aed,#3b82f6)}
-  .brand{font-weight:600;color:#e9eefc;font-size:17px;letter-spacing:.2px}
+  /* Alineamos el texto al centro del logo sin mover nada más */
+  .brand{
+    font-weight:600;color:#e9eefc;font-size:17px;letter-spacing:.2px;
+    display:flex;align-items:center;height:34px;line-height:1; /* <-- clave */
+  }
   .body{background:#0e1424;padding:28px 24px 20px;color:#dbe6ff}
   h1{margin:0 0 8px;font-size:36px;line-height:1.1;color:#e9eefc}
   .lead{font-size:18px;line-height:1.5;margin:14px 0 10px;color:#c9d6ff}
@@ -191,6 +196,7 @@ function _emailBaseCss(){
     .foot{background:#f7f9ff;border-color:rgba(2,6,23,.06);color:#4d5f86}
   }`;
 }
+
 function _shell({title, preheader, lead, blocks=[], cta, ctaUrl, brand='Taply'}){
   const b = blocks.map(t=>`<p class="p">${t}</p>`).join('');
   const pre = (preheader||'').replace(/\n/g,' ').slice(0,140);
