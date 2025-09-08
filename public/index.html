@@ -33,9 +33,7 @@
     .container{width:min(1200px,92%);margin-inline:auto}
     body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.6px);background-size:26px 26px;opacity:.12}
 
-    /* Header sticky + refuerzo al hacer scroll */
-    header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px);transition:background .25s ease, box-shadow .25s ease}
-    header.is-stuck{background:#0a0f16ea; box-shadow:0 6px 18px rgba(0,0,0,.35)}
+    header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px)}
     .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0; position:relative}
     .brand{display:flex;gap:10px;align-items:center;font-weight:800;letter-spacing:.3px}
     /* Contenedor neutro para el logo PNG */
@@ -95,35 +93,6 @@
     .card{background:var(--bg-2);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);text-align:center}
     .card h3{margin:.2rem 0 .6rem}
     .card p{color:var(--muted);margin:0}
-
-    /* ====== LIGERO CAMBIO ESTÉTICO EN “CÓMO FUNCIONA” ====== */
-    #como-funciona .grid-3{grid-template-columns:repeat(3,1fr)}
-    #como-funciona .card{
-      text-align:left;
-      position:relative;
-      padding:22px 18px 22px 64px; /* espacio para icono */
-      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
-      border:1px solid rgba(255,255,255,.12);
-      transition:transform .15s ease, border-color .2s ease;
-    }
-    #como-funciona .card:hover{ transform:translateY(-2px); border-color:rgba(255,255,255,.18) }
-    /* Iconito sutil según la tarjeta (sin tocar el contenido) */
-    #como-funciona .card::before{
-      content:"";
-      position:absolute; left:18px; top:22px;
-      width:34px; height:34px; border-radius:12px;
-      display:grid; place-items:center;
-      background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
-      color:#061017; font-weight:800;
-      box-shadow:0 8px 22px rgba(124,58,237,.35);
-    }
-    #como-funciona .card:nth-child(1)::before{ content:"📱"; }
-    #como-funciona .card:nth-child(2)::before{ content:"🧭"; }
-    #como-funciona .card:nth-child(3)::before{ content:"📝"; }
-    #como-funciona .card:nth-child(4)::before{ content:"📊"; }
-    #como-funciona .card:nth-child(5)::before{ content:"⭐"; }
-    /* Alinear solo textos internos de las cards */
-    #como-funciona .card h3, #como-funciona .card p{ text-align:left }
 
     /* Reviews / carrusel */
     .reviews{position:relative;margin:36px 0}
@@ -285,8 +254,6 @@
         </div>
       </div>
     </section>
-
-    <!-- SOLO estética de esta sección ligeramente distinta -->
     <section id="como-funciona">
       <div class="container"><h2>¿Cómo funciona Taply?</h2></div>
       <div class="container grid-3">
@@ -297,7 +264,6 @@
         <div class="card"><h3>5) Todo suma</h3><p>Más y mejores valoraciones elevan tu visibilidad en el buscador, aumentan la confianza y traen más clientes.</p></div>
       </div>
     </section>
-
     <section id="beneficios">
       <div class="container">
         <h2>¿Qué podrás conseguir gracias a nuestro sistema?</h2>
@@ -311,7 +277,7 @@
       </div>
     </section>
 
-    <!-- RESEÑAS (sin cambios) -->
+    <!-- RESEÑAS -->
     <section class="reviews" id="reviews" aria-labelledby="reviews-title">
       <div class="container">
         <h2 id="reviews-title">Valorado 4,8/5 por más de 30 negocios</h2>
@@ -446,14 +412,6 @@
 
   <script>
     window.addEventListener('load', () => document.body.classList.add('is-loaded'));
-
-    /* Refuerzo sticky: el header siempre visible con sombra sutil al hacer scroll */
-    (function(){
-      const h = document.querySelector('header');
-      const onScroll = () => h.classList.toggle('is-stuck', window.scrollY > 6);
-      onScroll();
-      window.addEventListener('scroll', onScroll, {passive:true});
-    })();
 
     // Menú móvil
     const menuBtn=document.getElementById('menuBtn');
