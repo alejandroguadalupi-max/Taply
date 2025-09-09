@@ -269,14 +269,23 @@
         <h2>¿Qué podrás conseguir gracias a nuestro sistema?</h2>
         <style>
           .lead.justify{
-            text-align: justify;           /* justifica el texto */
-            text-justify: inter-word;      /* reparte espacios entre palabras */
-            -webkit-hyphens: auto;         /* cortes automáticos de palabra */
+            text-align: justify;           
+            text-justify: inter-word;      
+            -webkit-hyphens: auto;         
             -ms-hyphens: auto;
             hyphens: auto;
-            max-width: 900px;              /* opcional: limita el ancho para mejor lectura */
-            line-height: 1.6;              /* mejora la legibilidad */
+            max-width: 900px;              
+            line-height: 1.6;              
             margin: 0 auto;
+          }
+
+          /* 📱 Ajustes solo para móviles */
+          @media (max-width: 480px){
+            .lead.justify{
+              padding-left: 14px;
+              padding-right: 14px;
+              line-height: 1.7; /* un poco más aireado en móvil */
+            }
           }
         </style>
 
@@ -287,6 +296,7 @@
           y si la opinión no es tan favorable, le ofrecemos un <strong>formulario privado</strong> para que la gestiones internamente, sin que afecte a tu puntuación pública. 
           Así conseguimos que tu negocio <strong>gane visibilidad</strong>, escale posiciones entre los favoritos y todo ello de manera <strong>legal, transparente y realista</strong>.
         </p>
+
       
         <div class="cta-row"><a class="btn" href="suscripciones.html">Empezar ahora</a></div>
       </div>
