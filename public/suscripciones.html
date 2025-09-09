@@ -1,4 +1,4 @@
-<!doctype html>  
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
@@ -13,6 +13,11 @@
       --border:rgba(255,255,255,.10); --radius:18px;
       --shadow:0 12px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
       --focus:0 0 0 3px rgba(0,212,255,.25),0 0 0 6px rgba(124,58,237,.18);
+
+      /* === Tamaños unificados de la barra superior (usa esto también en la home) === */
+      --header-padding-y:14px;
+      --logo-size:34px;
+      --header-blur:10px;
     }
     *{box-sizing:border-box}
     html{-webkit-text-size-adjust:100%}
@@ -22,9 +27,9 @@
     a{text-decoration:none;color:inherit}
     .container{max-width:1100px;width:92%;margin-inline:auto}
 
-    header{padding:14px 0;border-bottom:1px solid var(--border);background:#0a0f16cc;backdrop-filter:blur(10px)}
+    header{padding:var(--header-padding-y) 0;border-bottom:1px solid var(--border);background:#0a0f16cc;backdrop-filter:blur(var(--header-blur))}
     .brand{font-weight:800;display:flex;align-items:center;gap:8px;justify-content:space-between}
-    .logo-img{width:34px;height:34px;border-radius:10px;object-fit:cover;display:block}
+    .logo-img{width:var(--logo-size);height:var(--logo-size);border-radius:10px;object-fit:cover;display:block}
 
     .banner{display:none}
     .banner.show{display:block}
@@ -112,7 +117,7 @@
     .toggle-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
     .acct-err{color:var(--err);margin-top:2px}
 
-    /* ===== Mejorar visibilidad de confirmaciones (verde) y auto-scroll ===== */
+    /* ===== Confirmaciones (verde) y auto-scroll ===== */
     .acct-ok{
       margin-top:2px;
       padding:12px 14px;
@@ -124,7 +129,6 @@
       text-align:center;
       box-shadow:var(--shadow);
     }
-    /* Para que al hacer scrollIntoView se quede con un pequeño margen */
     #acct-form-register .acct-ok{ scroll-margin-top: 12px; }
 
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
@@ -464,7 +468,7 @@
 
   // ----------- AUTH + session ----------- 
   (function(){
-    const S = { user:null, polling:null };
+    const S = { user:null, polling:null, pending:{login:false, register:false, recover:false} };
     const modal = $('#acct-modal'), title = $('#acct-title'), sub = $('#acct-sub');
     const forms = { login:$('#acct-form-login'), register:$('#acct-form-register'), recover:$('#acct-form-recover') };
     const errs  = { login:$('#acct-error-login'), register:$('#acct-error-register'), recover:$('#acct-error-recover') };
@@ -522,15 +526,73 @@
       if(meter){ meter.style.width=Math.min(100,score)+'%'; meter.style.background=score>80?'#22c55e':score>50?'#f59e0b':'#ef4444'; }
     });
 
-    async function api(method,url,body){
-      const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:body?JSON.stringify(body):undefined});
-      let data=null; try{ data=await res.json(); }catch{}
-      if(!res.ok){ const e=new Error(data?.message||`HTTP ${res.status}`); e.code=data?.error||'http_error'; e.fieldErrors=data?.fieldErrors||null; throw e; }
-      return data;
+    /* ===== api() robusto: maneja 500 y no-JSON + timeout + network ===== */
+    async function api(method, url, body, { timeoutMs = 12000 } = {}) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+
+      let res, txt;
+      try {
+        res = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          credentials: 'include',
+          cache: 'no-store',
+          body: body ? JSON.stringify(body) : undefined,
+          signal: ctrl.signal
+        });
+      } catch (networkErr) {
+        clearTimeout(t);
+        const e = new Error('No hay conexión con el servidor. Comprueba tu red e inténtalo de nuevo.');
+        e.code = 'network_error';
+        throw e;
+      } finally {
+        clearTimeout(t);
+      }
+
+      let data = null;
+      try { data = await res.clone().json(); }
+      catch {
+        try { txt = await res.text(); } catch {}
+      }
+
+      if (!res.ok) {
+        const msgServer = data?.message || txt?.trim();
+        const e = new Error(
+          msgServer ||
+          (res.status >= 500
+            ? 'Ha fallado el servidor (500). Inténtalo de nuevo en unos segundos.'
+            : `Error ${res.status}.`)
+        );
+        e.code = data?.error || `http_${res.status}`;
+        e.fieldErrors = data?.fieldErrors || null;
+        throw e;
+      }
+
+      return data ?? {};
     }
 
+    /* ===== util bloqueos anti-doble envío ===== */
+    function setPending(form, key, on) {
+      S.pending[key] = on;
+      const btn = form?.querySelector('button[type="submit"]');
+      if (btn) {
+        btn.disabled = on;
+        btn.style.opacity = on ? '.7' : '1';
+        btn.style.cursor = on ? 'not-allowed' : 'pointer';
+      }
+    }
+
+    /* ===== Recover ===== */
     forms.recover?.addEventListener('submit', async e=>{
-      e.preventDefault(); errs.recover.style.display='none'; oks.recover.style.display='none';
+      e.preventDefault();
+      if (S.pending.recover) return;
+      setPending(forms.recover, 'recover', true);
+
+      errs.recover.style.display='none'; oks.recover.style.display='none';
       const email=$('#acct-recover-email').value.trim();
       try{
         const d=await api('POST','/api/request-password-reset',{email});
@@ -538,9 +600,13 @@
         reveal(oks.recover);
       }catch(err){
         if(err.code==='account_not_found'){ errs.recover.textContent='No existe ninguna cuenta con ese correo.'; }
+        else if(err.code==='http_500'){ errs.recover.textContent='Ahora mismo no se puede enviar el enlace (500). Inténtalo en unos segundos.'; }
+        else if(err.code==='network_error'){ errs.recover.textContent='No hay conexión con el servidor. Inténtalo de nuevo cuando vuelva.'; }
         else { errs.recover.textContent=err.message||'No se pudo enviar el enlace.'; }
         errs.recover.style.display='block';
         ensureVisible(errs.recover);
+      } finally {
+        setPending(forms.recover, 'recover', false);
       }
     });
 
@@ -553,8 +619,13 @@
       }catch(e){}
     }
 
+    /* ===== Login ===== */
     forms.login?.addEventListener('submit', async e=>{
-      e.preventDefault(); errs.login.style.display='none'; oks.login.style.display='none';
+      e.preventDefault();
+      if (S.pending.login) return;
+      setPending(forms.login, 'login', true);
+
+      errs.login.style.display='none'; oks.login.style.display='none';
       const email=$('#acct-login-email').value.trim(); const password=$('#acct-login-pass').value;
       try{
         const data=await api('POST','/api/login',{email,password});
@@ -565,27 +636,40 @@
           errs.login.style.display='block';
           ensureVisible(errs.login);
           setTimeout(()=>{ document.getElementById('resend-link')?.addEventListener('click',()=>resendVerification(email)); },0);
-          return;
+        }else{
+          const map = {
+            account_not_found:'No existe una cuenta con ese email.',
+            invalid_credentials:'Correo o contraseña incorrectos.',
+            password_not_set:'Esta cuenta no tiene contraseña. Usa el enlace de recuperación.',
+            use_google_login:'Este correo está registrado con Google. Inicia sesión con Google.',
+            http_500:'Ha fallado el servidor (500). Prueba de nuevo en unos segundos.',
+            network_error:'No hay conexión con el servidor. Revisa tu red.'
+          };
+          errs.login.textContent = map[err.code] || err.message || 'No se pudo iniciar sesión.';
+          errs.login.style.display='block';
+          ensureVisible(errs.login);
         }
-        const map = {
-          account_not_found:'No existe una cuenta con ese email.',
-          invalid_credentials:'Correo o contraseña incorrectos.',
-          password_not_set:'Esta cuenta no tiene contraseña. Usa el enlace de recuperación.',
-          use_google_login:'Este correo está registrado con Google. Inicia sesión con Google.'
-        };
-        errs.login.textContent = map[err.code] || err.message || 'No se pudo iniciar sesión.';
-        errs.login.style.display='block';
-        ensureVisible(errs.login);
+      } finally {
+        setPending(forms.login, 'login', false);
       }
     });
 
+    /* ===== Register ===== */
     forms.register?.addEventListener('submit', async e=>{
-      e.preventDefault(); errs.register.style.display='none'; oks.register.style.display='none';
+      e.preventDefault();
+      if (S.pending.register) return;
+      setPending(forms.register, 'register', true);
+
+      errs.register.style.display='none'; oks.register.style.display='none';
       const name=$('#acct-reg-name').value.trim(); const email=$('#acct-reg-email').value.trim();
       const p1=$('#acct-reg-pass').value; const p2=$('#acct-reg-pass2').value;
-      if(p1!==p2){ errs.register.textContent='Las contraseñas no coinciden.'; errs.register.style.display='block'; ensureVisible(errs.register); return; }
-      if(p1.length<6){ errs.register.textContent='La contraseña debe tener al menos 6 caracteres.'; errs.register.style.display='block'; ensureVisible(errs.register); return; }
-      if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; ensureVisible(errs.register); return; }
+
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; ensureVisible(errs.register); setPending(forms.register,'register',false); return; }
+      if(!emailOk){ errs.register.textContent='Introduce un correo válido.'; errs.register.style.display='block'; ensureVisible(errs.register); setPending(forms.register,'register',false); return; }
+      if(p1!==p2){ errs.register.textContent='Las contraseñas no coinciden.'; errs.register.style.display='block'; ensureVisible(errs.register); setPending(forms.register,'register',false); return; }
+      if(p1.length<6){ errs.register.textContent='La contraseña debe tener al menos 6 caracteres.'; errs.register.style.display='block'; ensureVisible(errs.register); setPending(forms.register,'register',false); return; }
+
       try{
         await api('POST','/api/register',{name,email,password:p1});
         oks.register.innerHTML = `
@@ -595,20 +679,22 @@
           <a href="https://outlook.live.com/mail/0/inbox" target="_blank" rel="noopener" class="badge">Abrir Outlook</a>
           <a id="resend-verif" class="badge" style="cursor:pointer">Reenviar verificación</a>
         `;
-        reveal(oks.register); // <— se muestra y hace scroll automático
-        setTimeout(()=>{ 
-          document.getElementById('resend-verif')?.addEventListener('click',()=>resendVerification(email)); 
-        },0);
+        reveal(oks.register);
+        setTimeout(()=>{ document.getElementById('resend-verif')?.addEventListener('click',()=>resendVerification(email)); },0);
       }catch(err){
         const map = {
           email_in_use_google:'Ese correo ya existe como cuenta Google. Inicia sesión con Google.',
           email_in_use:'Ese correo ya tiene una cuenta. Inicia sesión.',
           weak_password:'La contraseña debe tener al menos 6 caracteres.',
-          name_email_password_required:'Nombre, email y contraseña son obligatorios.'
+          name_email_password_required:'Nombre, email y contraseña son obligatorios.',
+          http_500:'No se pudo crear la cuenta por un problema del servidor (500). Prueba otra vez en unos segundos.',
+          network_error:'No hay conexión con el servidor. Inténtalo de nuevo cuando vuelva.'
         };
         errs.register.textContent = map[err.code] || err.message || 'No se pudo crear la cuenta.';
         errs.register.style.display='block';
         ensureVisible(errs.register);
+      } finally {
+        setPending(forms.register, 'register', false);
       }
     });
 
@@ -678,7 +764,6 @@
       if(statusEl){ statusEl.style.display='none'; statusEl.textContent=''; }
 
       if(!S.user){
-        // No mostramos "Sesión no iniciada" (queda oculto) ni plan
         if(nfcEl) nfcEl.textContent='NFC comprados: 0';
         if(authCta) authCta.style.display='block';
         if(portalRow) portalRow.style.display='none';
