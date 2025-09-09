@@ -1,4 +1,4 @@
-<!doctype html>
+<!doctype html>  
 <html lang="es">
 <head>
   <meta charset="utf-8" />
@@ -111,7 +111,22 @@
     .acct-input input:focus{outline:none;border-color:rgba(0,212,255,.45); box-shadow:var(--focus)}
     .toggle-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
     .acct-err{color:var(--err);margin-top:2px}
-    .acct-ok{color:var(--ok);margin-top:2px}
+
+    /* ===== Mejorar visibilidad de confirmaciones (verde) y auto-scroll ===== */
+    .acct-ok{
+      margin-top:2px;
+      padding:12px 14px;
+      background:linear-gradient(135deg, rgba(34,197,94,.18), rgba(0,212,255,.14));
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:12px;
+      color:#d9ffe6;
+      font-weight:800;
+      text-align:center;
+      box-shadow:var(--shadow);
+    }
+    /* Para que al hacer scrollIntoView se quede con un pequeño margen */
+    #acct-form-register .acct-ok{ scroll-margin-top: 12px; }
+
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .acct-actions{display:grid;gap:10px}
 
@@ -125,6 +140,9 @@
       background:rgba(124,58,237,.10);border:1px solid rgba(124,58,237,.35);font-weight:800;color:#cfe3ff
     }
     .acct-small{color:var(--muted);font-size:.92rem;margin-top:6px}
+
+    /* ===== Ocultar estado/plan en el resumen de cuenta ===== */
+    #acct-status{ display:none !important; }
   </style>
 </head>
 <body>
@@ -374,27 +392,21 @@
     (async function main(){
       const onThisPageHasSubs = document.getElementById('panel-sub') != null;
 
-      // Señal guardada al salir hacia el Portal
       const flagPortal = sessionStorage.getItem('taply_portal_intent') === '1';
 
-      // Señales que indica Stripe:
       const fromPortal = h.get('from')==='stripe-portal' || q.get('from')==='stripe-portal' ||
                          h.has('stripe_portal_return') || q.has('stripe_portal_return');
 
-      // También si venimos con referrer de Stripe (ej: "Volver a entorno de prueba")
       const stripeBack = isStripeReferrer();
 
-      // Si detectamos cualquiera de las señales o la bandera, abrimos el panel AQUÍ
       if (onThisPageHasSubs && (fromPortal || stripeBack || flagPortal)) {
         openSubPanelHere();
         showBanner('Has vuelto desde Stripe.', 'ok');
         cleanUrl();
-        // Limpia la bandera para próximas visitas
         try{ sessionStorage.removeItem('taply_portal_intent'); }catch{}
         return;
       }
 
-      // Checkout con session_id (opcional, por si lo usas)
       const sessionId = h.get('session_id') || q.get('session_id');
       const redirectStatus = h.get('redirect_status') || q.get('redirect_status');
       if (sessionId || redirectStatus === 'succeeded') {
@@ -403,7 +415,6 @@
           showBanner('¡Compra confirmada! Te hemos enviado un correo con los siguientes pasos. 🎉');
           cleanUrl();
         } else {
-          // Si por lo que sea estás en otra página, al menos limpia hash
           cleanUrl();
         }
         try{ sessionStorage.removeItem('taply_portal_intent'); }catch{}
@@ -411,7 +422,6 @@
     })();
   })();
 </script>
-
 
 <script>
   // ----------- Utilidades UI ----------- 
@@ -525,11 +535,12 @@
       try{
         const d=await api('POST','/api/request-password-reset',{email});
         oks.recover.textContent = d?.message || 'Te hemos enviado un enlace (caduca en 1 hora).';
-        oks.recover.style.display='block';
+        reveal(oks.recover);
       }catch(err){
         if(err.code==='account_not_found'){ errs.recover.textContent='No existe ninguna cuenta con ese correo.'; }
         else { errs.recover.textContent=err.message||'No se pudo enviar el enlace.'; }
         errs.recover.style.display='block';
+        ensureVisible(errs.recover);
       }
     });
 
@@ -537,8 +548,8 @@
       if(!email) return;
       try{
         await api('POST','/api/resend-verification',{email});
-        oks.login.textContent='Te hemos reenviado el correo de verificación.'; oks.login.style.display='block';
-        oks.register.textContent='Te hemos reenviado el correo de verificación.'; oks.register.style.display='block';
+        oks.login.textContent='Te hemos reenviado el correo de verificación.'; reveal(oks.login);
+        oks.register.textContent='Te hemos reenviado el correo de verificación.'; reveal(oks.register);
       }catch(e){}
     }
 
@@ -552,6 +563,7 @@
         if(err.code==='email_not_verified'){
           errs.login.innerHTML = 'Tu correo no está verificado. <a id="resend-link" style="text-decoration:underline;cursor:pointer">Reenviar verificación</a>';
           errs.login.style.display='block';
+          ensureVisible(errs.login);
           setTimeout(()=>{ document.getElementById('resend-link')?.addEventListener('click',()=>resendVerification(email)); },0);
           return;
         }
@@ -563,6 +575,7 @@
         };
         errs.login.textContent = map[err.code] || err.message || 'No se pudo iniciar sesión.';
         errs.login.style.display='block';
+        ensureVisible(errs.login);
       }
     });
 
@@ -570,9 +583,9 @@
       e.preventDefault(); errs.register.style.display='none'; oks.register.style.display='none';
       const name=$('#acct-reg-name').value.trim(); const email=$('#acct-reg-email').value.trim();
       const p1=$('#acct-reg-pass').value; const p2=$('#acct-reg-pass2').value;
-      if(p1!==p2){ errs.register.textContent='Las contraseñas no coinciden.'; errs.register.style.display='block'; return; }
-      if(p1.length<6){ errs.register.textContent='La contraseña debe tener al menos 6 caracteres.'; errs.register.style.display='block'; return; }
-      if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; return; }
+      if(p1!==p2){ errs.register.textContent='Las contraseñas no coinciden.'; errs.register.style.display='block'; ensureVisible(errs.register); return; }
+      if(p1.length<6){ errs.register.textContent='La contraseña debe tener al menos 6 caracteres.'; errs.register.style.display='block'; ensureVisible(errs.register); return; }
+      if(!name){ errs.register.textContent='El nombre es obligatorio.'; errs.register.style.display='block'; ensureVisible(errs.register); return; }
       try{
         await api('POST','/api/register',{name,email,password:p1});
         oks.register.innerHTML = `
@@ -582,7 +595,10 @@
           <a href="https://outlook.live.com/mail/0/inbox" target="_blank" rel="noopener" class="badge">Abrir Outlook</a>
           <a id="resend-verif" class="badge" style="cursor:pointer">Reenviar verificación</a>
         `;
-        oks.register.style.display='block';
+        reveal(oks.register); // <— se muestra y hace scroll automático
+        setTimeout(()=>{ 
+          document.getElementById('resend-verif')?.addEventListener('click',()=>resendVerification(email)); 
+        },0);
       }catch(err){
         const map = {
           email_in_use_google:'Ese correo ya existe como cuenta Google. Inicia sesión con Google.',
@@ -592,6 +608,7 @@
         };
         errs.register.textContent = map[err.code] || err.message || 'No se pudo crear la cuenta.';
         errs.register.style.display='block';
+        ensureVisible(errs.register);
       }
     });
 
@@ -657,9 +674,12 @@
       const portalRow = $('#acct-portal-row');
       const portalBtn = document.getElementById('portalBtn'); // botón bajo las tarjetas
 
+      // Ocultar siempre el badge de estado/plan
+      if(statusEl){ statusEl.style.display='none'; statusEl.textContent=''; }
+
       if(!S.user){
-        statusEl.textContent='Sesión no iniciada';
-        nfcEl.textContent='NFC comprados: 0';
+        // No mostramos "Sesión no iniciada" (queda oculto) ni plan
+        if(nfcEl) nfcEl.textContent='NFC comprados: 0';
         if(authCta) authCta.style.display='block';
         if(portalRow) portalRow.style.display='none';
         if(portalBtn) portalBtn.style.display='none';
@@ -668,8 +688,11 @@
 
       if(authCta) authCta.style.display='none';
       const active = isSubActive(S.user);
-      statusEl.textContent = active ? prettyPlan(S.user) : 'Sin plan activo';
-      const qty = Number(S.user.nfc_qty || 0); nfcEl.textContent = `NFC comprados: ${qty}`;
+
+      // Tampoco mostramos el tipo de plan aunque esté activo
+      if(statusEl){ statusEl.style.display='none'; statusEl.textContent=''; }
+
+      const qty = Number(S.user.nfc_qty || 0); if(nfcEl) nfcEl.textContent = `NFC comprados: ${qty}`;
 
       if(portalRow) portalRow.style.display = active ? 'block' : 'none';
       if(portalBtn) portalBtn.style.display = active ? 'inline-flex' : 'none';
@@ -740,6 +763,7 @@
         if(target){
           target.textContent = msgFromGoogleCode(s.code, s.from);
           target.style.display = 'block';
+          ensureVisible(target);
         }
       }
       clearUrl();
@@ -764,21 +788,28 @@
       }
     });
 
+    // ---- Utilidades de visibilidad (scroll automático) ----
+    function ensureVisible(el){
+      if(!el) return;
+      try{ el.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch{}
+    }
+    function reveal(el){
+      if(!el) return;
+      el.style.display='block';
+      ensureVisible(el);
+    }
+
     // --- Portal Stripe ---
     async function openPortal(){
       try{
-        // Deja bandera para que, al volver SIN return_url, abramos suscripciones
         try{
           sessionStorage.setItem('taply_portal_intent','1');
-          // De paso, coloca en la URL un hash “inofensivo” por si la vuelta es con back()
           history.replaceState(null,'', location.pathname + '#from=stripe-portal');
         }catch{}
-
         const res = await fetch('/api/portal', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include' });
         const data = await res.json();
         if(res.ok && data?.url){ location.href = data.url; return; }
       }catch{}
-      // Fallback a login de Portal test si tu endpoint falla
       location.href = 'https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00';
     }
 
@@ -793,47 +824,6 @@
 
     getSession();
   })();
-
-  // -------- Pago suscripciones (BÁSICO y PRO) --------
-  $$('.btn.plan').forEach(btn => btn.addEventListener('click', async () => {
-    const tier = btn.dataset.tier; // 'basic' | 'pro'
-    const frequency = (document.querySelector('#btn-year')?.classList.contains('active')) ? 'annual' : 'monthly';
-
-    if (window.taplyAuth?.user && (window.taplyAuth.user.subscription || window.taplyAuth.user.isSubscribed)) {
-      if (confirm('Ya tienes una suscripción activa. ¿Quieres abrir el portal para gestionarla?')) {
-        try{
-          const r=await fetch('/api/portal',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include'});
-          const d=await r.json(); if(r.ok && d?.url){ location.href=d.url; return; }
-          location.href='https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00';
-        }catch{
-          location.href='https://billing.stripe.com/p/login/test_28E28sevk0OcdGMdkX4ko00';
-        }
-      }
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/create-checkout-session', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        credentials:'include',
-        body: JSON.stringify({ tier, frequency })
-      });
-      const data = await res.json();
-      if (!res.ok) { alert(data?.error || 'Error iniciando la suscripción'); return; }
-      if (data?.url) location.href = data.url; else alert('No se generó la URL de Stripe (no_session_url)');
-    } catch { alert('Error de red al iniciar la suscripción'); }
-  }));
-
-  // -------- Pago NFC --------
-  document.getElementById('buyNfcBtn').addEventListener('click', async () => {
-    try {
-      const res = await fetch('/api/buy-nfc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ quantity: qty }) });
-      const data = await res.json();
-      if (!res.ok) { alert(data?.error || 'Error iniciando el pago de NFC'); return; }
-      if (data?.url) location.href = data.url; else alert('No se generó la URL de Stripe (no_session_url)');
-    } catch { alert('Error de red al iniciar el pago de NFC'); }
-  });
 </script>
 </body>
 </html>
