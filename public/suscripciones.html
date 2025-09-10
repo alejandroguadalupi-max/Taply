@@ -1,4 +1,4 @@
-<!doctype html> 
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
@@ -167,6 +167,7 @@
       <span id="acct-nav-slot" style="position:relative"></span>
     </nav>
   </div>
+  <!-- Conservado pero oculto por CSS -->
   <div id="top-banner" class="banner"><div class="box" id="top-banner-text"></div></div>
 </header>
 
@@ -391,7 +392,7 @@
 </div>
 
 <script>
-  /* ===== Manejo de retornos desde Stripe (Portal y Checkout) — SOLO FRONT ===== */
+  /* ===== Manejo de retornos desde Stripe (Portal y Checkout) — sin banners ===== */
   (function(){
     const hash = (location.hash||'').replace(/^#/, '');
     const search = (location.search||'').replace(/^\?/, '');
@@ -410,23 +411,16 @@
       if(nfc) nfc.classList.remove('show');
       try{ sub && sub.scrollIntoView({behavior:'smooth'}); }catch(e){}
     }
-
-    // NO-OP: ya no mostramos banners arriba
-    function showBanner(){ /* no-op */ }
-
     function cleanUrl(){ try{ history.replaceState(null,'',location.pathname); }catch{} }
 
     (async function main(){
       const onThisPageHasSubs = document.getElementById('panel-sub') != null;
-
       const flagPortal = sessionStorage.getItem('taply_portal_intent') === '1';
-      const fromPortal = h.get('from')==='stripe-portal' || q.get('from')==='stripe-portal' ||
-                         h.has('stripe_portal_return') || q.has('stripe_portal_return');
+      const fromPortal = h.get('from')==='stripe-portal' || q.get('from')==='stripe-portal' || h.has('stripe_portal_return') || q.has('stripe_portal_return');
       const stripeBack = isStripeReferrer();
 
       if (onThisPageHasSubs && (fromPortal || stripeBack || flagPortal)) {
         openSubPanelHere();
-        // sin mensajes arriba
         cleanUrl();
         try{ sessionStorage.removeItem('taply_portal_intent'); }catch{}
         return;
@@ -435,13 +429,8 @@
       const sessionId = h.get('session_id') || q.get('session_id');
       const redirectStatus = h.get('redirect_status') || q.get('redirect_status');
       if (sessionId || redirectStatus === 'succeeded') {
-        if (onThisPageHasSubs) {
-          openSubPanelHere();
-          // sin banner superior
-          cleanUrl();
-        } else {
-          cleanUrl();
-        }
+        if (onThisPageHasSubs) openSubPanelHere();
+        cleanUrl();
         try{ sessionStorage.removeItem('taply_portal_intent'); }catch{}
       }
     })();
@@ -756,21 +745,7 @@
 
       if(portalRow) portalRow.style.display = active ? 'block' : 'none';
       if(portalBtn) portalBtn.style.display = active ? 'inline-flex' : 'none';
-
-      // ------ Mensaje centrado si ya tiene suscripción ------
-      if (active) {
-        const plan = prettyPlan(S.user);
-        showCenterMsg({
-          title: 'Suscripción activa',
-          text: `Ya tienes una suscripción activa <strong>${plan}</strong>.`,
-          type: 'ok',
-          actionText: 'Gestionar suscripción',
-          onAction: () => {
-            document.getElementById('portalBtn')?.click() || document.getElementById('portalBtnAccount')?.click();
-          },
-          autoCloseMs: 6000
-        });
-      }
+      // Importante: NO mostramos el overlay aquí (solo al intentar pagar un plan)
     }
 
     async function forceSessionRefresh(retries=4, delay=600){
@@ -797,8 +772,7 @@
         emailVerified: (h.get('email') === 'verified') || (q.get('email') === 'verified')
       };
     }
-    // NO-OP: no queremos mensajes arriba
-    function showTopBanner(){ /* no-op */ }
+    function showTopBanner(){ /* no-op: sin mensajes arriba */ }
     function clearUrl(){ try{ history.replaceState(null,'',location.pathname); }catch{} }
 
     function msgFromGoogleCode(code, from){
@@ -819,14 +793,12 @@
 
       if(s.emailVerified){
         await forceSessionRefresh();
-        // sin banner superior
         clearUrl();
       }
 
       if(!s.google) return;
       if(s.google==='ok'){
         await forceSessionRefresh();
-        // sin banner superior
       }else{
         openModal(s.from === 'register' ? 'register' : 'login');
         const target = (s.from === 'register') ? errs.register : errs.login;
@@ -853,7 +825,7 @@
 
       /* ====== HANDLERS DE PAGO: NFC + SUSCRIPCIONES ====== */
 
-      // Redefinimos "banner" para mostrar como mensaje centrado (no arriba)
+      // Usamos overlay para errores de pago (no banner superior)
       function banner(text, type='ok'){
         showCenterMsg({ title: type==='err'?'Error':'Información', text, type });
       }
@@ -884,6 +856,20 @@
           const tier = btn.getAttribute('data-tier'); // 'basic' | 'pro'
           const frequency = yearly ? 'annual' : 'monthly';
           if(!S.user){ openModal('login'); return; }
+
+          // SOLO aquí: si ya está suscrito, mostramos el mensaje centrado y NO vamos a checkout
+          if(isSubActive(S.user)){
+            showCenterMsg({
+              title:'Suscripción activa',
+              text:'Ya tienes una suscripción activa. Puedes verla y gestionarla abajo pulsando en <em>“Gestionar suscripción”</em>.',
+              type:'ok',
+              actionText:'Gestionar suscripción',
+              onAction:()=>{ document.getElementById('portalBtn')?.click() || document.getElementById('portalBtnAccount')?.click(); }
+            });
+            return; // bloquear checkout
+          }
+
+          // Si NO tiene suscripción: crear sesión de checkout
           try{
             const res = await fetch('/api/create-checkout-session', {
               method:'POST',
@@ -900,21 +886,7 @@
         });
       });
 
-      // Interceptar "Ver planes" si ya está suscrito (capturing para adelantarnos al handler anterior)
-      document.getElementById('showSub')?.addEventListener('click', (e)=>{
-        if(S.user && isSubActive(S.user)){
-          e.preventDefault(); e.stopImmediatePropagation();
-          const plan = prettyPlan(S.user);
-          showCenterMsg({
-            title:'Suscripción activa',
-            text:`Ya tienes una suscripción activa <strong>${plan}</strong>.`,
-            type:'ok',
-            actionText:'Gestionar suscripción',
-            onAction:()=>{ document.getElementById('portalBtn')?.click() || document.getElementById('portalBtnAccount')?.click(); }
-          });
-          return false;
-        }
-      }, true);
+      // IMPORTANTE: Ya NO interceptamos “Ver planes”; solo bloqueamos cuando intenta pagar un plan.
 
     }
 
