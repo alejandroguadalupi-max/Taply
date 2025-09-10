@@ -18,6 +18,12 @@
       --blue-1:#38bdf8; --blue-2:#2563eb;
       --radius:20px; --shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
       --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 36px);
+
+      /* Unificación con suscripciones.html */
+      --border: rgba(255,255,255,.10);
+      --header-padding-y: 14px;
+      --header-blur: 10px;
+      --logo-size: 34px;
     }
     *{box-sizing:border-box}
     html{-webkit-text-size-adjust:100%}
@@ -30,23 +36,24 @@
     }
     body.is-loaded{opacity:1;transform:none}
     a{color:inherit;text-decoration:none}
-    .container{width:min(1200px,92%);margin-inline:auto}
+
+    /* === Contenedor igual que suscripciones === */
+    .container{max-width:1100px;width:92%;margin-inline:auto}
+
     body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.6px);background-size:26px 26px;opacity:.12}
 
-    header{position:sticky;top:0;z-index:60;background:#0a0f16cc;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(10px)}
-    .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0; position:relative}
-    .brand{display:flex;gap:10px;align-items:center;font-weight:800;letter-spacing:.3px}
-    /* Contenedor neutro para el logo PNG */
-    .brand-logo{
-      width:34px;height:34px;border-radius:10px;
-      display:grid;place-items:center;overflow:hidden;
-      background:none;box-shadow:none;padding:0;
+    /* === Header calcado === */
+    header{
+      position:sticky;top:0;z-index:60;
+      background:#0a0f16cc;
+      border-bottom:1px solid var(--border);
+      backdrop-filter:blur(var(--header-blur));
     }
-    .brand-logo img{
-      display:block;
-      width:100%;
-      height:100%;
-      object-fit:contain; /* encaja el PNG sin deformarlo */
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:var(--header-padding-y) 0; position:relative}
+    .brand{display:flex;gap:8px;align-items:center;font-weight:800;letter-spacing:.3px}
+    .logo-img{
+      width:var(--logo-size);height:var(--logo-size);
+      border-radius:10px;object-fit:cover;display:block;
     }
     .nav-links{display:flex;gap:18px;align-items:center}
     .ghost{padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);color:var(--txt);touch-action:manipulation}
@@ -171,21 +178,12 @@
     .acct-body{padding:22px}
     .acct-head{display:flex;justify-content:center;align-items:center;margin:10px 0 18px}
     .acct-logo{
-      width:48px; 
-      height:48px;
-      border-radius:16px;
-      display:block;
-      background:url('img/logo.png') center/cover no-repeat;
-      box-shadow:var(--shadow);
-      /* ocultar el “⌁” */
-      color:transparent;
-      font-size:0;
-      line-height:0;
+      width:48px; height:48px; border-radius:16px; display:block;
+      background:url('img/logo.png') center/cover no-repeat; box-shadow:var(--shadow);
+      color:transparent; font-size:0; line-height:0;
     }
-
     .acct-title{margin:10px 0 0;text-align:center;font-weight:800;font-size:1.25rem}
     .acct-sub{margin:6px 0 0;text-align:center;color:var(--muted);font-size:.96rem}
-
     .acct-tabs{display:flex;gap:8px;margin:16px auto 12px;justify-content:center}
     .acct-tabs .acct-tab{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);border-radius:999px;padding:8px 14px;cursor:pointer;color:inherit;font-weight:700}
     .acct-tabs .acct-tab.acct-tab-active{background:linear-gradient(135deg,var(--brand-1),var(--brand-2)); color:#061017}
@@ -211,10 +209,8 @@
 <body>
   <header>
     <div class="container nav">
-      <a class="brand" href="index.html" aria-label="Inicio">
-        <span class="brand-logo" aria-hidden="true">
-          <img src="img/logo.png" alt="Taply" width="34" height="34" loading="eager">
-        </span>
+      <a class="brand" href="index.html" aria-label="Inicio" style="display:flex;align-items:center;gap:8px;color:inherit">
+        <img src="img/logo.png" alt="Taply" class="logo-img" width="34" height="34" loading="eager">
         <span>Taply</span>
       </a>
 
@@ -269,35 +265,28 @@
         <h2>¿Qué podrás conseguir gracias a nuestro sistema?</h2>
         <style>
           .lead.justify{
-            text-align: justify;           
-            text-justify: inter-word;      
-            -webkit-hyphens: auto;         
+            text-align: justify;
+            text-justify: inter-word;
+            -webkit-hyphens: auto;
             -ms-hyphens: auto;
             hyphens: auto;
-            max-width: 900px;              
-            line-height: 1.6;              
+            max-width: 900px;
+            line-height: 1.6;
             margin: 0 auto;
           }
-
-          /* 📱 Ajustes solo para móviles */
           @media (max-width: 480px){
-            .lead.justify{
-              padding-left: 14px;
-              padding-right: 14px;
-              line-height: 1.7; /* un poco más aireado en móvil */
-            }
+            .lead.justify{ padding-left:14px; padding-right:14px; line-height:1.7; }
           }
         </style>
 
         <p class="lead justify">
-          En <strong>Taply</strong> te ayudamos a <strong>multiplicar tus reseñas</strong>, atraer <strong>muchos más clientes</strong> y, como resultado, <strong>aumentar tus ingresos</strong>. 
-          Nuestro sistema está diseñado para impulsar la <strong>valoración global de tu negocio</strong>: 
-          cuando un cliente vive una experiencia positiva, le animamos a compartirla en <strong>Google</strong>, reforzando tu reputación online; 
-          y si la opinión no es tan favorable, le ofrecemos un <strong>formulario privado</strong> para que la gestiones internamente, sin que afecte a tu puntuación pública. 
+          En <strong>Taply</strong> te ayudamos a <strong>multiplicar tus reseñas</strong>, atraer <strong>muchos más clientes</strong> y, como resultado, <strong>aumentar tus ingresos</strong>.
+          Nuestro sistema está diseñado para impulsar la <strong>valoración global de tu negocio</strong>:
+          cuando un cliente vive una experiencia positiva, le animamos a compartirla en <strong>Google</strong>, reforzando tu reputación online;
+          y si la opinión no es tan favorable, le ofrecemos un <strong>formulario privado</strong> para que la gestiones internamente, sin que afecte a tu puntuación pública.
           Así conseguimos que tu negocio <strong>gane visibilidad</strong>, escale posiciones entre los favoritos y todo ello de manera <strong>legal, transparente y realista</strong>.
         </p>
 
-      
         <div class="cta-row"><a class="btn" href="suscripciones.html">Empezar ahora</a></div>
       </div>
     </section>
@@ -328,9 +317,7 @@
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:20px">
         <div>
           <div class="brand" style="margin-bottom:10px">
-            <span class="brand-logo" aria-hidden="true">
-              <img src="img/logo.png" alt="Taply" width="34" height="34" loading="lazy">
-            </span>
+            <img src="img/logo.png" alt="Taply" class="logo-img" width="34" height="34" loading="lazy">
             <span>taply</span>
           </div>
           <p style="color:#9fb0c8;max-width:560px">Tecnología NFC para convertir feedback en crecimiento real.</p>
@@ -623,7 +610,6 @@
           okRegister.textContent = data?.message || 'Te enviamos un correo de verificación. Revisa tu bandeja y el spam.';
           okRegister.style.display='block';
           resendRegisterBtn.style.display='inline-flex';
-          // Dejamos al usuario en la pestaña de registro para poder reenviar si hace falta
         }catch(err){
           const code = err.code || String(err);
           let msg = err.message || 'No se pudo crear la cuenta.';
@@ -650,7 +636,7 @@
           errs.login.style.display='none';
           okRegister.textContent = d?.message || 'Te enviamos un nuevo enlace de verificación.';
           okRegister.style.display='block';
-          setTab('register', true); // mostrar mensaje en el panel con más espacio
+          setTab('register', true);
         }catch(err){
           errs.login.textContent = err.message || 'No pudimos reenviar el correo.';
           errs.login.style.display='block';
