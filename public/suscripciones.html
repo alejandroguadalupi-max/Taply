@@ -112,7 +112,7 @@
     .toggle-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
     .acct-err{color:var(--err);margin-top:2px}
 
-    /* ===== Mejorar visibilidad de confirmaciones (verde) y auto-scroll ===== */
+    /* ===== Mensajes OK mejorados (verde) ===== */
     .acct-ok{
       margin-top:2px;
       padding:12px 14px;
@@ -124,7 +124,6 @@
       text-align:center;
       box-shadow:var(--shadow);
     }
-    /* Para que al hacer scrollIntoView se quede con un pequeño margen */
     #acct-form-register .acct-ok{ scroll-margin-top: 12px; }
 
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
@@ -141,7 +140,7 @@
     }
     .acct-small{color:var(--muted);font-size:.92rem;margin-top:6px}
 
-    /* ===== Ocultar estado/plan en el resumen de cuenta ===== */
+    /* Ocultar siempre el estado/plan */
     #acct-status{ display:none !important; }
   </style>
 </head>
@@ -419,6 +418,9 @@
         }
         try{ sessionStorage.removeItem('taply_portal_intent'); }catch{}
       }
+      
+      // Exponer utilidades en window para usarlas en otros bloques si hace falta
+      window.taplyUI = { showBanner };
     })();
   })();
 </script>
@@ -462,7 +464,7 @@
   $('#btn-year').addEventListener('click',()=>{yearly=true;$('#btn-year').classList.add('active');$('#btn-month').classList.remove('active');$('#btn-year').setAttribute('aria-selected','true');$('#btn-month').setAttribute('aria-selected','false');paintPrices()});
   paintPrices();
 
-  // ----------- AUTH + session ----------- 
+  // ----------- AUTH + session + CHECKOUT ----------- 
   (function(){
     const S = { user:null, polling:null };
     const modal = $('#acct-modal'), title = $('#acct-title'), sub = $('#acct-sub');
@@ -477,16 +479,84 @@
       window.taplyAuth = window.taplyAuth || {}; window.taplyAuth.user = S.user;
     }
 
-    function getInterval(u){ return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase(); }
-    function prettyPlan(u){
-      const nick = (u?.subscription?.price?.nickname || u?.subscription?.plan?.nickname || '').trim();
-      if(nick) return nick;
-      const interval=(getInterval(u)==='year')?'Anual':'Mensual';
-      const idOrNick=((u?.subscription?.price?.id||'')+' '+(u?.subscription?.plan?.nickname||'')).toLowerCase();
-      let base='Básico';
-      if(/pro/.test(idOrNick)) base='Pro';
-      return `${base} ${interval}`;
+    const successUrl = () => {
+      const url = new URL(location.href);
+      url.hash = 'redirect_status=succeeded';
+      return url.href;
+    };
+    const cancelUrl = () => location.href;
+
+    async function hitJson(method, url, payload){
+      const res = await fetch(url, {
+        method,
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body: payload ? JSON.stringify(payload) : undefined
+      });
+      let data=null; try{ data=await res.json(); }catch{}
+      return { ok: res.ok, status: res.status, data };
     }
+
+    // --- Crear sesión de checkout para NFC ---
+    async function startNfcCheckout(){
+      const body = { quantity: qty, success_url: successUrl(), cancel_url: cancelUrl() };
+      // Ruta principal
+      let r = await hitJson('POST', '/api/checkout/nfc', body);
+      // Fallbacks si tu backend usa otras rutas
+      if(!r.ok || !r.data?.url){
+        r = await hitJson('POST', '/api/checkout-nfc', body);
+      }
+      if(!r.ok || !r.data?.url){
+        r = await hitJson('POST', '/api/nfc/checkout', body);
+      }
+      if(r.ok && r.data?.url){
+        location.href = r.data.url;
+        return;
+      }
+      (window.taplyUI?.showBanner||console.warn)('No se pudo iniciar el pago de NFC. Revisa el endpoint del checkout.', 'err');
+      console.error('Checkout NFC error:', r.status, r.data);
+    }
+
+    // --- Crear sesión de checkout para SUSCRIPCIÓN ---
+    async function startSubCheckout(tier){
+      const interval = yearly ? 'year' : 'month';
+      const body = { tier, interval, success_url: successUrl(), cancel_url: cancelUrl() };
+      // Ruta principal
+      let r = await hitJson('POST', '/api/checkout/subscription', body);
+      // Fallbacks si tu backend usa otras rutas
+      if(!r.ok || !r.data?.url){
+        r = await hitJson('POST', '/api/checkout-subscription', body);
+      }
+      if(!r.ok || !r.data?.url){
+        r = await hitJson('POST', '/api/subscription/checkout', body);
+      }
+      if(r.ok && r.data?.url){
+        location.href = r.data.url;
+        return;
+      }
+      (window.taplyUI?.showBanner||console.warn)('No se pudo iniciar el pago de suscripción. Revisa el endpoint del checkout.', 'err');
+      console.error('Checkout SUB error:', r.status, r.data);
+    }
+
+    // Enlaces de COMPRA
+    const buyNfcBtn = document.getElementById('buyNfcBtn');
+    buyNfcBtn?.addEventListener('click', async (e)=>{
+      e.preventDefault();
+      if(!S.user){ openModal('login'); return; }
+      await startNfcCheckout();
+    });
+
+    document.querySelectorAll('.btn.plan').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        const tier = btn.getAttribute('data-tier') || 'basic';
+        if(!S.user){ openModal('login'); return; }
+        await startSubCheckout(tier);
+      });
+    });
+
+    // ==== resto auth ====
+    function getInterval(u){ return (u?.subscription?.price?.interval || u?.subscription?.plan?.interval || u?.subscription_interval || 'month').toLowerCase(); }
     function isSubActive(u){
       const s=(u?.subscription?.status || u?.subscription_status || '').toLowerCase();
       return s==='active'||s==='trialing'||s==='past_due'||u?.isSubscribed===true;
@@ -595,7 +665,7 @@
           <a href="https://outlook.live.com/mail/0/inbox" target="_blank" rel="noopener" class="badge">Abrir Outlook</a>
           <a id="resend-verif" class="badge" style="cursor:pointer">Reenviar verificación</a>
         `;
-        reveal(oks.register); // <— se muestra y hace scroll automático
+        reveal(oks.register);
         setTimeout(()=>{ 
           document.getElementById('resend-verif')?.addEventListener('click',()=>resendVerification(email)); 
         },0);
@@ -674,11 +744,9 @@
       const portalRow = $('#acct-portal-row');
       const portalBtn = document.getElementById('portalBtn'); // botón bajo las tarjetas
 
-      // Ocultar siempre el badge de estado/plan
       if(statusEl){ statusEl.style.display='none'; statusEl.textContent=''; }
 
       if(!S.user){
-        // No mostramos "Sesión no iniciada" (queda oculto) ni plan
         if(nfcEl) nfcEl.textContent='NFC comprados: 0';
         if(authCta) authCta.style.display='block';
         if(portalRow) portalRow.style.display='none';
@@ -688,12 +756,8 @@
 
       if(authCta) authCta.style.display='none';
       const active = isSubActive(S.user);
-
-      // Tampoco mostramos el tipo de plan aunque esté activo
       if(statusEl){ statusEl.style.display='none'; statusEl.textContent=''; }
-
-      const qty = Number(S.user.nfc_qty || 0); if(nfcEl) nfcEl.textContent = `NFC comprados: ${qty}`;
-
+      const qtyNow = Number(S.user.nfc_qty || 0); if(nfcEl) nfcEl.textContent = `NFC comprados: ${qtyNow}`;
       if(portalRow) portalRow.style.display = active ? 'block' : 'none';
       if(portalBtn) portalBtn.style.display = active ? 'inline-flex' : 'none';
     }
@@ -774,6 +838,7 @@
       try{ const data=await api('GET','/api/session'); setUser(data?.user||null); }catch{ setUser(cached||null); }
       paintNav(); paintAccountSection();
 
+      // Guard genérico: si no hay sesión y se pulsa algo con .acct-guard, abre modal (captura + cancel)
       document.body.addEventListener('click',(e)=>{
         const g=e.target.closest('.acct-guard'); if(g && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); }
       }, true);
@@ -788,7 +853,7 @@
       }
     });
 
-    // ---- Utilidades de visibilidad (scroll automático) ----
+    // ---- Utilidades de visibilidad (scroll automático de mensajes) ----
     function ensureVisible(el){
       if(!el) return;
       try{ el.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch{}
@@ -799,7 +864,7 @@
       ensureVisible(el);
     }
 
-    // --- Portal Stripe ---
+    // --- Portal Stripe (ya funcionaba) ---
     async function openPortal(){
       try{
         try{
@@ -827,3 +892,4 @@
 </script>
 </body>
 </html>
+
