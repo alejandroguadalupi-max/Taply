@@ -204,6 +204,57 @@
     .btn-google{background:#db4437;color:#fff}
     .btn-google:hover{filter:brightness(.95)}
     .acct-small{color:var(--muted);margin:0}
+    /* ==== Mejora visual del título (sin tocar el HTML) ==== */
+    /* ==== Más estrellas en la zona del título (ligeras y sin imágenes) ==== */
+    .hero{ position:relative; overflow:hidden; }
+
+    /* ==== Color degradado animado en el título ==== */
+    #hero-title{
+      background:linear-gradient(90deg,#00d4ff,#7c3aed,#22d3ee);
+      background-size:200% 100%;
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+      animation:titleGradient 8s linear infinite;
+      position:relative;
+      text-shadow:0 1px 0 rgba(0,0,0,.2);
+    }
+    @keyframes titleGradient{
+      0%{background-position:0% 50%}
+      100%{background-position:200% 50%}
+    }
+
+    /* ==== Más estrellas en la zona del título ==== */
+    .hero{ position:relative; overflow:hidden; }
+
+    .hero::before{
+      content:"";
+      position:absolute; inset:0; pointer-events:none;
+      background:
+        radial-gradient(1.8px 1.8px at 18% 20%, rgba(255,255,255,.95), transparent 60%),
+        radial-gradient(1.6px 1.6px at 30% 12%, rgba(255,255,255,.90), transparent 60%),
+        radial-gradient(1.6px 1.6px at 42% 26%, rgba(255,255,255,.85), transparent 60%),
+        radial-gradient(1.4px 1.4px at 55% 16%, rgba(255,255,255,.85), transparent 60%),
+        radial-gradient(1.2px 1.2px at 62% 28%, rgba(255,255,255,.80), transparent 60%),
+        radial-gradient(1.2px 1.2px at 71% 22%, rgba(255,255,255,.80), transparent 60%),
+        radial-gradient(1.2px 1.2px at 78% 30%, rgba(255,255,255,.80), transparent 60%),
+        radial-gradient(1.8px 1.8px at 84% 18%, rgba(255,255,255,.95), transparent 60%),
+        radial-gradient(1.4px 1.4px at 12% 32%, rgba(255,255,255,.85), transparent 60%),
+        radial-gradient(1.2px 1.2px at 25% 34%, rgba(255,255,255,.80), transparent 60%),
+        radial-gradient(1.2px 1.2px at 48% 34%, rgba(255,255,255,.78), transparent 60%),
+        radial-gradient(1.4px 1.4px at 66% 34%, rgba(255,255,255,.85), transparent 60%);
+      filter: drop-shadow(0 0 6px rgba(255,255,255,.18));
+      mask-image: linear-gradient(to bottom, black 36%, transparent 75%);
+      opacity:.95;
+    }
+
+    @media (max-width: 480px){
+      .hero::before{
+        opacity:.85;
+        mask-image: linear-gradient(to bottom, black 40%, transparent 70%);
+      }
+    }
+
   </style>
 </head>
 <body>
