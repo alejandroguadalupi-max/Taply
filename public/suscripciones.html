@@ -1,4 +1,4 @@
-<!doctype html>
+<!doctype html> 
 <html lang="es">
 <head>
   <meta charset="utf-8" />
@@ -26,16 +26,8 @@
     .brand{font-weight:800;display:flex;align-items:center;gap:8px;justify-content:space-between}
     .logo-img{width:34px;height:34px;border-radius:10px;object-fit:cover;display:block}
 
-    .banner{display:none}
-    .banner.show{display:block}
-    .banner .box{
-      margin:10px auto 0; width:92%; max-width:1100px;
-      background:linear-gradient(135deg, rgba(34,197,94,.15), rgba(0,212,255,.12));
-      border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:12px 14px;
-      box-shadow:var(--shadow); color:#d9ffe6; font-weight:700; text-align:center
-    }
-    .banner.err .box{ background:linear-gradient(135deg, rgba(239,68,68,.18), rgba(124,58,237,.12)); color:#ffe0e0 }
-    .banner.warn .box{ background:linear-gradient(135deg, rgba(245,158,11,.18), rgba(124,58,237,.10)); color:#fff5d6 }
+    /* Ocultar por completo cualquier banner superior */
+    .banner{display:none !important}
 
     .hero{text-align:center;padding:40px 0 24px}
     .h1{font-size:clamp(2rem,5.5vw,3.2rem);margin:0;font-weight:800}
@@ -141,6 +133,25 @@
 
     /* ===== Ocultar estado/plan en el resumen de cuenta ===== */
     #acct-status{ display:none !important; }
+
+    /* ===== Mensaje centrado (overlay) ===== */
+    .center-msg-backdrop{
+      position:fixed; inset:0; display:none; place-items:center; z-index:1200;
+      background:rgba(6,10,18,.65); backdrop-filter:blur(8px);
+    }
+    .center-msg-backdrop.show{ display:grid; }
+    .center-msg{
+      width:min(520px,92%); border-radius:18px; border:1px solid var(--border);
+      background:var(--bg-2); box-shadow:var(--shadow); padding:18px;
+      text-align:center; color:var(--txt);
+    }
+    .center-msg.ok   { background:linear-gradient(135deg, rgba(34,197,94,.18), rgba(0,212,255,.14)); }
+    .center-msg.warn { background:linear-gradient(135deg, rgba(245,158,11,.18), rgba(124,58,237,.10)); }
+    .center-msg.err  { background:linear-gradient(135deg, rgba(239,68,68,.18), rgba(124,58,237,.12)); }
+    .center-msg h4{ margin:0 0 8px; font-size:1.1rem; font-weight:800; }
+    .center-msg p{  margin:0 0 12px; color:#e9eefc; }
+    .center-msg .msg-actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .center-msg .btn{ padding:10px 14px; }
   </style>
 </head>
 <body>
@@ -174,8 +185,7 @@
       Son pagos independientes y tras cada compra recibirás un correo de confirmación y un WhatsApp 
       por si tiene cualquier duda, y ya de paso ponernos manos a la obra con su negocio y montar todo como usted desee
     </p>
-
-
+  </div>
 </section>
 
 <section class="container">
@@ -368,6 +378,18 @@
   </div>
 </div>
 
+<!-- Overlay de mensaje centrado -->
+<div id="centerMsgBackdrop" class="center-msg-backdrop" role="dialog" aria-modal="true" aria-live="polite">
+  <div id="centerMsg" class="center-msg ok">
+    <h4 id="centerMsgTitle">Información</h4>
+    <p id="centerMsgText"></p>
+    <div class="msg-actions">
+      <button id="centerMsgClose" class="btn ghost">Cerrar</button>
+      <button id="centerMsgAction" class="btn" style="display:none"></button>
+    </div>
+  </div>
+</div>
+
 <script>
   /* ===== Manejo de retornos desde Stripe (Portal y Checkout) — SOLO FRONT ===== */
   (function(){
@@ -389,13 +411,8 @@
       try{ sub && sub.scrollIntoView({behavior:'smooth'}); }catch(e){}
     }
 
-    function showBanner(msg, type='ok'){
-      const b = document.getElementById('top-banner');
-      const t = document.getElementById('top-banner-text');
-      if(!b||!t) return;
-      b.classList.remove('err','warn'); if(type!=='ok') b.classList.add(type);
-      t.innerHTML = msg; b.classList.add('show');
-    }
+    // NO-OP: ya no mostramos banners arriba
+    function showBanner(){ /* no-op */ }
 
     function cleanUrl(){ try{ history.replaceState(null,'',location.pathname); }catch{} }
 
@@ -403,15 +420,13 @@
       const onThisPageHasSubs = document.getElementById('panel-sub') != null;
 
       const flagPortal = sessionStorage.getItem('taply_portal_intent') === '1';
-
       const fromPortal = h.get('from')==='stripe-portal' || q.get('from')==='stripe-portal' ||
                          h.has('stripe_portal_return') || q.has('stripe_portal_return');
-
       const stripeBack = isStripeReferrer();
 
       if (onThisPageHasSubs && (fromPortal || stripeBack || flagPortal)) {
         openSubPanelHere();
-        showBanner('Has vuelto desde Stripe.', 'ok');
+        // sin mensajes arriba
         cleanUrl();
         try{ sessionStorage.removeItem('taply_portal_intent'); }catch{}
         return;
@@ -422,7 +437,7 @@
       if (sessionId || redirectStatus === 'succeeded') {
         if (onThisPageHasSubs) {
           openSubPanelHere();
-          showBanner('¡Compra confirmada! Te hemos enviado un correo con los siguientes pasos. 🎉');
+          // sin banner superior
           cleanUrl();
         } else {
           cleanUrl();
@@ -471,6 +486,44 @@
   $('#btn-month').addEventListener('click',()=>{yearly=false;$('#btn-month').classList.add('active');$('#btn-year').classList.remove('active');$('#btn-month').setAttribute('aria-selected','true');$('#btn-year').setAttribute('aria-selected','false');paintPrices()});
   $('#btn-year').addEventListener('click',()=>{yearly=true;$('#btn-year').classList.add('active');$('#btn-month').classList.remove('active');$('#btn-year').setAttribute('aria-selected','true');$('#btn-month').setAttribute('aria-selected','false');paintPrices()});
   paintPrices();
+
+  // ====== Mensaje centrado (overlay) ======
+  function showCenterMsg({ text, title='Información', type='ok', actionText, onAction, autoCloseMs }){
+    const bd = document.getElementById('centerMsgBackdrop');
+    const bx = document.getElementById('centerMsg');
+    const tt = document.getElementById('centerMsgTitle');
+    const tx = document.getElementById('centerMsgText');
+    const btnClose = document.getElementById('centerMsgClose');
+    const btnAction = document.getElementById('centerMsgAction');
+
+    if(!bd || !bx) return;
+
+    bx.classList.remove('ok','warn','err');
+    bx.classList.add(type || 'ok');
+
+    tt.textContent = title || 'Información';
+    tx.innerHTML = text || '';
+
+    if(actionText){
+      btnAction.style.display = 'inline-flex';
+      btnAction.textContent = actionText;
+      btnAction.onclick = () => { try{ onAction && onAction(); }catch{} hideCenterMsg(); };
+    } else {
+      btnAction.style.display = 'none';
+      btnAction.onclick = null;
+    }
+
+    btnClose.onclick = hideCenterMsg;
+    bd.classList.add('show');
+
+    if(autoCloseMs && Number(autoCloseMs) > 0){
+      setTimeout(() => { hideCenterMsg(); }, Number(autoCloseMs));
+    }
+  }
+  function hideCenterMsg(){
+    const bd = document.getElementById('centerMsgBackdrop');
+    if(bd) bd.classList.remove('show');
+  }
 
   // ----------- AUTH + session ----------- 
   (function(){
@@ -703,6 +756,21 @@
 
       if(portalRow) portalRow.style.display = active ? 'block' : 'none';
       if(portalBtn) portalBtn.style.display = active ? 'inline-flex' : 'none';
+
+      // ------ Mensaje centrado si ya tiene suscripción ------
+      if (active) {
+        const plan = prettyPlan(S.user);
+        showCenterMsg({
+          title: 'Suscripción activa',
+          text: `Ya tienes una suscripción activa <strong>${plan}</strong>.`,
+          type: 'ok',
+          actionText: 'Gestionar suscripción',
+          onAction: () => {
+            document.getElementById('portalBtn')?.click() || document.getElementById('portalBtnAccount')?.click();
+          },
+          autoCloseMs: 6000
+        });
+      }
     }
 
     async function forceSessionRefresh(retries=4, delay=600){
@@ -729,13 +797,8 @@
         emailVerified: (h.get('email') === 'verified') || (q.get('email') === 'verified')
       };
     }
-    function showTopBanner(text, type='ok'){
-      const b = document.getElementById('top-banner');
-      const t = document.getElementById('top-banner-text');
-      if(!b||!t) return;
-      b.classList.remove('err','warn'); if(type!=='ok') b.classList.add(type);
-      t.innerHTML = text; b.classList.add('show');
-    }
+    // NO-OP: no queremos mensajes arriba
+    function showTopBanner(){ /* no-op */ }
     function clearUrl(){ try{ history.replaceState(null,'',location.pathname); }catch{} }
 
     function msgFromGoogleCode(code, from){
@@ -756,14 +819,14 @@
 
       if(s.emailVerified){
         await forceSessionRefresh();
-        showTopBanner('¡Correo verificado! Tu cuenta está activada. 🎉', 'ok');
+        // sin banner superior
         clearUrl();
       }
 
       if(!s.google) return;
       if(s.google==='ok'){
         await forceSessionRefresh();
-        showTopBanner('Sesión iniciada con Google.', 'ok');
+        // sin banner superior
       }else{
         openModal(s.from === 'register' ? 'register' : 'login');
         const target = (s.from === 'register') ? errs.register : errs.login;
@@ -790,13 +853,9 @@
 
       /* ====== HANDLERS DE PAGO: NFC + SUSCRIPCIONES ====== */
 
-      // helper banner
+      // Redefinimos "banner" para mostrar como mensaje centrado (no arriba)
       function banner(text, type='ok'){
-        const b = document.getElementById('top-banner');
-        const t = document.getElementById('top-banner-text');
-        if(!b||!t) return;
-        b.classList.remove('err','warn'); if(type!=='ok') b.classList.add(type);
-        t.innerHTML = text; b.classList.add('show');
+        showCenterMsg({ title: type==='err'?'Error':'Información', text, type });
       }
 
       // Comprar NFC
@@ -840,6 +899,22 @@
           }
         });
       });
+
+      // Interceptar "Ver planes" si ya está suscrito (capturing para adelantarnos al handler anterior)
+      document.getElementById('showSub')?.addEventListener('click', (e)=>{
+        if(S.user && isSubActive(S.user)){
+          e.preventDefault(); e.stopImmediatePropagation();
+          const plan = prettyPlan(S.user);
+          showCenterMsg({
+            title:'Suscripción activa',
+            text:`Ya tienes una suscripción activa <strong>${plan}</strong>.`,
+            type:'ok',
+            actionText:'Gestionar suscripción',
+            onAction:()=>{ document.getElementById('portalBtn')?.click() || document.getElementById('portalBtnAccount')?.click(); }
+          });
+          return false;
+        }
+      }, true);
 
     }
 
