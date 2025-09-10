@@ -1,4 +1,4 @@
-<!doctype html>  
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
@@ -112,7 +112,6 @@
     .toggle-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
     .acct-err{color:var(--err);margin-top:2px}
 
-    /* ===== Mejorar visibilidad de confirmaciones (verde) y auto-scroll ===== */
     .acct-ok{
       margin-top:2px;
       padding:12px 14px;
@@ -124,7 +123,6 @@
       text-align:center;
       box-shadow:var(--shadow);
     }
-    /* Para que al hacer scrollIntoView se quede con un pequeño margen */
     #acct-form-register .acct-ok{ scroll-margin-top: 12px; }
 
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
@@ -599,7 +597,7 @@
           <a href="https://outlook.live.com/mail/0/inbox" target="_blank" rel="noopener" class="badge">Abrir Outlook</a>
           <a id="resend-verif" class="badge" style="cursor:pointer">Reenviar verificación</a>
         `;
-        reveal(oks.register); // <— se muestra y hace scroll automático
+        reveal(oks.register);
         setTimeout(()=>{ 
           document.getElementById('resend-verif')?.addEventListener('click',()=>resendVerification(email)); 
         },0);
@@ -676,13 +674,11 @@
     function paintAccountSection(){
       const statusEl = $('#acct-status'), nfcEl = $('#acct-nfc'), authCta = $('#acct-auth-cta');
       const portalRow = $('#acct-portal-row');
-      const portalBtn = document.getElementById('portalBtn'); // botón bajo las tarjetas
+      const portalBtn = document.getElementById('portalBtn');
 
-      // Ocultar siempre el badge de estado/plan
       if(statusEl){ statusEl.style.display='none'; statusEl.textContent=''; }
 
       if(!S.user){
-        // No mostramos "Sesión no iniciada" (queda oculto) ni plan
         if(nfcEl) nfcEl.textContent='NFC comprados: 0';
         if(authCta) authCta.style.display='block';
         if(portalRow) portalRow.style.display='none';
@@ -693,7 +689,6 @@
       if(authCta) authCta.style.display='none';
       const active = isSubActive(S.user);
 
-      // Tampoco mostramos el tipo de plan aunque esté activo
       if(statusEl){ statusEl.style.display='none'; statusEl.textContent=''; }
 
       const qty = Number(S.user.nfc_qty || 0); if(nfcEl) nfcEl.textContent = `NFC comprados: ${qty}`;
@@ -778,11 +773,66 @@
       try{ const data=await api('GET','/api/session'); setUser(data?.user||null); }catch{ setUser(cached||null); }
       paintNav(); paintAccountSection();
 
+      // Guard general para requerir login en elementos con .acct-guard
       document.body.addEventListener('click',(e)=>{
         const g=e.target.closest('.acct-guard'); if(g && !S.user){ e.stopImmediatePropagation(); e.preventDefault(); openModal('login'); }
       }, true);
 
       await handleSignals();
+
+      /* ====== HANDLERS DE PAGO: NFC + SUSCRIPCIONES ====== */
+
+      // helper banner
+      function banner(text, type='ok'){
+        const b = document.getElementById('top-banner');
+        const t = document.getElementById('top-banner-text');
+        if(!b||!t) return;
+        b.classList.remove('err','warn'); if(type!=='ok') b.classList.add(type);
+        t.innerHTML = text; b.classList.add('show');
+      }
+
+      // Comprar NFC
+      document.getElementById('buyNfcBtn')?.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        if(!S.user){ openModal('login'); return; }
+        try{
+          const res = await fetch('/api/buy-nfc', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            credentials:'include',
+            body: JSON.stringify({ quantity: qty })
+          });
+          const data = await res.json();
+          if(res.ok && data?.url){ location.href = data.url; return; }
+          throw new Error(data?.message || 'No pudimos iniciar el pago.');
+        }catch(err){
+          banner(err.message || 'No pudimos iniciar el pago de NFC.', 'err');
+        }
+      });
+
+      // Suscripciones (basic/pro) según mensual/anual
+      document.querySelectorAll('.btn.plan[data-tier]')?.forEach(btn=>{
+        btn.addEventListener('click', async (e)=>{
+          e.preventDefault();
+          const tier = btn.getAttribute('data-tier'); // 'basic' | 'pro'
+          const frequency = yearly ? 'annual' : 'monthly';
+          if(!S.user){ openModal('login'); return; }
+          try{
+            const res = await fetch('/api/create-checkout-session', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              credentials:'include',
+              body: JSON.stringify({ tier, frequency })
+            });
+            const data = await res.json();
+            if(res.ok && data?.url){ location.href = data.url; return; }
+            throw new Error(data?.message || 'No pudimos iniciar el pago.');
+          }catch(err){
+            banner(err.message || 'No pudimos iniciar el pago de la suscripción.', 'err');
+          }
+        });
+      });
+
     }
 
     window.addEventListener('storage', e=>{
@@ -792,7 +842,6 @@
       }
     });
 
-    // ---- Utilidades de visibilidad (scroll automático) ----
     function ensureVisible(el){
       if(!el) return;
       try{ el.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch{}
