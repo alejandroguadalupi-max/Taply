@@ -158,7 +158,7 @@ async function sendEmail({to, subject, text, html}){
     const from = { email: fromParsed.email, name: fromParsed.name || 'Taply' };
     const replyTo = replyParsed ? { email: replyParsed.email, name: replyParsed.name } : undefined;
 
-    const isVerify = /Confirma tu correo|Confirma tu correo|Confirmar mi correo|verify/i.test(subject + ' ' + String(html||''));
+    const isVerify = /Confirma tu correo|Confirmar mi correo|verify/i.test(subject + ' ' + String(html||''));
     const toEmailForCheck = (() => {
       if (typeof to === 'string') return to;
       if (Array.isArray(to)) {
@@ -184,6 +184,10 @@ async function sendEmail({to, subject, text, html}){
           openTracking: { enable: false }
         }
       } : {}),
+      // 🔸 IMPORTANTE: tratar como transaccional para no bloquear por List Management
+      mailSettings: {
+        bypassListManagement: { enable: true }
+      },
       headers: {
         'Auto-Submitted': 'auto-generated',
         'X-Auto-Response-Suppress': 'All',
@@ -527,7 +531,7 @@ async function googleOAuthCallback(req, res){
 
     const payload = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64').toString('utf8') || '{}');
     const email = normalizeEmail(payload?.email || '');
-    const emailVerified = !!payload?.email_verified;
+       const emailVerified = !!payload?.email_verified;
     const name = payload?.name || payload?.given_name || null;
     if(!email || !emailVerified) throw new Error('email_not_verified');
 
