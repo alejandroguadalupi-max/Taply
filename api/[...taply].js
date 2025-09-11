@@ -906,20 +906,28 @@ async function postPago(req, res){
         expand: ['line_items.data.price','customer','customer_details','payment_intent']
       });
 
+      // ...
       // Solo enviamos correo si el pago está completado
       const isPaid = cs?.payment_status === 'paid' || cs?.status === 'complete';
       if (!isPaid) {
         return res.status(202).json({ ok:false, pending:true, message:'La sesión de pago no está completada todavía.' });
       }
 
-      buyerEmail = cs.customer_details?.email || cs.customer_email || (typeof cs.customer !== 'string' ? cs.customer?.email : null) || null;
-      buyerEmail = cs.customer_details?.email || cs.customer_email || (typeof cs.customer !== 'string' ? cs.customer?.email : null) || null;
-      buyerPhone = cs.customer_details?.phone || (typeof cs.customer !== 'string' ? cs.customer?.phone : null) || null;
+      buyerEmail = cs.customer_details?.email
+                || cs.customer_email
+                || (typeof cs.customer !== 'string' ? cs.customer?.email : null)
+                || null;
+
+      buyerPhone = cs.customer_details?.phone
+                || (typeof cs.customer !== 'string' ? cs.customer?.phone : null)
+                || null;
+
       customerId = typeof cs.customer === 'string' ? cs.customer : cs.customer?.id || null;
 
       const li = cs.line_items?.data || [];
       lineSummary = li.map(i => `${i.quantity} × ${i.description || i.price?.nickname || i.price?.id}`).join(', ');
       amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '';
+      // ...
 
       // Si es NFC, sumar unidades al customer y persistir shipping y phone si existen
       if (cs.mode === 'payment' && PRICE_ID_NFC && customerId) {
@@ -1245,3 +1253,5 @@ async function resetPassword(req, res){
   await stripe.customers.update(customer.id, { metadata: { ...meta, taply_pass_hash: hash, taply_reset_token: '', taply_reset_exp: '' }});
   return res.status(200).json({ ok:true, message:'Contraseña actualizada.' });
 }
+
+
