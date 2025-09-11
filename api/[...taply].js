@@ -158,7 +158,7 @@ async function sendEmail({to, subject, text, html}){
     const from = { email: fromParsed.email, name: fromParsed.name || 'Taply' };
     const replyTo = replyParsed ? { email: replyParsed.email, name: replyParsed.name } : undefined;
 
-    // Mejora de entregabilidad en Apple/iCloud (Mail)
+    const isVerify = /Confirma tu correo|Confirma tu correo|Confirmar mi correo|verify/i.test(subject + ' ' + String(html||''));
     const toEmailForCheck = (() => {
       if (typeof to === 'string') return to;
       if (Array.isArray(to)) {
@@ -168,10 +168,8 @@ async function sendEmail({to, subject, text, html}){
       if (to && typeof to === 'object') return to.email || '';
       return '';
     })();
-    const isApple = /@(icloud|me|mac|privaterelay\.appleid)\.com$/i.test(toEmailForCheck);
-
-    // Desactivar tracking (iCloud suele filtrar con click/open tracking)
-    const disableTracking = isApple || /confirm/i.test(subject || '');
+    const isApple = /@(icloud|me|mac)\.com$/i.test(toEmailForCheck);
+    const disableTracking = isVerify || isApple;
 
     const payload = {
       to,
@@ -186,12 +184,6 @@ async function sendEmail({to, subject, text, html}){
           openTracking: { enable: false }
         }
       } : {}),
-      // Señalar como transaccional
-      categories: ['transactional'],
-      mailSettings: {
-        // Evita supresiones por listas
-        bypassListManagement: { enable: true }
-      },
       headers: {
         'Auto-Submitted': 'auto-generated',
         'X-Auto-Response-Suppress': 'All',
@@ -794,7 +786,7 @@ async function subscriptionSwap(req, res){
   }
 }
 
-/* ========== SUSCRIPCIÓN: Teléfono OBLIGATORIO, sin dirección envío ========== */
+/* ========== CAMBIO: Suscripción pide SIEMPRE teléfono ========== */
 async function createCheckoutSession(req, res){
   const { tier, frequency } = getBody(req);
   if (!tier || !frequency) return res.status(422).json({ error:'validation_error', message:'Faltan parámetros de plan.' });
@@ -821,20 +813,11 @@ async function createCheckoutSession(req, res){
     allow_promotion_codes: true,
     success_url: `${appBase(req)}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url:  `${appBase(req)}/cancelado.html`,
-
-    // Teléfono visible + campo personalizado obligatorio
+    // Teléfono SIEMPRE
     phone_number_collection: { enabled: true },
-    custom_fields: [{
-      key: 'phone',
-      label: { type: 'custom', custom: 'Teléfono (móvil o WhatsApp)' },
-      type: 'text',
-      optional: false
-    }],
-
-    // No pedimos dirección de envío en suscripción
-    customer_update: { address: 'auto', name: 'auto', phone: 'auto' },
+    // Que Checkout actualice datos del customer si el usuario los edita
+    customer_update: { address: 'auto', name: 'auto' },
     customer: customerId,
-
     subscription_data: { metadata: { type: 'subscription', tier, frequency, app:'taply' } },
     metadata: { type: 'subscription', tier, frequency, app:'taply' }
   });
@@ -843,7 +826,7 @@ async function createCheckoutSession(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-/* ========== NFC: Teléfono OBLIGATORIO + Dirección de envío OBLIGATORIA ========== */
+/* ========== CAMBIO: NFC pide teléfono + ENVÍO OBLIGATORIO ========== */
 async function buyNfc(req, res){
   if (!PRICE_ID_NFC) return res.status(500).json({ error: 'missing_nfc_price_id', message:'Falta configurar el precio NFC.' });
   const sess = getSessionFromCookie(req);
@@ -862,14 +845,8 @@ async function buyNfc(req, res){
     cancel_url:  `${appBase(req)}/cancelado.html`,
     allow_promotion_codes: true,
 
-    // Teléfono visible + campo personalizado obligatorio (además del de Stripe)
+    // Teléfono SIEMPRE
     phone_number_collection: { enabled: true },
-    custom_fields: [{
-      key: 'phone',
-      label: { type: 'custom', custom: 'Teléfono (móvil o WhatsApp)' },
-      type: 'text',
-      optional: false
-    }],
 
     // Dirección de envío OBLIGATORIA (forzamos paso de envío con una opción gratuita)
     shipping_address_collection: { allowed_countries: ['ES'] },
@@ -885,8 +862,8 @@ async function buyNfc(req, res){
       }
     }],
 
-    // Permite a Checkout escribir shipping/address/name/phone en el customer
-    customer_update: { address: 'auto', shipping: 'auto', name: 'auto', phone: 'auto' },
+    // Permite a Checkout escribir shipping/address/name en el customer
+    customer_update: { address: 'auto', shipping: 'auto', name: 'auto' },
 
     billing_address_collection: 'auto',
     metadata: { type: 'nfc', qty: String(qty), app:'taply' },
@@ -921,12 +898,6 @@ async function postPago(req, res){
 
       buyerEmail = cs.customer_details?.email || cs.customer_email || (typeof cs.customer !== 'string' ? cs.customer?.email : null) || null;
       buyerPhone = cs.customer_details?.phone || (typeof cs.customer !== 'string' ? cs.customer?.phone : null) || null;
-      // Teléfono desde campo personalizado obligatorio
-      if (!buyerPhone && Array.isArray(cs.custom_fields)) {
-        const f = cs.custom_fields.find(x => x?.key === 'phone');
-        const val = f?.text?.value || f?.numeric?.value || null;
-        if (val) buyerPhone = String(val);
-      }
       customerId = typeof cs.customer === 'string' ? cs.customer : cs.customer?.id || null;
 
       const li = cs.line_items?.data || [];
@@ -960,11 +931,6 @@ async function postPago(req, res){
           const prev = parseInt(cust?.metadata?.taply_nfc_qty || '0', 10) || 0;
           await stripe.customers.update(customerId, { metadata: { ...(cust.metadata||{}), taply_nfc_qty: String(prev + addQty) }});
         }
-      } else if (cs.mode === 'subscription' && customerId) {
-        // En suscripción, asegurarnos de guardar el teléfono recogido
-        try{
-          if (buyerPhone) await stripe.customers.update(customerId, { phone: buyerPhone });
-        }catch(e){ console.error('update customer phone failed', e?.message||e); }
       }
     }catch(e){ console.error('post-pago retrieve error', e?.message || e); }
   }
