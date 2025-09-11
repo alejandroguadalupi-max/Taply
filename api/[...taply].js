@@ -140,8 +140,18 @@ function normalizeToList(to){
   if (typeof to === 'object' && to.email) return [parseAddress(to.email)];
   return [];
 }
-function isAppleDomain(email=''){
-  return /@(icloud|me|mac)\.com$/i.test(String(email||'').trim());
+
+// iCloud (incluye dominios personalizados alojados en iCloud si se listan en APPLE_HOSTED_DOMAINS)
+function isAppleHosted(email=''){
+  const e = String(email||'').trim().toLowerCase();
+  if (/@(icloud\.com|me\.com|mac\.com)$/.test(e)) return true;
+  const host = e.split('@')[1];
+  const extra = (process.env.APPLE_HOSTED_DOMAINS || '')
+    .toLowerCase()
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  return extra.includes(host);
 }
 
 async function sendEmail({to, subject, text, html}){
@@ -168,7 +178,7 @@ async function sendEmail({to, subject, text, html}){
 
     // Para iCloud & verificación: desactiva tracking totalmente
     const firstTo = normalizeToList(to)[0]?.email || '';
-    const apple = isAppleDomain(firstTo);
+    const appleHosted = isAppleHosted(firstTo);
     const isVerify = /Confirma tu correo|Confirmar mi correo|verify|verifica/i.test(`${subject} ${String(html||'')}`);
 
     const payload = {
@@ -178,13 +188,11 @@ async function sendEmail({to, subject, text, html}){
       subject,
       text: text || (html ? String(html).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim() : ''),
       html: html || `<p>${text || ''}</p>`,
-      // Quitar tracking para Apple y correos críticos
-      ...(apple || isVerify ? {
+      ...(appleHosted || isVerify ? {
         trackingSettings: { clickTracking: { enable: false, enableText: false }, openTracking: { enable: false } }
       } : {}),
       headers: {
-        // Quitamos Auto-Submitted para que iCloud no lo oculte
-        'X-Auto-Response-Suppress': 'All',
+        // Nada de Auto-Submitted ni Precedence bulk
         'X-Entity-Ref-ID': crypto.randomBytes(16).toString('hex')
       },
       ...(process.env.SENDGRID_BYPASS_MANAGEMENT === '1'
@@ -208,7 +216,6 @@ async function sendEmail({to, subject, text, html}){
   }catch(e){ console.error('sendEmail error fatal', e?.message || e); }
   return false;
 }
-
 /* ===== Plantillas email (modo claro forzado) ===== */
 function _safeName(name){ return (name || '').trim() || null; }
 function _emailBaseCss(){
@@ -304,6 +311,7 @@ function makeVerifyEmailUI({name, verifyUrl}){
   });
   return { subject: 'Confirma tu correo — Taply', html };
 }
+
 /* ================== Auth ================== */
 
 // POST /api/register
@@ -526,7 +534,7 @@ async function googleOAuthCallback(req, res){
     const idToken = tokenJson.id_token;
     if(!idToken) throw new Error('no_id_token');
 
-    const [stateVal, fromState] = String(state || '').split('|');
+    const [, fromState] = String(state || '').split('|');
     const from = (fromState || 'login').toLowerCase();
 
     const payload = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64').toString('utf8') || '{}');
@@ -885,10 +893,9 @@ function getAdminEmailTo(){
     (process.env.EMAIL_FROM || '').trim()
   ].filter(Boolean);
   const from = (process.env.EMAIL_FROM || '').trim().toLowerCase();
-  const chosen = cands.find(e => e.toLowerCase() !== from) || cands[0] || from;
-  return parseAddress(chosen).email;
+  const chosen = cands.find(e => e.toLowerCase() !== from) || cands[0] || '';
+  return chosen ? parseAddress(chosen).email : '';
 }
-
 /* ===== Post-pago ===== */
 async function postPago(req, res){
   const stripe = getStripe();
@@ -906,7 +913,6 @@ async function postPago(req, res){
         expand: ['line_items.data.price','customer','customer_details','payment_intent']
       });
 
-      // ...
       // Solo enviamos correo si el pago está completado
       const isPaid = cs?.payment_status === 'paid' || cs?.status === 'complete';
       if (!isPaid) {
@@ -927,7 +933,6 @@ async function postPago(req, res){
       const li = cs.line_items?.data || [];
       lineSummary = li.map(i => `${i.quantity} × ${i.description || i.price?.nickname || i.price?.id}`).join(', ');
       amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '';
-      // ...
 
       // Si es NFC, sumar unidades al customer y persistir shipping y phone si existen
       if (cs.mode === 'payment' && PRICE_ID_NFC && customerId) {
@@ -1183,7 +1188,7 @@ export default async function handler(req, res){
 
       // ---- Self test de email (opcional) ----
       if (route === 'email-self-test') {
-        const to = getBody(req).to || parseAddress(process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM || '').email;
+        const to = getBody(req).to || parseAddress(process.env.EMAIL_NOTIFICATIONS || process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM || '').email;
         const ok = await sendEmail({ to, subject: 'Ping Taply', html: '<p>Funciona ✅</p>' });
         return res.status(ok ? 200 : 500).json({ ok });
       }
@@ -1253,5 +1258,3 @@ async function resetPassword(req, res){
   await stripe.customers.update(customer.id, { metadata: { ...meta, taply_pass_hash: hash, taply_reset_token: '', taply_reset_exp: '' }});
   return res.status(200).json({ ok:true, message:'Contraseña actualizada.' });
 }
-
-
