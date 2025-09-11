@@ -133,49 +133,15 @@ function parseAddress(v=''){
   if (m) return { email: m[1], name: undefined };
   return { email: s, name: undefined };
 }
-
-// Detecta propósito para categorizar
-function _purpose(subject='', html=''){
-  const s = (String(subject)+' '+String(html||'')).toLowerCase();
-  if (s.includes('confirma tu correo') || s.includes('confirmar mi correo') || s.includes('verify')) return 'verify';
-  if (s.includes('recupera tu contraseña') || s.includes('restablecer') || s.includes('reset')) return 'reset';
-  if (s.includes('suscripción') || s.includes('pedido') || s.includes('compra') || s.includes('exito')) return 'receipt';
-  return 'transactional';
+function normalizeToList(to){
+  if(!to) return [];
+  if (typeof to === 'string') return [parseAddress(to)];
+  if (Array.isArray(to)) return to.map(t => typeof t==='string' ? parseAddress(t) : ({ email:t.email, name:t.name }));
+  if (typeof to === 'object' && to.email) return [parseAddress(to.email)];
+  return [];
 }
-
-// Quita el email de listas de supresión típicas (bounces, blocks, spam reports, invalid, global unsub)
-async function sendgridUnsuppressIfNeeded(email){
-  try{
-    const key = (process.env.SENDGRID_API_KEY || '').trim();
-    if(!key || !email) return;
-    const headers = { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' };
-
-    // 1) Bounces / Blocks / Spam / Invalid
-    const table = [
-      { check: `https://api.sendgrid.com/v3/suppression/bounces/${encodeURIComponent(email)}`, del: 'https://api.sendgrid.com/v3/suppression/bounces', body: { emails: [email] } },
-      { check: `https://api.sendgrid.com/v3/suppression/blocks/${encodeURIComponent(email)}`,  del: 'https://api.sendgrid.com/v3/suppression/blocks',  body: { emails: [email] } },
-      { check: `https://api.sendgrid.com/v3/suppression/spam_reports/${encodeURIComponent(email)}`, del: 'https://api.sendgrid.com/v3/suppression/spam_reports', body: { delete_all:false, emails:[email] } },
-      { check: `https://api.sendgrid.com/v3/suppression/invalid_emails/${encodeURIComponent(email)}`, del: 'https://api.sendgrid.com/v3/suppression/invalid_emails', body: { emails: [email] } },
-    ];
-    for (const row of table){
-      try{
-        const r = await fetch(row.check, { headers });
-        if (r.status === 200){
-          await fetch(row.del, { method:'DELETE', headers, body: JSON.stringify(row.body) });
-        }
-      }catch{ /* noop */ }
-    }
-
-    // 2) Global Unsubscribe (ASM)
-    try{
-      const r = await fetch(`https://api.sendgrid.com/v3/asm/suppressions/global/${encodeURIComponent(email)}`, { headers });
-      if (r.status === 200){
-        await fetch('https://api.sendgrid.com/v3/asm/suppressions/global', {
-          method:'DELETE', headers, body: JSON.stringify({ recipient_emails: [email] })
-        });
-      }
-    }catch{ /* noop */ }
-  }catch(e){ console.warn('unsuppress error', e?.message||e); }
+function isAppleDomain(email=''){
+  return /@(icloud|me|mac)\.com$/i.test(String(email||'').trim());
 }
 
 async function sendEmail({to, subject, text, html}){
@@ -199,50 +165,35 @@ async function sendEmail({to, subject, text, html}){
     const fromParsed  = parseAddress(RAW_FROM);
     if(!fromParsed.email) { console.error('sendEmail: EMAIL_FROM inválido'); return false; }
     const replyParsed = RAW_REPLY ? parseAddress(RAW_REPLY) : null;
-    const from = { email: fromParsed.email, name: fromParsed.name || 'Taply' };
-    const replyTo = replyParsed ? { email: replyParsed.email, name: replyParsed.name } : undefined;
 
-    const toEmailForCheck = (() => {
-      if (typeof to === 'string') return to;
-      if (Array.isArray(to)) {
-        const first = to[0];
-        return typeof first === 'string' ? first : (first?.email || '');
-      }
-      if (to && typeof to === 'object') return to.email || '';
-      return '';
-    })();
-
-    // Antes de enviar, intenta quitar supresiones comunes
-    if (toEmailForCheck) {
-      await sendgridUnsuppressIfNeeded(normalizeEmail(toEmailForCheck));
-    }
-
-    // Desactivar *siempre* el tracking (más inbox, menos filtros)
-    const disableTracking = true;
-    const purpose = _purpose(subject, html);
+    // Para iCloud & verificación: desactiva tracking totalmente
+    const firstTo = normalizeToList(to)[0]?.email || '';
+    const apple = isAppleDomain(firstTo);
+    const isVerify = /Confirma tu correo|Confirmar mi correo|verify|verifica/i.test(`${subject} ${String(html||'')}`);
 
     const payload = {
       to,
-      from,
-      ...(replyTo ? { replyTo } : {}),
+      from: { email: fromParsed.email, name: fromParsed.name || 'Taply' },
+      ...(replyParsed ? { replyTo: { email: replyParsed.email, name: replyParsed.name } } : {}),
       subject,
-      text: text || (html ? String(html).replace(/<[^>]+>/g,' ') : ''),
+      text: text || (html ? String(html).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim() : ''),
       html: html || `<p>${text || ''}</p>`,
-      ...(disableTracking ? {
-        trackingSettings: {
-          clickTracking: { enable: false, enableText: false },
-          openTracking: { enable: false }
-        }
+      // Quitar tracking para Apple y correos críticos
+      ...(apple || isVerify ? {
+        trackingSettings: { clickTracking: { enable: false, enableText: false }, openTracking: { enable: false } }
       } : {}),
-      mailSettings: {
-        bypassListManagement: { enable: true }
-      },
-      categories: ['transactional', purpose],
       headers: {
-        'Auto-Submitted': 'auto-generated',
+        // Quitamos Auto-Submitted para que iCloud no lo oculte
         'X-Auto-Response-Suppress': 'All',
         'X-Entity-Ref-ID': crypto.randomBytes(16).toString('hex')
-      }
+      },
+      ...(process.env.SENDGRID_BYPASS_MANAGEMENT === '1'
+        ? { mailSettings: {
+            bypassBounceManagement: { enable: true },
+            bypassSpamManagement: { enable: true },
+            bypassUnsubscribeManagement: { enable: true }
+          } }
+        : {})
     };
 
     for(let i=1;i<=3;i++){
@@ -347,17 +298,12 @@ function makeVerifyEmailUI({name, verifyUrl}){
     title,
     preheader: 'Confirma tu correo para activar tu cuenta en Taply.',
     lead,
-    blocks:[
-      'Por tu seguridad, necesitamos verificar que este correo es tuyo.',
-      'Haz clic en el botón para activar tu cuenta.',
-      `Si el botón no funciona, copia y pega este enlace en tu navegador:<br><a href="${verifyUrl}" style="word-break:break-all">${verifyUrl}</a>`
-    ],
+    blocks:['Por tu seguridad, necesitamos verificar que este correo es tuyo.','Haz clic en el botón para activar tu cuenta.'],
     cta: 'Confirmar mi correo',
     ctaUrl: verifyUrl
   });
   return { subject: 'Confirma tu correo — Taply', html };
 }
-
 /* ================== Auth ================== */
 
 // POST /api/register
@@ -653,71 +599,14 @@ async function verifyEmail(req, res){
       return invalidOrExpiredHtml(res, email);
     }
 
-    const meta = customer.metadata || {};
-    const now  = Math.floor(Date.now()/1000);
+    const exp = Number(customer.metadata?.taply_email_exp || '0');
+    const saved = customer.metadata?.taply_email_token || '';
 
-    // Idempotencia: si ya estaba verificado, muestra éxito y setea sesión
-    if (meta.taply_email_verified === '1') {
-      const successHtml = `<!doctype html><meta charset="utf-8">
-        <title>Correo verificado</title>
-        <style>body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#f3f6ff;color:#18213b;display:grid;place-items:center;height:100vh;margin:0}
-        .card{background:#ffffff;border:1px solid rgba(2,6,23,.08);padding:22px;border-radius:14px;max-width:520px;text-align:center}
-        a{color:#3354ff}</style>
-        <div class="card">
-          <h2>¡Correo verificado!</h2>
-          <p>Tu cuenta ya estaba activa.</p>
-          <p><a href="/suscripciones.html">Continuar</a></p>
-        </div>
-        <script>
-          (async ()=>{
-            try{
-              const r = await fetch('/api/session'); const d = await r.json();
-              localStorage.setItem('acct_user', JSON.stringify(d.user||null));
-              setTimeout(()=>{ location.replace('/suscripciones.html#email=verified'); }, 600);
-            }catch{
-              location.replace('/suscripciones.html#email=verified');
-            }
-          })();
-        </script>`;
-      setSession(res, { email, name: customer.name || null, customerId: customer.id });
-      res.setHeader('Content-Type','text/html; charset=utf-8');
-      return res.end(successHtml);
-    }
-
-    const saved = meta.taply_email_token || '';
-    const exp   = Number(meta.taply_email_exp || '0');
-    const tokenOk = !!token && saved === token && exp >= now;
-
-    if (!tokenOk) {
-      // Reenvío automático si tenemos email
-      if (email) {
-        const newToken = crypto.randomBytes(24).toString('hex');
-        const newExp   = now + EMAIL_VERIFY_TTL_SECONDS;
-        await stripe.customers.update(customer.id, {
-          metadata: { ...(meta||{}), taply_email_token: newToken, taply_email_exp: String(newExp) }
-        });
-        const verifyUrl = `${appBase(req)}/api/verify-email?token=${encodeURIComponent(newToken)}&email=${encodeURIComponent(email)}`;
-        const tpl = makeVerifyEmailUI({ name: customer.name || null, verifyUrl });
-        await sendEmail({ to: email, subject: tpl.subject, html: tpl.html });
-
-        res.setHeader('Content-Type','text/html; charset=utf-8');
-        return res.end(`<!doctype html><meta charset="utf-8">
-          <title>Enlace reenviado</title>
-          <style>
-            body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#f3f6ff;color:#18213b;display:grid;place-items:center;height:100vh;margin:0}
-            .card{background:#ffffff;border:1px solid rgba(2,6,23,.08);padding:22px;border-radius:14px;max-width:520px;text-align:center}
-            a{color:#3354ff}
-          </style>
-          <div class="card">
-            <h2>Te enviamos un nuevo enlace</h2>
-            <p>El enlace anterior no era válido o estaba caducado. Revisa ${email}.</p>
-            <p><a href="/suscripciones.html">Volver</a></p>
-          </div>`);
-      }
+    if (!token || saved !== token || exp < Math.floor(Date.now()/1000)) {
       return invalidOrExpiredHtml(res, email);
     }
 
-    await stripe.customers.update(customer.id, { metadata: { ...(meta||{}), taply_email_verified:'1', taply_email_token:'', taply_email_exp:'' }});
+    await stripe.customers.update(customer.id, { metadata: { ...(customer.metadata||{}), taply_email_verified:'1', taply_email_token:'', taply_email_exp:'' }});
     setSession(res, { email, name: customer.name || null, customerId: customer.id });
 
     const html = `<!doctype html><meta charset="utf-8">
@@ -988,6 +877,18 @@ async function buyNfc(req, res){
   return res.status(200).json({ url: session.url });
 }
 
+/* ===== Helpers admin email ===== */
+function getAdminEmailTo(){
+  const cands = [
+    (process.env.EMAIL_NOTIFICATIONS || '').trim(),
+    (process.env.EMAIL_REPLY_TO || '').trim(),
+    (process.env.EMAIL_FROM || '').trim()
+  ].filter(Boolean);
+  const from = (process.env.EMAIL_FROM || '').trim().toLowerCase();
+  const chosen = cands.find(e => e.toLowerCase() !== from) || cands[0] || from;
+  return parseAddress(chosen).email;
+}
+
 /* ===== Post-pago ===== */
 async function postPago(req, res){
   const stripe = getStripe();
@@ -1011,6 +912,7 @@ async function postPago(req, res){
         return res.status(202).json({ ok:false, pending:true, message:'La sesión de pago no está completada todavía.' });
       }
 
+      buyerEmail = cs.customer_details?.email || cs.customer_email || (typeof cs.customer !== 'string' ? cs.customer?.email : null) || null;
       buyerEmail = cs.customer_details?.email || cs.customer_email || (typeof cs.customer !== 'string' ? cs.customer?.email : null) || null;
       buyerPhone = cs.customer_details?.phone || (typeof cs.customer !== 'string' ? cs.customer?.phone : null) || null;
       customerId = typeof cs.customer === 'string' ? cs.customer : cs.customer?.id || null;
@@ -1120,7 +1022,9 @@ async function postPago(req, res){
     }
   }
 
-  if(process.env.EMAIL_FROM){
+  // Aviso interno (no lo envíes al mismo FROM)
+  const adminTo = getAdminEmailTo();
+  if(adminTo){
     const subjAdm = 'Nueva compra recibida';
     const htmlAdm = `
       <p>Compra recibida (${type || cs?.mode || 'checkout'}).</p>
@@ -1130,12 +1034,13 @@ async function postPago(req, res){
       ${amountText ? `<p>Importe: ${amountText}</p>` : ''}
       ${sessionId ? `<p>Checkout Session: ${sessionId}</p>` : ''}
     `;
-    await sendEmail({ to: parseAddress(process.env.EMAIL_FROM).email, subject: subjAdm, html: htmlAdm });
+    await sendEmail({ to: adminTo, subject: subjAdm, html: htmlAdm });
   }
 
   return res.status(200).json({ ok:true, notified: !!buyerEmail, idempotencyMarked });
 }
 
+/* ===== Guardar customer tras checkout ===== */
 async function storeCustomerFromSession(req, res){
   const { session_id } = getBody(req);
   if(!session_id) return res.status(422).json({ error:'validation_error', message:'Falta session_id.' });
