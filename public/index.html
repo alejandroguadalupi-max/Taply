@@ -287,7 +287,7 @@
       <div class="container grid-3">
         <div class="card"><h3>1) Acerca el móvil</h3><p>Coloque los dispositivos <strong>NFC</strong> en sus mesas. Al acercar el cliente el móvil, aparece la pantalla de valoración.</p></div>
         <div class="card"><h3>2) Enrutado inteligente</h3><p>Dicha pantalla de valoración recomienda a los clientes dejar su reseña en google si es positiva, y en formulario privado si es negativa. Al pulsar cada opción, la web te guiará a dejar tu reseña.</p></div>
-        <div class="card"><h3>3) Formulario privado</h3><p>Lo elaboramos adaptado a tu negocio (tiempos, atención, calidad…). Además, lo conectamos a una hoja privada donde se guardan todas las respuestas de los clientes.</p></div>
+        <div class="card"><h3>3) Formulario privado</h3><p>Lo elaboramos adaptado a su negocio (tiempos, atención, calidad…). Eso ya lo hablamos mano a mano por WhatsApp una vez comprados los NFC y pàgada una suscripción. Además, lo conectamos a una hoja privada donde se guardan todas las respuestas de los clientes.</p></div>
         <div class="card"><h3>4) Aprende y mejora</h3><p>Consulte la hoja cuando quiera: tendrá gráficos con los problemas más comunes, podrá filtrar las reseñas por fechas... En Taply nos mejoramos día a día para integrar nuevas funcionalidades útiles para el negocio.</p></div>
         <div class="card"><h3>5) Todo suma</h3><p>Más y mejores valoraciones elevan su visibilidad en el buscador, aumentan la confianza y atraen más clientes.</p></div>
       </div>
@@ -454,6 +454,71 @@
   </div>
 
   <!-- PARTE 2/2: el bloque <script> va aquí -->
+    <!-- FOOTER REDES SOCIALES (estilo Taply) -->
+<footer class="footer-social">
+  <p class="footer-text">
+    Si tiene cualquier duda o desea un video explicativo, contáctenos:
+  </p>
+  <div class="social-icons">
+    <!-- Instagram -->
+    <a href="https://www.instagram.com/taply.es/" target="_blank" rel="noopener" aria-label="Instagram">
+      <i class="fab fa-instagram"></i>
+    </a>
+    <!-- WhatsApp -->
+    <a href="https://wa.me/34683611328" target="_blank" rel="noopener" aria-label="WhatsApp">
+      <i class="fab fa-whatsapp"></i>
+    </a>
+  </div>
+</footer>
+
+<!-- Font Awesome para los íconos -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<style>
+  .footer-social{
+    /* Usa tu segunda capa y un sutil degradado para integrarlo */
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,.005)) ,
+      var(--bg-2, #0e1424);
+    border-top: 1px solid var(--border, rgba(255,255,255,.10));
+    padding: 26px 0 30px;
+    text-align: center;
+  }
+  .footer-text{
+    color: rgba(233,238,252,.9); /* --txt con ligera opacidad */
+    font-size: .98rem;
+    letter-spacing: .2px;
+    margin: 0 0 14px;
+  }
+  .social-icons{
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+  }
+  .social-icons a{
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    color: rgba(233,238,252,.9);
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(255,255,255,.03);
+    font-size: 1.1rem;
+    transition: transform .2s ease, box-shadow .25s ease, border-color .25s ease, background .25s ease, color .25s ease;
+  }
+  .social-icons a:hover{
+    /* Hover sutil con tu gradiente de marca como glow */
+    background: rgba(255,255,255,.06);
+    border-color: rgba(255,255,255,.28);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 18px rgba(124,58,237,.25),   /* --brand-2 */
+      0 0 12px rgba(0,212,255,.22);    /* --brand-1 */
+  }
+</style>
+
 </body>
 <script>
   // Animación de entrada

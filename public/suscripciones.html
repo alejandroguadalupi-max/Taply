@@ -199,7 +199,7 @@
     <article class="card">
       <span class="badge">Paso 1</span>
       <h3>Comprar NFC</h3>
-      <p>Dispositivos que colocas en las mesas. Pago único, <strong>imprescindibles para empezar</strong>. Recomendamos aquirir dos dispositivos por cada mesa de 4 personas</p>
+      <p>Dispositivos que coloca en las mesas. Pago único, <strong>imprescindibles para empezar</strong>. Recomendamos aquirir dos dispositivos por cada mesa de 4 personas</p>
       <div class="actions">
         <a href="#" id="showNfc" class="btn">Comprar NFC</a>
       </div>
@@ -207,7 +207,7 @@
     <article class="card">
       <span class="badge">Paso 2</span>
       <h3>Activar Suscripción</h3>
-      <p>Elija entre plan mensual o anual. La suscripción es necesaria para activar y gestionar Sus dispositivos NFC y todo el entorno que le ofrecemos. <strong>Una vez compre los NFC</strong></p>
+      <p>Elija entre plan mensual o anual y clase de plan. La suscripción es necesaria para activar y gestionar sus dispositivos NFC y todo el entorno que le ofrecemos. Pague la suscripción <strong>una vez compre los NFC</strong></p>
       <div class="actions">
         <a href="#" id="showSub" class="btn">Ver planes</a>
       </div>
@@ -933,5 +933,70 @@
     getSession();
   })();
 </script>
+  <!-- FOOTER REDES SOCIALES (estilo Taply) -->
+<footer class="footer-social">
+  <p class="footer-text">
+    Si tiene cualquier duda o desea un video explicativo, contáctenos:
+  </p>
+  <div class="social-icons">
+    <!-- Instagram -->
+    <a href="https://www.instagram.com/taply.es/" target="_blank" rel="noopener" aria-label="Instagram">
+      <i class="fab fa-instagram"></i>
+    </a>
+    <!-- WhatsApp -->
+    <a href="https://wa.me/34683611328" target="_blank" rel="noopener" aria-label="WhatsApp">
+      <i class="fab fa-whatsapp"></i>
+    </a>
+  </div>
+</footer>
+
+<!-- Font Awesome para los íconos -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<style>
+  .footer-social{
+    /* Usa tu segunda capa y un sutil degradado para integrarlo */
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,.005)) ,
+      var(--bg-2, #0e1424);
+    border-top: 1px solid var(--border, rgba(255,255,255,.10));
+    padding: 26px 0 30px;
+    text-align: center;
+  }
+  .footer-text{
+    color: rgba(233,238,252,.9); /* --txt con ligera opacidad */
+    font-size: .98rem;
+    letter-spacing: .2px;
+    margin: 0 0 14px;
+  }
+  .social-icons{
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+  }
+  .social-icons a{
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    color: rgba(233,238,252,.9);
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(255,255,255,.03);
+    font-size: 1.1rem;
+    transition: transform .2s ease, box-shadow .25s ease, border-color .25s ease, background .25s ease, color .25s ease;
+  }
+  .social-icons a:hover{
+    /* Hover sutil con tu gradiente de marca como glow */
+    background: rgba(255,255,255,.06);
+    border-color: rgba(255,255,255,.28);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 18px rgba(124,58,237,.25),   /* --brand-2 */
+      0 0 12px rgba(0,212,255,.22);    /* --brand-1 */
+  }
+</style>
+
 </body>
 </html>
