@@ -319,9 +319,9 @@ function makeSubscriptionEmailUI({name, tierLabel, panelUrl}){
     title,
     preheader: `Tu suscripción ${tierLabel} ya está activa.`,
     lead,
-    blocks: ['Te enviaremos la guía rápida y dejaremos tu panel listo.','¿Dudas? Responde a este correo y te ayudamos.'],
-    cta: 'Abrir mi panel',
-    ctaUrl: panelUrl || 'https://taply.app/panel'
+    blocks: ['Pronto te escribiremos por WhatsApp para preparar tu proyecto.','¿Dudas? Responde a este correo y te ayudamos.'],
+    cta: 'Abrir Taply web',
+    ctaUrl: panelUrl || 'https://taply.es/suscripciones.html'
   });
   return { subject: 'Suscripción activa — Taply', html };
 }
@@ -332,7 +332,7 @@ function makeNfcEmailUI({name, qty, trackingUrl}){
     title,
     preheader: `Hemos recibido tu pedido de ${qty} NFC.`,
     lead,
-    blocks: [`Unidades NFC: <strong>${qty}</strong>`, 'Te contactaremos por WhatsApp con los siguientes pasos.'],
+    blocks: [`Unidades NFC: <strong>${qty}</strong>`, 'Te contactaremos por WhatsApp muy pronto para empezar a tener contacto.'],
     cta: trackingUrl ? 'Ver estado' : null,
     ctaUrl: trackingUrl || null
   });
