@@ -17,13 +17,13 @@
       --brand-1:#00d4ff; --brand-2:#7c3aed; --blue-1:#38bdf8; --blue-2:#2563eb;
       --radius:20px; --shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
       --arrowSize:56px; --edgePad:calc(var(--arrowSize) + 36px);
-
       /* Unificación con suscripciones.html */
       --border: rgba(255,255,255,.10);
       --header-padding-y: 14px;
       --header-blur: 10px;
       --logo-size: 34px;
     }
+
     *{box-sizing:border-box}
     html{-webkit-text-size-adjust:100%}
     html,body{margin:0;height:100%;scroll-behavior:smooth}
@@ -36,12 +36,12 @@
     body.is-loaded{opacity:1;transform:none}
     a{color:inherit;text-decoration:none}
 
-    /* === Contenedor igual que suscripciones === */
+    /* === Contenedor === */
     .container{max-width:1100px;width:92%;margin-inline:auto}
 
     body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-image:radial-gradient(rgba(255,255,255,.08) 1px, transparent 1.6px);background-size:26px 26px;opacity:.12}
 
-    /* === Header calcado === */
+    /* === Header (idéntico a suscripciones) === */
     header{
       position:sticky;top:0;z-index:60;
       background:#0a0f16cc;
@@ -50,15 +50,12 @@
     }
     .nav{display:flex;align-items:center;justify-content:space-between;padding:var(--header-padding-y) 0; position:relative}
     .brand{display:flex;gap:8px;align-items:center;font-weight:800;letter-spacing:.3px}
-    .logo-img{
-      width:var(--logo-size);height:var(--logo-size);
-      border-radius:10px;object-fit:cover;display:block;
-    }
+    .logo-img{width:var(--logo-size);height:var(--logo-size);border-radius:10px;object-fit:cover;display:block}
     .nav-links{display:flex;gap:18px;align-items:center}
     .ghost{padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);color:var(--txt);touch-action:manipulation}
     .menu{display:none}
 
-    /* Cuenta */
+    /* Cuenta (nav) */
     .acct-chip{display:inline-flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(255,255,255,.04);cursor:pointer}
     .acct-avatar{width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,var(--brand-1),var(--brand-2));display:grid;place-items:center;font-weight:800;color:#061017}
     .acct-dd{position:relative}
@@ -67,11 +64,7 @@
     .acct-menu a:hover,.acct-menu button:hover{background:rgba(255,255,255,.06)}
     .acct-dd.open .acct-menu{display:block}
 
-    .mobile-menu{position:absolute; left:0; right:0; top:100%; display:none; padding:14px; background:#0b0f1a; border-top:1px solid rgba(255,255,255,.08); box-shadow:0 16px 40px rgba(0,0,0,.45)}
-    .mobile-links{display:flex;flex-direction:column;gap:10px}
-    .mobile-links .ghost{background:rgba(255,255,255,.02); border-color:rgba(255,255,255,.18)}
-    .mobile-links .btn{width:100%; justify-content:center}
-
+    /* Botones */
     .btn{
       --p:14px 18px; background:linear-gradient(135deg,var(--brand-1),var(--brand-2));
       color:#061017;font-weight:700;border:0;border-radius:999px;cursor:pointer;touch-action:manipulation;
@@ -87,7 +80,7 @@
     .btn-google{background:#db4437;color:#fff}
     .btn-google:hover{filter:brightness(.95)}
 
-    /* ===== Hero (sin duplicados) ===== */
+    /* ===== Hero ===== */
     .hero{padding:64px 0 40px; text-align:center; position:relative; overflow:hidden}
     .hero-grid{display:grid;grid-template-columns:1fr;gap:18px;justify-items:center}
     h1,h2,h3,p{ text-align:center }
@@ -95,16 +88,12 @@
     #hero-title{
       background:linear-gradient(90deg,#00d4ff,#7c3aed,#22d3ee);
       background-size:200% 100%;
-      -webkit-background-clip:text;
-      background-clip:text;
-      color:transparent;
-      animation:titleGradient 8s linear infinite;
-      text-shadow:0 1px 0 rgba(0,0,0,.2);
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+      animation:titleGradient 8s linear infinite; text-shadow:0 1px 0 rgba(0,0,0,.2);
     }
     @keyframes titleGradient{0%{background-position:0% 50%}100%{background-position:200% 50%}}
     .hero::before{
-      content:"";
-      position:absolute; inset:0; pointer-events:none;
+      content:""; position:absolute; inset:0; pointer-events:none;
       background:
         radial-gradient(1.8px 1.8px at 18% 20%, rgba(255,255,255,.95), transparent 60%),
         radial-gradient(1.6px 1.6px at 30% 12%, rgba(255,255,255,.90), transparent 60%),
@@ -143,13 +132,10 @@
       overscroll-behavior-x: contain; touch-action: pan-x;
     }
     .reviews-track::-webkit-scrollbar{display:none}
-
     .review-card{
       flex:0 0 clamp(320px, 86vw, 520px);
-      max-width:520px;
-      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
-      border:1px solid rgba(255,255,255,.1);
-      border-radius:16px;padding:20px;scroll-snap-align:center;scroll-snap-stop:always;
+      max-width:520px;background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+      border:1px solid rgba(255,255,255,.1); border-radius:16px;padding:20px;scroll-snap-align:center;scroll-snap-stop:always;
       text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.35);
     }
     .review-header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
@@ -198,7 +184,7 @@
     }
     @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
 
-    /* ===== MODAL ACCESO (idéntico a suscripciones.html) ===== */
+    /* ===== MODAL ACCESO (calcado a suscripciones.html) ===== */
     #acct-modal.acct-hidden{display:none!important}
     #acct-modal{position:fixed;inset:0;background:rgba(6,10,18,.65);backdrop-filter:blur(8px);display:grid;place-items:center;z-index:1000}
     .acct-dialog{
@@ -229,9 +215,24 @@
     }
     .acct-input input:focus{outline:none;border-color:rgba(0,212,255,.45); box-shadow:0 0 0 3px rgba(0,212,255,.25),0 0 0 6px rgba(124,58,237,.18)}
     .toggle-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:0;color:#cfe3ff;cursor:pointer}
+
+    /* Mensajes (idénticos) */
     .acct-err{color:#ef4444;margin-top:2px}
     .acct-ok{color:#22c55e;margin-top:2px}
+
     .acct-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+
+    /* Botón “¿Olvidaste…?” igual que suscripciones: pill gris, sin borde discontinuo */
+    .link-forgot{
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.05);
+      color:inherit;
+      padding:8px 14px;
+      border-radius:999px;
+      font-weight:700;
+      cursor:pointer;
+    }
+
     .acct-actions{display:grid;gap:10px}
     .acct-small{color:var(--muted);margin:0}
   </style>
@@ -272,9 +273,9 @@
     <section class="hero" aria-labelledby="hero-title">
       <div class="container hero-grid">
         <div>
-          <h1 id="hero-title">¿Imagina subir la valoración de su negocio <em>SIN HACER NADA</em>?</h1>
+          <h1 id="hero-title">¿Imaginas subir la valoración de tu negocio <em>SIN HACER NADA</em>?</h1>
           <br>
-          <p class="lead">Aumente sus reseñas, proteja su reputación y convierta opiniones en más clientes y más ingresos, sin mover un solo dedo.</p>
+          <p class="lead">Aumenta tus reseñas, protege tu reputación y convierte opiniones en más clientes y más ingresos, sin mover un solo dedo.</p>
           <div class="cta-row">
             <a class="btn" href="suscripciones.html">Ver suscripciones</a>
           </div>
@@ -285,39 +286,32 @@
     <section id="como-funciona">
       <div class="container"><h2>¿Cómo funciona Taply?</h2></div>
       <div class="container grid-3">
-        <div class="card"><h3>1) Acerca el móvil</h3><p>Coloque los dispositivos <strong>NFC</strong> en sus mesas. Al acercar el cliente el móvil, aparece la pantalla de valoración.</p></div>
-        <div class="card"><h3>2) Enrutado inteligente</h3><p>Dicha pantalla de valoración recomienda a los clientes dejar su reseña en google si es positiva, y en formulario privado si es negativa. Al pulsar cada opción, la web te guiará a dejar tu reseña.</p></div>
-        <div class="card"><h3>3) Formulario privado</h3><p>Lo elaboramos adaptado a tu negocio (tiempos, atención, calidad…). Además, lo conectamos a una hoja privada donde se guardan todas las respuestas de los clientes.</p></div>
-        <div class="card"><h3>4) Aprende y mejora</h3><p>Consulte la hoja cuando quiera: tendrá gráficos con los problemas más comunes, podrá filtrar las reseñas por fechas... En Taply nos mejoramos día a día para integrar nuevas funcionalidades útiles para el negocio.</p></div>
-        <div class="card"><h3>5) Todo suma</h3><p>Más y mejores valoraciones elevan su visibilidad en el buscador, aumentan la confianza y atraen más clientes.</p></div>
+        <div class="card"><h3>1) Acerca el móvil</h3><p>Coloca los dispositivos <strong>NFC</strong> en tus mesas. Al acercar el cliente el móvil, aparece la pantalla de valoración.</p></div>
+        <div class="card"><h3>2) Enrutado inteligente</h3><p>Si la valoración es positiva, sugerimos reseña en Google; si no, un formulario privado. Al pulsar cada opción, la web guía el proceso.</p></div>
+        <div class="card"><h3>3) Formulario privado</h3><p>Lo adaptamos a tu negocio (tiempos, atención, calidad…) y lo conectamos a una hoja privada con todas las respuestas.</p></div>
+        <div class="card"><h3>4) Aprende y mejora</h3><p>Consulta la hoja cuando quieras: verás gráficos de problemas comunes, filtros por fecha y mejoras continuas de Taply.</p></div>
+        <div class="card"><h3>5) Todo suma</h3><p>Más y mejores valoraciones aumentan visibilidad, confianza y clientes.</p></div>
       </div>
     </section>
 
     <section id="beneficios">
       <div class="container">
-        <h2>¿Qué podrá conseguir gracias a nuestro sistema?</h2>
+        <h2>¿Qué podrás conseguir gracias a nuestro sistema?</h2>
         <style>
           .lead.justify{
-            text-align: justify;
-            text-justify: inter-word;
-            -webkit-hyphens: auto;
-            -ms-hyphens: auto;
-            hyphens: auto;
-            max-width: 900px;
-            line-height: 1.6;
-            margin: 0 auto;
+            text-align: justify; text-justify: inter-word;
+            -webkit-hyphens: auto; -ms-hyphens: auto; hyphens: auto;
+            max-width: 900px; line-height: 1.6; margin: 0 auto;
           }
           @media (max-width: 480px){
             .lead.justify{ padding-left:14px; padding-right:14px; line-height:1.7; }
           }
         </style>
-
         <p class="lead justify">
-          En <strong>Taply</strong> le ayudamos a <strong>multiplicar sus reseñas</strong>, atraer <strong>muchos más clientes</strong> y, como resultado, <strong>aumentar sus ingresos</strong>.
-          Nuestro sistema impulsa la <strong>valoración global</strong>: si la experiencia es positiva, animamos a reseñar en <strong>Google</strong>; si no lo es, ofrecemos un <strong>formulario privado</strong> para gestionarlo sin afectar tu puntuación pública.
-          Así su negocio <strong>gana visibilidad</strong>, escala posiciones y todo de forma <strong>legal, transparente y realista</strong>.
+          En <strong>Taply</strong> te ayudamos a <strong>multiplicar tus reseñas</strong>, atraer <strong>más clientes</strong> y, como resultado, <strong>aumentar tus ingresos</strong>.
+          Si el cliente vive una experiencia positiva, le animamos a compartirla en <strong>Google</strong>; si no, le ofrecemos un <strong>formulario privado</strong> para gestionarla sin afectar tu puntuación pública.
+          Así tu negocio <strong>gana visibilidad</strong>, escala posiciones y todo de forma <strong>legal, transparente y realista</strong>.
         </p>
-
         <div class="cta-row"><a class="btn" href="suscripciones.html">Empezar ahora</a></div>
       </div>
     </section>
@@ -326,11 +320,9 @@
     <section class="reviews" id="reviews" aria-labelledby="reviews-title">
       <div class="container">
         <h2 id="reviews-title">Valorado 4,8/5 por más de 30 negocios</h2>
-
         <div class="reviews-window">
           <button class="carousel-btn left" id="revPrev" aria-label="Opinión anterior"><span>‹</span></button>
           <button class="carousel-btn right" id="revNext" aria-label="Opinión siguiente"><span>›</span></button>
-
           <div class="reviews-track" id="reviewsTrack" tabindex="0" aria-label="Opiniones de clientes">
             <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=26" alt="Lucia" width="54" height="54"></div><div><div class="review-name">Sara</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Instalación en 5 minutos. Los avisos de reseñas negativas nos han permitido corregir fallos en días.</p></article>
             <article class="review-card"><div class="review-header"><div class="review-avatar"><img loading="lazy" src="https://i.pravatar.cc/110?img=33" alt="Marlon" width="54" height="54"></div><div><div class="review-name">Marlon</div><div class="review-stars" aria-label="5 de 5">★★★★★</div></div></div><p class="review-text">Ahorra tiempo en reputación online. Muy fácil para el cliente.</p></article>
@@ -340,7 +332,6 @@
         </div>
       </div>
     </section>
-
   </main>
 
   <footer>
@@ -395,7 +386,7 @@
 
           <div class="acct-row">
             <label class="remember"><input type="checkbox" checked> Mantener sesión activa</label>
-            <button type="button" id="link-forgot" class="acct-tab" style="background:transparent;border:1px dashed rgba(255,255,255,.18);cursor:pointer">¿Olvidaste la contraseña?</button>
+            <button type="button" id="link-forgot" class="link-forgot">¿Olvidaste la contraseña?</button>
           </div>
 
           <div class="acct-actions">
@@ -426,7 +417,12 @@
               <button type="button" class="toggle-eye" data-toggle="#acct-reg-pass2">👁</button>
             </span>
           </label>
-          <div class="meter" aria-hidden="true"><i id="pw-meter" style="display:block;height:6px;border-radius:6px;background:#1f2937;width:0"></i></div>
+
+          <!-- Medidor de fuerza (igual) -->
+          <div class="meter" aria-hidden="true">
+            <i id="pw-meter" style="display:block;height:6px;border-radius:6px;background:#1f2937;width:0"></i>
+          </div>
+
           <div class="acct-actions">
             <button type="submit" class="btn">Crear cuenta</button>
             <a id="btn-google-register" href="/api/google?from=register" class="btn btn-google" rel="nofollow noopener noreferrer">Registrarme con Google</a>
@@ -452,8 +448,7 @@
       </div>
     </div>
   </div>
-
-  <!-- PARTE 2/2: el bloque <script> va aquí -->
+  <!-- PARTE 2/2: pondremos aquí el <script> idéntico al de suscripciones.html -->
 </body>
 <script>
   // Animación de entrada
@@ -637,7 +632,7 @@
       }
     });
 
-    /* ===== Helper API (idéntico) ===== */
+    /* ===== Helper API ===== */
     async function api(method, url, body){
       const res = await fetch(url, {
         method,

@@ -1,5 +1,3 @@
-export const config = { runtime: "nodejs" };
-
 import Stripe from 'stripe';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -133,22 +131,49 @@ function parseAddress(v=''){
   if (m) return { email: m[1], name: undefined };
   return { email: s, name: undefined };
 }
-function normalizeToList(to){
-  if(!to) return [];
-  if (typeof to === 'string') return [parseAddress(to)];
-  if (Array.isArray(to)) return to.map(t => typeof t==='string' ? parseAddress(t) : ({ email:t.email, name:t.name }));
-  if (typeof to === 'object' && to.email) return [parseAddress(to.email)];
-  return [];
+
+// Detecta propósito para categorizar
+function _purpose(subject='', html=''){
+  const s = (String(subject)+' '+String(html||'')).toLowerCase();
+  if (s.includes('confirma tu correo') || s.includes('confirmar mi correo') || s.includes('verify')) return 'verify';
+  if (s.includes('recupera tu contraseña') || s.includes('restablecer') || s.includes('reset')) return 'reset';
+  if (s.includes('suscripción') || s.includes('pedido') || s.includes('compra') || s.includes('exito')) return 'receipt';
+  return 'transactional';
 }
 
-// iCloud y dominios personalizados alojados en iCloud
-function isAppleHosted(email=''){
-  const e = String(email||'').trim().toLowerCase();
-  if (/@(icloud\.com|me\.com|mac\.com)$/.test(e)) return true;
-  const host = e.split('@')[1];
-  const extra = (process.env.APPLE_HOSTED_DOMAINS || '')
-    .toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
-  return extra.includes(host);
+// Quita el email de listas de supresión típicas (bounces, blocks, spam reports, invalid, global unsub)
+async function sendgridUnsuppressIfNeeded(email){
+  try{
+    const key = (process.env.SENDGRID_API_KEY || '').trim();
+    if(!key || !email) return;
+    const headers = { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' };
+
+    // 1) Bounces / Blocks / Spam / Invalid
+    const table = [
+      { check: `https://api.sendgrid.com/v3/suppression/bounces/${encodeURIComponent(email)}`, del: 'https://api.sendgrid.com/v3/suppression/bounces', body: { emails: [email] } },
+      { check: `https://api.sendgrid.com/v3/suppression/blocks/${encodeURIComponent(email)}`,  del: 'https://api.sendgrid.com/v3/suppression/blocks',  body: { emails: [email] } },
+      { check: `https://api.sendgrid.com/v3/suppression/spam_reports/${encodeURIComponent(email)}`, del: 'https://api.sendgrid.com/v3/suppression/spam_reports', body: { delete_all:false, emails:[email] } },
+      { check: `https://api.sendgrid.com/v3/suppression/invalid_emails/${encodeURIComponent(email)}`, del: 'https://api.sendgrid.com/v3/suppression/invalid_emails', body: { emails: [email] } },
+    ];
+    for (const row of table){
+      try{
+        const r = await fetch(row.check, { headers });
+        if (r.status === 200){
+          await fetch(row.del, { method:'DELETE', headers, body: JSON.stringify(row.body) });
+        }
+      }catch{ /* noop */ }
+    }
+
+    // 2) Global Unsubscribe (ASM)
+    try{
+      const r = await fetch(`https://api.sendgrid.com/v3/asm/suppressions/global/${encodeURIComponent(email)}`, { headers });
+      if (r.status === 200){
+        await fetch('https://api.sendgrid.com/v3/asm/suppressions/global', {
+          method:'DELETE', headers, body: JSON.stringify({ recipient_emails: [email] })
+        });
+      }
+    }catch{ /* noop */ }
+  }catch(e){ console.warn('unsuppress error', e?.message||e); }
 }
 
 async function sendEmail({to, subject, text, html}){
@@ -172,33 +197,50 @@ async function sendEmail({to, subject, text, html}){
     const fromParsed  = parseAddress(RAW_FROM);
     if(!fromParsed.email) { console.error('sendEmail: EMAIL_FROM inválido'); return false; }
     const replyParsed = RAW_REPLY ? parseAddress(RAW_REPLY) : null;
+    const from = { email: fromParsed.email, name: fromParsed.name || 'Taply' };
+    const replyTo = replyParsed ? { email: replyParsed.email, name: replyParsed.name } : undefined;
 
-    const firstTo = normalizeToList(to)[0]?.email || '';
-    const appleHosted = isAppleHosted(firstTo);
-    const isVerify = /Confirma tu correo|Confirmar mi correo|verify|verifica/i.test(`${subject} ${String(html||'')}`);
+    const toEmailForCheck = (() => {
+      if (typeof to === 'string') return to;
+      if (Array.isArray(to)) {
+        const first = to[0];
+        return typeof first === 'string' ? first : (first?.email || '');
+      }
+      if (to && typeof to === 'object') return to.email || '';
+      return '';
+    })();
+
+    // Antes de enviar, intenta quitar supresiones comunes
+    if (toEmailForCheck) {
+      await sendgridUnsuppressIfNeeded(normalizeEmail(toEmailForCheck));
+    }
+
+    // Desactivar *siempre* el tracking (más inbox, menos filtros)
+    const disableTracking = true;
+    const purpose = _purpose(subject, html);
 
     const payload = {
       to,
-      from: { email: fromParsed.email, name: fromParsed.name || 'Taply' },
-      ...(replyParsed ? { replyTo: { email: replyParsed.email, name: replyParsed.name } } : {}),
+      from,
+      ...(replyTo ? { replyTo } : {}),
       subject,
-      text: text || (html ? String(html).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim() : ''),
+      text: text || (html ? String(html).replace(/<[^>]+>/g,' ') : ''),
       html: html || `<p>${text || ''}</p>`,
-      ...(appleHosted || isVerify ? {
-        trackingSettings: { clickTracking: { enable: false, enableText: false }, openTracking: { enable: false } }
+      ...(disableTracking ? {
+        trackingSettings: {
+          clickTracking: { enable: false, enableText: false },
+          openTracking: { enable: false }
+        }
       } : {}),
-      headers: {
-        'Auto-Submitted': 'no',
-        'X-Entity-Ref-ID': crypto.randomBytes(16).toString('hex')
+      mailSettings: {
+        bypassListManagement: { enable: true }
       },
-      ...(process.env.SENDGRID_BYPASS_MANAGEMENT === '1'
-        ? { mailSettings: {
-            bypassBounceManagement: { enable: true },
-            bypassSpamManagement: { enable: true },
-            bypassUnsubscribeManagement: { enable: true },
-            bypassListManagement: { enable: true }
-          } }
-        : {})
+      categories: ['transactional', purpose],
+      headers: {
+        'Auto-Submitted': 'auto-generated',
+        'X-Auto-Response-Suppress': 'All',
+        'X-Entity-Ref-ID': crypto.randomBytes(16).toString('hex')
+      }
     };
 
     for(let i=1;i<=3;i++){
@@ -303,12 +345,17 @@ function makeVerifyEmailUI({name, verifyUrl}){
     title,
     preheader: 'Confirma tu correo para activar tu cuenta en Taply.',
     lead,
-    blocks:['Por tu seguridad, necesitamos verificar que este correo es tuyo.','Haz clic en el botón para activar tu cuenta.'],
+    blocks:[
+      'Por tu seguridad, necesitamos verificar que este correo es tuyo.',
+      'Haz clic en el botón para activar tu cuenta.',
+      `Si el botón no funciona, copia y pega este enlace en tu navegador:<br><a href="${verifyUrl}" style="word-break:break-all">${verifyUrl}</a>`
+    ],
     cta: 'Confirmar mi correo',
     ctaUrl: verifyUrl
   });
   return { subject: 'Confirma tu correo — Taply', html };
 }
+
 /* ================== Auth ================== */
 
 // POST /api/register
@@ -531,7 +578,7 @@ async function googleOAuthCallback(req, res){
     const idToken = tokenJson.id_token;
     if(!idToken) throw new Error('no_id_token');
 
-    const [, fromState] = String(state || '').split('|');
+    const [stateVal, fromState] = String(state || '').split('|');
     const from = (fromState || 'login').toLowerCase();
 
     const payload = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64').toString('utf8') || '{}');
@@ -565,7 +612,7 @@ async function googleOAuthCallback(req, res){
   }
 }
 
-/* ===== Verificación de email (SIEMPRE muestra éxito) ===== */
+/* ===== Verificación de email ===== */
 async function findCustomerByVerifyToken(stripe, token){
   try{
     const q = `metadata['taply_email_token']:'${escapeStripeQueryValue(token)}'`;
@@ -577,34 +624,129 @@ async function findCustomerByVerifyToken(stripe, token){
   }
 }
 
-// Página de éxito
-function verifiedHtml(res){
-  const html = `<!doctype html><meta charset="utf-8">
-    <title>Correo verificado</title>
-    <style>body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#f3f6ff;color:#18213b;display:grid;place-items:center;height:100vh;margin:0}
-    .card{background:#ffffff;border:1px solid rgba(2,6,23,.08);padding:22px;border-radius:14px;max-width:520px;text-align:center}
-    a{color:#3354ff}</style>
-    <div class="card">
-      <h2>¡Correo verificado!</h2>
-      <p>Tu cuenta ha sido activada.</p>
-      <p><a href="/suscripciones.html">Continuar</a></p>
-    </div>
-    <script>
-      (async ()=>{
-        try{
-          const r = await fetch('/api/session'); const d = await r.json();
-          localStorage.setItem('acct_user', JSON.stringify(d.user||null));
-          setTimeout(()=>{ location.replace('/suscripciones.html#email=verified'); }, 600);
-        }catch{
-          location.replace('/suscripciones.html#email=verified');
-        }
-      })();
-    </script>`;
-  res.setHeader('Content-Type','text/html; charset=utf-8');
-  return res.end(html);
+async function verifyEmail(req, res){
+  try{
+    const url = new URL(req.url, 'http://x');
+    const body = getBody(req) || {};
+    const token = (url.searchParams.get('token') || url.searchParams.get('t') || body.token || '').trim();
+    let email   = normalizeEmail(url.searchParams.get('email') || url.searchParams.get('e') || body.email || '');
+
+    if(!token && !email) {
+      res.statusCode=400;
+      return res.end('Parámetros inválidos.');
+    }
+
+    const stripe = getStripe();
+    let customer = null;
+
+    if (email) {
+      const found = await stripe.customers.search({ query: `email:'${escapeStripeQueryValue(email)}'`, limit:1 });
+      customer = found.data[0] || null;
+    }
+    if (!customer && token) {
+      customer = await findCustomerByVerifyToken(stripe, token);
+      if (customer && !email) email = normalizeEmail(customer.email || '');
+    }
+    if(!customer){
+      return invalidOrExpiredHtml(res, email);
+    }
+
+    const meta = customer.metadata || {};
+    const now  = Math.floor(Date.now()/1000);
+
+    // Idempotencia: si ya estaba verificado, muestra éxito y setea sesión
+    if (meta.taply_email_verified === '1') {
+      const successHtml = `<!doctype html><meta charset="utf-8">
+        <title>Correo verificado</title>
+        <style>body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#f3f6ff;color:#18213b;display:grid;place-items:center;height:100vh;margin:0}
+        .card{background:#ffffff;border:1px solid rgba(2,6,23,.08);padding:22px;border-radius:14px;max-width:520px;text-align:center}
+        a{color:#3354ff}</style>
+        <div class="card">
+          <h2>¡Correo verificado!</h2>
+          <p>Tu cuenta ya estaba activa.</p>
+          <p><a href="/suscripciones.html">Continuar</a></p>
+        </div>
+        <script>
+          (async ()=>{
+            try{
+              const r = await fetch('/api/session'); const d = await r.json();
+              localStorage.setItem('acct_user', JSON.stringify(d.user||null));
+              setTimeout(()=>{ location.replace('/suscripciones.html#email=verified'); }, 600);
+            }catch{
+              location.replace('/suscripciones.html#email=verified');
+            }
+          })();
+        </script>`;
+      setSession(res, { email, name: customer.name || null, customerId: customer.id });
+      res.setHeader('Content-Type','text/html; charset=utf-8');
+      return res.end(successHtml);
+    }
+
+    const saved = meta.taply_email_token || '';
+    const exp   = Number(meta.taply_email_exp || '0');
+    const tokenOk = !!token && saved === token && exp >= now;
+
+    if (!tokenOk) {
+      // Reenvío automático si tenemos email
+      if (email) {
+        const newToken = crypto.randomBytes(24).toString('hex');
+        const newExp   = now + EMAIL_VERIFY_TTL_SECONDS;
+        await stripe.customers.update(customer.id, {
+          metadata: { ...(meta||{}), taply_email_token: newToken, taply_email_exp: String(newExp) }
+        });
+        const verifyUrl = `${appBase(req)}/api/verify-email?token=${encodeURIComponent(newToken)}&email=${encodeURIComponent(email)}`;
+        const tpl = makeVerifyEmailUI({ name: customer.name || null, verifyUrl });
+        await sendEmail({ to: email, subject: tpl.subject, html: tpl.html });
+
+        res.setHeader('Content-Type','text/html; charset=utf-8');
+        return res.end(`<!doctype html><meta charset="utf-8">
+          <title>Enlace reenviado</title>
+          <style>
+            body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#f3f6ff;color:#18213b;display:grid;place-items:center;height:100vh;margin:0}
+            .card{background:#ffffff;border:1px solid rgba(2,6,23,.08);padding:22px;border-radius:14px;max-width:520px;text-align:center}
+            a{color:#3354ff}
+          </style>
+          <div class="card">
+            <h2>Te enviamos un nuevo enlace</h2>
+            <p>El enlace anterior no era válido o estaba caducado. Revisa ${email}.</p>
+            <p><a href="/suscripciones.html">Volver</a></p>
+          </div>`);
+      }
+      return invalidOrExpiredHtml(res, email);
+    }
+
+    await stripe.customers.update(customer.id, { metadata: { ...(meta||{}), taply_email_verified:'1', taply_email_token:'', taply_email_exp:'' }});
+    setSession(res, { email, name: customer.name || null, customerId: customer.id });
+
+    const html = `<!doctype html><meta charset="utf-8">
+      <title>Correo verificado</title>
+      <style>body{font-family:system-ui,Segoe UI,Inter,sans-serif;background:#f3f6ff;color:#18213b;display:grid;place-items:center;height:100vh;margin:0}
+      .card{background:#ffffff;border:1px solid rgba(2,6,23,.08);padding:22px;border-radius:14px;max-width:520px;text-align:center}
+      a{color:#3354ff}</style>
+      <div class="card">
+        <h2>¡Correo verificado!</h2>
+        <p>Tu cuenta ha sido activada.</p>
+        <p><a href="/suscripciones.html">Continuar</a></p>
+      </div>
+      <script>
+        (async ()=>{
+          try{
+            const r = await fetch('/api/session'); const d = await r.json();
+            localStorage.setItem('acct_user', JSON.stringify(d.user||null));
+            setTimeout(()=>{ location.replace('/suscripciones.html#email=verified'); }, 600);
+          }catch{
+            location.replace('/suscripciones.html#email=verified');
+          }
+        })();
+      </script>`;
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    return res.end(html);
+  }catch(e){
+    console.error('verifyEmail error', e?.message||e);
+    res.status(500).end('Error verificando el correo.');
+  }
 }
 
-// Mantengo esta por si quieres usarla en otros contextos
 function invalidOrExpiredHtml(res, email){
   res.setHeader('Content-Type','text/html; charset=utf-8');
   return res.end(`<!doctype html><meta charset="utf-8">
@@ -625,52 +767,6 @@ function invalidOrExpiredHtml(res, email){
       <button onclick="(async()=>{const r=await fetch('/api/resend-verification',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('em').value})});const d=await r.json();alert(d.message||'Listo');})()">Reenviar verificación</button>
     </div>
   </div>`);
-}
-
-// *** NUEVA verifyEmail: siempre muestra éxito y, si podemos identificar al cliente, lo marcamos verificado y creamos sesión ***
-async function verifyEmail(req, res){
-  try{
-    const url = new URL(req.url, 'http://x');
-    const body = getBody(req) || {};
-    const token = (url.searchParams.get('token') || url.searchParams.get('t') || body.token || '').trim();
-    let email   = normalizeEmail(url.searchParams.get('email') || url.searchParams.get('e') || body.email || '');
-
-    const stripe = getStripe();
-    let customer = null;
-
-    // Intento por email primero
-    if (email) {
-      try{
-        const found = await stripe.customers.search({ query: `email:'${escapeStripeQueryValue(email)}'`, limit:1 });
-        customer = found.data[0] || null;
-      }catch(e){ console.error('search by email failed', e?.message||e); }
-    }
-    // Si no, intento por token
-    if (!customer && token) {
-      customer = await findCustomerByVerifyToken(stripe, token);
-      if (customer && !email) email = normalizeEmail(customer.email || '');
-    }
-
-    if (customer) {
-      const meta = customer.metadata || {};
-      if (meta.taply_email_verified !== '1') {
-        try{
-          await stripe.customers.update(customer.id, { metadata: { ...meta, taply_email_verified:'1', taply_email_token:'', taply_email_exp:'' }});
-        }catch(e){ console.error('mark verified failed', e?.message||e); }
-      }
-      // Creamos sesión si tenemos email
-      if (email) setSession(res, { email, name: customer.name || null, customerId: customer.id });
-    } else {
-      // No encontramos cliente: registramos aviso y devolvemos éxito igualmente (UX sin bloqueos)
-      console.warn('verifyEmail: no customer found for click', { email, tokenPresent: !!token });
-    }
-
-    return verifiedHtml(res);
-  }catch(e){
-    console.error('verifyEmail error', e?.message||e);
-    // Incluso ante error, devolvemos éxito visual (para no mostrar "enlace inválido")
-    return verifiedHtml(res);
-  }
 }
 
 /* ===== Reenviar verificación ===== */
@@ -700,6 +796,7 @@ async function resendVerification(req, res){
     return res.status(500).json({ error:'server_error', message:'No pudimos reenviar el correo de verificación.' });
   }
 }
+
 /* ===== Portal + Subscriptions + Checkout ===== */
 async function getUpcomingPhaseInfo(stripe, sub){
   try{
@@ -802,7 +899,7 @@ async function subscriptionSwap(req, res){
   }
 }
 
-/* ========== Suscripción y NFC ========== */
+/* ========== CAMBIO: Suscripción pide SIEMPRE teléfono ========== */
 async function createCheckoutSession(req, res){
   const { tier, frequency } = getBody(req);
   if (!tier || !frequency) return res.status(422).json({ error:'validation_error', message:'Faltan parámetros de plan.' });
@@ -829,7 +926,9 @@ async function createCheckoutSession(req, res){
     allow_promotion_codes: true,
     success_url: `${appBase(req)}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url:  `${appBase(req)}/cancelado.html`,
+    // Teléfono SIEMPRE
     phone_number_collection: { enabled: true },
+    // Que Checkout actualice datos del customer si el usuario los edita
     customer_update: { address: 'auto', name: 'auto' },
     customer: customerId,
     subscription_data: { metadata: { type: 'subscription', tier, frequency, app:'taply' } },
@@ -840,6 +939,7 @@ async function createCheckoutSession(req, res){
   return res.status(200).json({ url: session.url });
 }
 
+/* ========== CAMBIO: NFC pide teléfono + ENVÍO OBLIGATORIO ========== */
 async function buyNfc(req, res){
   if (!PRICE_ID_NFC) return res.status(500).json({ error: 'missing_nfc_price_id', message:'Falta configurar el precio NFC.' });
   const sess = getSessionFromCookie(req);
@@ -857,7 +957,11 @@ async function buyNfc(req, res){
     success_url: `${appBase(req)}/exito.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url:  `${appBase(req)}/cancelado.html`,
     allow_promotion_codes: true,
+
+    // Teléfono SIEMPRE
     phone_number_collection: { enabled: true },
+
+    // Dirección de envío OBLIGATORIA (forzamos paso de envío con una opción gratuita)
     shipping_address_collection: { allowed_countries: ['ES'] },
     shipping_options: [{
       shipping_rate_data: {
@@ -870,7 +974,10 @@ async function buyNfc(req, res){
         }
       }
     }],
+
+    // Permite a Checkout escribir shipping/address/name en el customer
     customer_update: { address: 'auto', shipping: 'auto', name: 'auto' },
+
     billing_address_collection: 'auto',
     metadata: { type: 'nfc', qty: String(qty), app:'taply' },
     customer: customerId
@@ -879,17 +986,6 @@ async function buyNfc(req, res){
   return res.status(200).json({ url: session.url });
 }
 
-/* ===== Helpers admin email ===== */
-function getAdminEmailTo(){
-  const cands = [
-    (process.env.EMAIL_NOTIFICATIONS || '').trim(),
-    (process.env.EMAIL_REPLY_TO || '').trim(),
-    (process.env.EMAIL_FROM || '').trim()
-  ].filter(Boolean);
-  const from = (process.env.EMAIL_FROM || '').trim().toLowerCase();
-  const chosen = cands.find(e => e.toLowerCase() !== from) || cands[0] || '';
-  return chosen ? parseAddress(chosen).email : '';
-}
 /* ===== Post-pago ===== */
 async function postPago(req, res){
   const stripe = getStripe();
@@ -907,34 +1003,30 @@ async function postPago(req, res){
         expand: ['line_items.data.price','customer','customer_details','payment_intent']
       });
 
+      // Solo enviamos correo si el pago está completado
       const isPaid = cs?.payment_status === 'paid' || cs?.status === 'complete';
       if (!isPaid) {
         return res.status(202).json({ ok:false, pending:true, message:'La sesión de pago no está completada todavía.' });
       }
 
-      buyerEmail = cs.customer_details?.email
-                || cs.customer_email
-                || (typeof cs.customer !== 'string' ? cs.customer?.email : null)
-                || null;
-
-      buyerPhone = cs.customer_details?.phone
-                || (typeof cs.customer !== 'string' ? cs.customer?.phone : null)
-                || null;
-
+      buyerEmail = cs.customer_details?.email || cs.customer_email || (typeof cs.customer !== 'string' ? cs.customer?.email : null) || null;
+      buyerPhone = cs.customer_details?.phone || (typeof cs.customer !== 'string' ? cs.customer?.phone : null) || null;
       customerId = typeof cs.customer === 'string' ? cs.customer : cs.customer?.id || null;
 
       const li = cs.line_items?.data || [];
       lineSummary = li.map(i => `${i.quantity} × ${i.description || i.price?.nickname || i.price?.id}`).join(', ');
       amountText = (cs.amount_total!=null && cs.currency) ? `${(cs.amount_total/100).toFixed(2)} ${cs.currency.toUpperCase()}` : '';
 
+      // Si es NFC, sumar unidades al customer y persistir shipping y phone si existen
       if (cs.mode === 'payment' && PRICE_ID_NFC && customerId) {
         const addQty = li.reduce((acc, it) => acc + ((it.price?.id === PRICE_ID_NFC) ? (it.quantity || 0) : 0), 0);
 
+        // Shipping puede venir en el PaymentIntent
         const pi = typeof cs.payment_intent === 'string'
           ? await stripe.paymentIntents.retrieve(cs.payment_intent)
           : cs.payment_intent;
 
-        const shipping = pi?.shipping || null;
+        const shipping = pi?.shipping || null; // {name, phone, address}
         try{
           const updates = {};
           if (buyerPhone || shipping?.phone) updates.phone = buyerPhone || shipping?.phone;
@@ -1003,6 +1095,7 @@ async function postPago(req, res){
         if(!ok){ await sendEmail({ to: buyerEmail, subject: 'Pedido recibido — Taply', html: `<h2>¡Gracias!</h2><p>Hemos recibido tu pedido NFC.</p>` }); }
       }
 
+      // Marca idempotencia
       try{
         if (piId) {
           const pi = await stripe.paymentIntents.retrieve(piId);
@@ -1025,8 +1118,7 @@ async function postPago(req, res){
     }
   }
 
-  const adminTo = getAdminEmailTo();
-  if(adminTo){
+  if(process.env.EMAIL_FROM){
     const subjAdm = 'Nueva compra recibida';
     const htmlAdm = `
       <p>Compra recibida (${type || cs?.mode || 'checkout'}).</p>
@@ -1036,13 +1128,12 @@ async function postPago(req, res){
       ${amountText ? `<p>Importe: ${amountText}</p>` : ''}
       ${sessionId ? `<p>Checkout Session: ${sessionId}</p>` : ''}
     `;
-    await sendEmail({ to: adminTo, subject: subjAdm, html: htmlAdm });
+    await sendEmail({ to: parseAddress(process.env.EMAIL_FROM).email, subject: subjAdm, html: htmlAdm });
   }
 
   return res.status(200).json({ ok:true, notified: !!buyerEmail, idempotencyMarked });
 }
 
-/* ===== Guardar customer tras checkout ===== */
 async function storeCustomerFromSession(req, res){
   const { session_id } = getBody(req);
   if(!session_id) return res.status(422).json({ error:'validation_error', message:'Falta session_id.' });
@@ -1177,7 +1268,7 @@ export default async function handler(req, res){
 
       // ---- Self test de email (opcional) ----
       if (route === 'email-self-test') {
-        const to = getBody(req).to || parseAddress(process.env.EMAIL_NOTIFICATIONS || process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM || '').email;
+        const to = getBody(req).to || parseAddress(process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM || '').email;
         const ok = await sendEmail({ to, subject: 'Ping Taply', html: '<p>Funciona ✅</p>' });
         return res.status(ok ? 200 : 500).json({ ok });
       }
