@@ -829,7 +829,7 @@ async function createPortalSession(req, res){
 
   try{
     const portal = await stripe.billingPortal.sessions.create({
-      customer: customerId, return_url: appBase(req) + '/gestionar.html'
+      customer: customerId, return_url: appBase(req) + '/suscripciones.html'
     });
     return res.status(200).json({ url: portal.url });
   }catch(e){
