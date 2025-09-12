@@ -332,7 +332,7 @@ function makeNfcEmailUI({name, qty, trackingUrl}){
     title,
     preheader: `Hemos recibido tu pedido de ${qty} NFC.`,
     lead,
-    blocks: [`Unidades NFC: <strong>${qty}</strong>`, 'Te contactaremos por WhatsApp muy pronto para empezar a tener contacto.'],
+    blocks: [`Unidades NFC: <strong>${qty}</strong>`, 'Te escribiremos por WhatsApp muy pronto para empezar a tener contacto.'],
     cta: trackingUrl ? 'Ver estado' : null,
     ctaUrl: trackingUrl || null
   });
